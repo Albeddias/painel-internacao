@@ -2203,9 +2203,10 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     });
     document.getElementById('printBtn').addEventListener('click', () => {
         const activeBeds = state.beds.map((b,i) => ({b,i})).filter(item => !item.b.isArchived);
-        const originalStates = activeBeds.map(item => ({ 
-            min: item.b.isMinimized, tmin: item.b.isTrackerMinimized, 
-            nmin: item.b.isNotesMinimized, cmin: item.b.isCondutaMinimized 
+        const originalStates = activeBeds.map(item => ({
+            min: item.b.isMinimized, tmin: item.b.isTrackerMinimized,
+            nmin: item.b.isNotesMinimized, cmin: item.b.isCondutaMinimized,
+            pmin: item.b.isProblemsMinimized, amin: item.b.isAnamneseMinimized
         }));
         activeBeds.forEach(item => {
             item.b.isMinimized = false;
@@ -2230,6 +2231,8 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             item.b.isTrackerMinimized = originalStates[idx].tmin;
             item.b.isNotesMinimized = originalStates[idx].nmin;
             item.b.isCondutaMinimized = originalStates[idx].cmin;
+            item.b.isProblemsMinimized = originalStates[idx].pmin;
+            item.b.isAnamneseMinimized = originalStates[idx].amin;
         });
         currentPatientIndex = null;
         showScreen('list');
