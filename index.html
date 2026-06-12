@@ -579,9 +579,11 @@
   </template>
 
 
+  <script src="painel-core.js"></script>
   <script>
     // Nova chave de storage
-    const STORAGE_KEY = 'wardBookData_v14_tasks'; // v11 -> v14 (erro meu)
+    const STORAGE_KEY = 'wardBookData_v16';
+    const OLD_STORAGE_KEY = 'wardBookData_v14_tasks';
 
     // --- Variáveis de Estado Global ---
     const globalNotesTemplate = "S: (Subjetivo)\n\nO: (Objetivo)\n- SSVV:\n- Exame:\n- Labs:\n- Imagem:\n\nA: (Avaliação)\n\nP: (Plano)\n";
@@ -928,35 +930,18 @@
       }
     }
     
-      function loadData() {
-      const defaultState = {
-        beds: [], lastReset: todayISO(),
-        commonCondutas: ['Manter ATB', 'Solicitar Labs (Rotina)', 'Aguardar resultado de cultura', 'Monitorar SSVV', 'Dieta livre'],
-        commonExtDocs: [], 
-        notesTemplate: globalNotesTemplate,
-        generalTasks: [] ,
-        generalExams: [],
-        pinnedExams: ['Hb', 'Ht', 'Leucócitos', 'Plaquetas', 'Cr', 'Ur', 'Na', 'K', 'PCR', 'Glicemia']
-      };
+    function loadData() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return defaultState;
-        const parsed = JSON.parse(raw);
-        const mergedState = { ...defaultState, ...parsed };
-        mergedState.beds = mergedState.beds.map(b => ({
-          isVisited: false, reminderDate: '', trackers: [], 
-          isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-         isArchived: b.isArchived || false, 
-	exams: b.exams || [],
-	isExamsMinimized: b.isExamsMinimized !== undefined ? b.isExamsMinimized : true,
-	dischargeForecast: b.dischargeForecast || '',
-          ...b
-        }));
-        mergedState.generalTasks = mergedState.generalTasks || []; // NOVO
-       mergedState.generalExams = mergedState.generalExams || defaultState.generalExams;
-        mergedState.pinnedExams = mergedState.pinnedExams || defaultState.pinnedExams;
-        return mergedState;
-      } catch (e) { return defaultState; }
+        let raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          // migração automática a partir da versão antiga (mesmo navegador)
+          raw = localStorage.getItem(OLD_STORAGE_KEY);
+          if (!raw) return PainelCore.defaultState(todayISO());
+        }
+        const migrated = PainelCore.migrateState(JSON.parse(raw), todayISO());
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        return migrated;
+      } catch (e) { return PainelCore.defaultState(todayISO()); }
     }
     function saveData(s) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
@@ -2125,16 +2110,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     function handleAddNewBed() {
       const v = newBedNumberInput.value.trim();
       if (!v) return;
-      const bedObj = {
-        bedNumber: v, patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '',
-        checks: { ev: false, p: false, ex: false, tev: false },
-        condutas: [], externalDoctor: { active: false, name: '' },
-        isVisited: false, reminderDate: '', trackers: [], 
-        isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-        isArchived: false,
-	exams: [], isExamsMinimized: true,
-	dischargeForecast: ''
-      };
+      const bedObj = PainelCore.migrateBed({ bedNumber: v });
       state.beds.push(bedObj);
       saveData(state);
       renderScreenA();
@@ -2346,19 +2322,8 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
           const newState = JSON.parse(event.target.result);
           if (!newState || typeof newState !== 'object' || !Array.isArray(newState.beds)) throw new Error("Formato inválido.");
           showConfirm("Isso substituirá TODOS os dados atuais. Continuar?", () => {
-            const defaultState = loadData();
-            state.commonCondutas = newState.commonCondutas || defaultState.commonCondutas;
-            state.commonExtDocs = newState.commonExtDocs || defaultState.commonExtDocs; 
-            state.notesTemplate = newState.notesTemplate || defaultState.notesTemplate;
-            state.generalTasks = newState.generalTasks || defaultState.generalTasks; // NOVO
-            state.beds = newState.beds.map(b => ({ 
-                isVisited: false, reminderDate: '', trackers: [], 
-                isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-                isArchived: b.isArchived || false,
-                dischargeForecast: b.dischargeForecast || '',
-                ...b
-            }));
-            state.lastReset = newState.lastReset || todayISO();
+            const migrated = PainelCore.migrateState(newState, todayISO());
+            state = migrated;
             saveData(state);
             renderScreenA();
           }, "Importar Backup?", 'bg-green-600', 'Importar');
@@ -2369,24 +2334,6 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     });
 
     // --- Renderização Inicial ---
-    
-    function getPastDate(daysAgo) {
-        const d = new Date(); d.setDate(d.getDate() - daysAgo);
-        return d.toISOString().split('T')[0];
-    }
-    if (state.beds.length === 0) {
-      state.beds = [
-        { bedNumber: '1012-A', patientName: 'Mariana Silva Dias', age: 32, admitDate: getPastDate(5), diagnoses: ['Pneumonia Comunitária', 'Insuficiência Respiratória'], hpp: 'HAS / DM2', notes: 'Evolução estável.\nLab: Hb 12.1, PCR 3.2\nExame físico: FC 70, PA 120x80, SpO2 98% em ar ambiente.\nEstertores crepitantes em base direita.', checks: { ev: true, p: true, ex: true, tev: true }, condutas: [{ text: 'Manter ATB (Ceftriaxona)', done: true }, { text: 'Aguardar resultado de cultura', done: false }], externalDoctor: { active: false, name: '' }, isVisited: true, reminderDate: '', trackers: [{id: 'abc', type: 'atb', name: 'Ceftriaxona', startDate: getPastDate(5), duration: 7}], isDxMinimized: false, isTrackerMinimized: false, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false },
-        { bedNumber: '1014-B', patientName: 'Carlos Andrade', age: 58, admitDate: getPastDate(2), diagnoses: ['Infarto Agudo do Miocárdio'], hpp: 'Tabagista', notes: 'Pós-cateterismo (Stent em DA)\nDor torácica resolvida\nCKMB e Troponina em queda', checks: { ev: true, p: false, ex: false, tev: true }, condutas: [{ text: 'Manter dupla antiagregação', done: true }], externalDoctor: { active: true, name: 'Dra. Beatriz (Cardio)' }, isVisited: false, reminderDate: getPastDate(-1), trackers: [], isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false },
-        { bedNumber: '1015-A', patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '', checks: { ev: false, p: false, ex: false, tev: false }, condutas: [], externalDoctor: { active: false, name: '' }, isVisited: false, reminderDate: '', trackers: [], isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false }
-      ];
-      state.lastReset = todayISO();
-      state.commonExtDocs = ['Dra. Beatriz (Cardio)'];
-      state.generalTasks = [{id: 'xyz', text: 'Ligar para Dr. João (Cardio)', done: false}];
-      saveData(state);
-    }
-
-    // Chama a renderização inicial
     ensureDailyReset();
     renderScreenA();
   </script>
