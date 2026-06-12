@@ -64,6 +64,13 @@ Segurança: RLS habilitado, acesso restrito ao usuário autenticado (conta únic
 5. **Sync**: botões Enviar/Receber, indicador de última sincronização, login Supabase via supabase-js (CDN).
 6. Push remove o nome completo (envia iniciais); pull traz edições feitas pela IA.
 
+## Alta, arquivamento, reinternação e troca de leito
+
+- A identidade do paciente é o `id` (uuid); **o leito é só um atributo** (`bed_number`). Trocar de leito = editar o número na tela do paciente, como hoje; nada se perde porque todos os dados são amarrados ao `id`.
+- **"Dar Alta" deixa de apagar dados** (comportamento atual do app): passa a marcar `status = alta`, liberar o leito e preservar o registro completo (problemas, anamnese, textos crus, documentos gerados) no banco e na lista de arquivados.
+- **Reinternação** = restaurar da lista de arquivados (mesmo gesto de hoje): `status` volta a "internado", todo o histórico retorna ao app e o usuário/IA atualiza o que mudou (nova anamnese, novos problemas).
+- Nome completo dos arquivados existe apenas no aparelho; o backup JSON (export/import) é o mecanismo de recuperação ao trocar de dispositivo.
+
 ## Fluxos de IA
 
 1. **Texto cru → base**: usuário cola evolução do prontuário (no app ou direto no chat) → IA interpreta e preenche `problems`, `antibiotics`, `condutas`, `anamnese_inicial` etc. no banco, e arquiva o texto em `raw_texts` → usuário dá "Receber" no app.
