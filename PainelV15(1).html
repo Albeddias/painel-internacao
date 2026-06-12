@@ -1,0 +1,2394 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1, user-scalable=no" />
+  <title>Caderno de Visitas | v11 Tarefas</title>
+  <meta name="description" content="Painel mobile-first para gerenciar visitas médicas diárias." />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Carrega o Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Carrega a fonte Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Define a fonte Inter como padrão */
+    body {
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      /* Impede o "puxar para atualizar" no mobile */
+      overscroll-behavior-y: contain;
+    }
+    .screen {
+      display: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .screen.active {
+      display: block;
+    }
+    
+    .hidden { display: none; }
+    
+    .sort-btn.active {
+      background-color: #0ea5e9;
+      color: white;
+      border-color: #0ea5e9;
+    }
+    .reminder-active {
+      border-left-width: 4px;
+      border-left-color: #3b82f6;
+    }
+    .reminder-list-active {
+      background-color: #eff6ff; /* bg-blue-50 */
+    }
+    .reminder-btn.active svg { color: #3b82f6; }
+    
+    #trackerModal .tracker-step { display: none; }
+    #trackerModal .tracker-step.active { display: block; }
+    #trackerModal .tracker-form { display: none; }
+    #trackerModal .tracker-form.active { display: block; }
+
+    /* Aumenta a área de toque de inputs */
+    input[type="text"], input[type="date"], input[type="number"], textarea {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+        min-height: 48px; /* Área de toque maior */
+    }
+    
+    /* Remove setas de input[number] */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+    
+    .doc-tag {
+      padding: 2px 8px;
+      font-size: 0.75rem; /* 12px */
+      line-height: 1rem; /* 16px */
+      font-weight: 500;
+      border-radius: 9999px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      max-width: 100px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+  <!-- =================================================================== -->
+  <!-- TELA A: LISTA DE LEITOS (HOME)                                      -->
+  <!-- =================================================================== -->
+  <div id="screen-list" class="screen active">
+    <!-- CABEÇALHO FIXO (TELA A) -->
+    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
+      <div class="container mx-auto max-w-7xl">
+        <!-- Linha 1: Título e Ações Principais -->
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold text-slate-900">Caderno <span class="text-sky-600">v11</span></h1>
+            <div id="progressCounter" class="text-sm font-medium text-slate-600">
+              <!-- JS: T: 8 | V: 2 | P: 6 | E: 0 -->
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <!-- Botão de Exportar (Seta Cima Azul) -->
+            <button id="exportDataBtn" class="p-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 transition-all print:hidden" title="Exportar Backup">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 15.25a.75.75 0 00-1.5 0v-8.614L6.295 9.765a.75.75 0 10-1.09-1.03l4.25-4.5a.75.75 0 001.09 0l4.25 4.5a.75.75 0 00-1.09 1.03l-2.955-3.129v8.614Z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
+            </button>
+            <!-- Botão de Importar (Seta Baixo Verde) -->
+            <label class="p-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-all cursor-pointer print:hidden" title="Importar Backup">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 00-1.5 0v8.614L6.295 10.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V4.75Z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
+              <input type="file" id="importDataInput" class="hidden" accept=".json">
+            </label>
+            <!-- NOVO: Botão de Tarefas (Roxo) -->
+            <button id="openTasksBtn" class="p-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-all" title="Tarefas do Dia">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 3a.75.75 0 01.75.75v.008l.004.004.008.003.012.003h.004a.75.75 0 010 1.5H6.75a.75.75 0 010-1.5h.004l.012-.003.008-.003.004-.004V3.75A.75.75 0 0110 3zM8.5 6.75A.75.75 0 019.25 6h.008l.004.004.008.003.012.003h.004a.75.75 0 010 1.5H5.25a.75.75 0 010-1.5h.004l.012-.003.008-.003.004-.004H8.5V6.75zM12.25 9a.75.75 0 000 1.5h.004l.012.003.008.003.004.004.001.001v.008a.75.75 0 001.5 0v-.008l-.001-.001-.004-.004-.008-.003-.012-.003h-.004a.75.75 0 00-.75-.75h-.008zM14 12.75a.75.75 0 01.75-.75h.008l.004.004.008.003.012.003h.004a.75.75 0 010 1.5h-.004l-.012-.003-.008-.003-.004-.004H14V12.75z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2H4zm0 1.5h12a.5.5 0 01.5.5v12a.5.5 0 01-.5.5H4a.5.5 0 01-.5-.5V4a.5.5 0 01.5-.5z" clip-rule="evenodd" /></svg>
+            </button>
+            <button id="addBedBtn" class="p-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 transition-all" title="Adicionar Leito">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" /></svg>
+            </button>
+          </div>
+        </div>
+        <!-- Linha 2: Filtros e Controles -->
+        <div class="flex gap-2 items-center mt-3">
+          <div class="flex-1 relative">
+            <input id="searchInput" type="search" placeholder="Buscar..." class="w-full text-sm border border-slate-300 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 absolute left-2 top-2.5 text-slate-400"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+          </div>
+          <button id="toggleFiltersBtn" class="p-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-all" title="Filtros e Ações">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 0 1 .628.74v2.288a2.25 2.25 0 0 1-.659 1.59l-4.682 4.683a2.25 2.25 0 0 0-.659 1.59v3.033c0 .676-.43 1.258-1.025 1.498l-1.975.79a.75.75 0 0 1-.975-.743V12.493a2.25 2.25 0 0 0-.659-1.59L4.682 6.22A2.25 2.25 0 0 1 4.024 4.63V2.34a.75.75 0 0 1 .604-.74ZM10 4.5a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 4.5Zm0 3a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 7.5Zm0 3a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 10.5Z" clip-rule="evenodd" /></svg>
+          </button>
+        </div>
+        <!-- Linha 3: Painel de Filtros Oculto -->
+        <div id="filtersPanel" class="hidden pt-3 space-y-3">
+          <!-- Ocultar Concluídos -->
+          <div id="filter-hide-completed" class="flex items-center justify-between bg-slate-100 p-2 rounded-lg">
+            <label for="hideCompletedBtn" class="text-sm font-medium text-slate-700 cursor-pointer">Ocultar (Concluídos, Vazios, Externos)</label>
+            <button type="button" id="hideCompletedBtn" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-600 focus:ring-offset-2" role="switch" aria-checked="false">
+              <span aria-hidden="true" class="translate-x-0 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+            </button>
+          </div>
+          <!-- Ordenar por -->
+          <div id="filter-sort" class="flex flex-wrap gap-2">
+            <span class="text-sm font-medium text-slate-700 flex items-center">Ordenar:</span>
+            <button class="sort-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-1 px-3 hover:bg-slate-50 transition-all active" data-sort-key="bedNumber">Leito</button>
+            <button class="sort-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-1 px-3 hover:bg-slate-50 transition-all" data-sort-key="admitDate">Admissão</button>
+            <button class="sort-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-1 px-3 hover:bg-slate-50 transition-all" data-sort-key="patientName">Nome (A-Z)</button>
+          </div>
+          <!-- Ações -->
+          <div id="filter-actions" class="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+            <button id="resetChecksBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Resetar dia</button>
+            <button id="printBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all print:hidden">Imprimir</button>
+            <button id="viewArchiveBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Ver Arquivados</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- LISTA DE LEITOS (TELA A) -->
+    <main id="bedsListArea" class="container mx-auto max-w-7xl p-3 space-y-2" style="padding-top: 120px;">
+      <!-- Cards da Lista são renderizados aqui pelo JS -->
+    </main>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- TELA B: DETALHES DO PACIENTE                                        -->
+  <!-- =================================================================== -->
+  <div id="screen-details" class="screen hidden">
+    <!-- CABEÇALHO FIXO (TELA B) -->
+    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
+      <div class="container mx-auto max-w-7xl flex justify-between items-center">
+        <button id="backToListBtn" class="flex items-center gap-1 text-sky-600 font-medium rounded-lg py-1 pr-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
+          Voltar
+        </button>
+        <div id="patient-header-info" class="text-right">
+          <div id="patient-header-bed" class="patient-header-bed font-bold text-slate-800 text-lg"></div>
+          <div id="patient-header-name" class="patient-header-name text-slate-600 text-sm"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTEÚDO DO PACIENTE (TELA B) -->
+    <main id="patientDetailContent" class="container mx-auto max-w-7xl p-3" style="padding-top: 80px; padding-bottom: 100px;">
+      <!-- O Card de Detalhes é renderizado aqui pelo JS -->
+    </main>
+
+    <!-- RODAPÉ FIXO (TELA B) -->
+    <footer class="bg-white border-t border-slate-200 p-3 fixed bottom-0 left-0 right-0 z-20">
+      <div class="container mx-auto max-w-7xl flex justify-between items-center gap-2">
+        <!-- Navegação -->
+        <button id="prevPatientBtn" class="nav-btn p-3 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all" title="Paciente Anterior">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
+        </button>
+        
+        <!-- Ações Rápidas -->
+        <button id="footerActionConduta" class="flex-1 text-sm bg-sky-600 text-white font-medium rounded-lg py-3 px-4 hover:bg-sky-700 transition-all">
+          + Conduta
+        </button>
+        <button id="footerActionNote" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-4 hover:bg-slate-50 transition-all">
+          + Nota
+        </button>
+        <button id="footerActionTracker" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-4 hover:bg-slate-50 transition-all">
+          + Controle
+        </button>
+
+        <!-- Navegação -->
+        <button id="nextPatientBtn" class="nav-btn p-3 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all" title="Próximo Paciente">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1.02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>
+        </button>
+      </div>
+    </footer>
+  </div>
+  
+  <!-- =================================================================== -->
+  <!-- TELA C: TAREFAS GERAIS (NOVO)                                       -->
+  <!-- =================================================================== -->
+  <div id="screen-tasks" class="screen hidden">
+    <!-- CABEÇALHO FIXO (TELA C) -->
+    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
+      <div class="container mx-auto max-w-7xl flex justify-between items-center">
+        <button id="backToListFromTasksBtn" class="flex items-center gap-1 text-sky-600 font-medium rounded-lg py-1 pr-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
+          Voltar
+        </button>
+        <div class="text-right">
+          <h2 class="font-bold text-slate-800 text-lg">Tarefas do Dia</h2>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTEÚDO (TELA C) -->
+    <main id="tasksListArea" class="container mx-auto max-w-7xl p-3 space-y-2" style="padding-top: 80px; padding-bottom: 100px;">
+      <!-- Tarefas são renderizadas aqui pelo JS -->
+    </main>
+
+    <!-- RODAPÉ FIXO (TELA C) -->
+    <footer class="bg-white border-t border-slate-200 p-3 fixed bottom-0 left-0 right-0 z-20">
+      <div class="container mx-auto max-w-7xl flex gap-2 w-full">
+        <input id="newTaskInput" class="text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nova tarefa...">
+        <button id="addNewTaskBtn" class="text-sm bg-sky-600 text-white font-medium rounded-lg py-3 px-4 hover:bg-sky-700 transition-all">Add</button>
+      </div>
+    </footer>
+  </div>
+
+  
+  <!-- =================================================================== -->
+  <!-- MODAIS (Usados por todas as telas)                                  -->
+  <!-- =================================================================== -->
+
+  <!-- === MODAL DE ADICIONAR LEITO === -->
+  <div id="addBedModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 class="text-lg font-bold text-slate-900">Adicionar Novo Leito</h3>
+      <p class="text-sm text-slate-600 mt-1">Insira o número ou identificador do leito.</p>
+      <input id="newBedNumberInput" type="text" placeholder="Ex: 1012-A" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <div class="flex gap-3 mt-5">
+        <button id="cancelAddBedBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
+        <button id="saveAddBedBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- === MODAL DE CONFIRMAÇÃO === -->
+  <div id="confirmModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 id="confirmModalTitle" class="text-lg font-bold text-slate-900">Ação Irreversível</h3>
+      <p id="confirmModalMessage" class="text-sm text-slate-600 mt-1">Você tem certeza que deseja continuar?</p>
+      <div class="flex gap-3 mt-5">
+        <button id="confirmCancelBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
+        <button id="confirmActionBtn" class="w-full bg-red-600 text-white font-medium rounded-lg py-3 hover:bg-red-700 transition-all">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- === MODAL DE LEMBRETE === -->
+  <div id="reminderModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 class="text-lg font-bold text-slate-900">Definir Lembrete</h3>
+      <input id="reminderDateInput" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <div class="flex gap-3 mt-5">
+        <button id="clearReminderBtn" class="w-full bg-red-100 text-red-700 font-medium rounded-lg py-3 hover:bg-red-200 transition-all">Limpar</button>
+        <button id="saveReminderBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+      </div>
+      <button id="cancelReminderBtn" class="w-full text-sm text-slate-600 mt-3 text-center hover:text-slate-800">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- === MODAL DE CONTROLE (TRACKER) === -->
+  <div id="trackerModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      
+      <!-- Passo 1: Escolher Tipo (Apenas Adicionar) -->
+      <div id="tracker-step-1" class="tracker-step active">
+        <h3 class="text-lg font-bold text-slate-900">Adicionar Controle</h3>
+        <p class="text-sm text-slate-600 mt-1">O que você deseja adicionar?</p>
+        <div class="grid grid-cols-1 gap-3 mt-4">
+          <button data-type="atb" class="tracker-type-btn w-full text-left bg-sky-50 hover:bg-sky-100 text-sky-800 font-medium rounded-lg p-4 transition-all">Antibiótico</button>
+          <button data-type="culture" class="tracker-type-btn w-full text-left bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium rounded-lg p-4 transition-all">Cultura</button>
+          <button data-type="device" class="tracker-type-btn w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-800 font-medium rounded-lg p-4 transition-all">Dispositivo / Procedimento</button>
+        </div>
+      </div>
+
+      <!-- Passo 2: Formulários (Adicionar ou Editar) -->
+      <div id="tracker-step-2" class="tracker-step">
+        <h3 id="tracker-form-title" class="text-lg font-bold text-slate-900">Novo Antibiótico</h3>
+        
+        <div id="tracker-form-atb" class="tracker-form active space-y-3 mt-4">
+          <div>
+            <label class="text-sm font-medium text-slate-700">Nome do Antibiótico</label>
+            <input id="tracker-atb-name" type="text" placeholder="Ex: Piperacilina" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm font-medium text-slate-700">Data D1</label>
+              <input id="tracker-atb-start" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-slate-700">Duração (dias)</label>
+              <input id="tracker-atb-duration" type="number" placeholder="Ex: 7" min="1" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+          </div>
+        </div>
+        
+        <div id="tracker-form-culture" class="tracker-form space-y-3 mt-4">
+          <div>
+            <label class="text-sm font-medium text-slate-700">Tipo de Cultura</label>
+            <input id="tracker-culture-name" type="text" placeholder="Ex: Hemocultura" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div>
+            <label class="text-sm font-medium text-slate-700">Data da Coleta</label>
+            <input id="tracker-culture-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div>
+            <label class="text-sm font-medium text-slate-700">Resultado</label>
+            <input id="tracker-culture-result" type="text" placeholder="Ex: Aguardando" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+        
+        <div id="tracker-form-device" class="tracker-form space-y-3 mt-4">
+          <div>
+            <label class="text-sm font-medium text-slate-700">Nome do Dispositivo</label>
+            <input id="tracker-device-name" type="text" placeholder="Ex: CVC Subclávia D" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div>
+            <label class="text-sm font-medium text-slate-700">Data da Instalação</label>
+            <input id="tracker-device-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+        
+        <div class="flex gap-3 mt-5">
+          <button id="trackerBackBtn" class="w-1/3 bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Voltar</e>
+          <button id="saveTrackerBtn" class="w-2/3 bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+        </div>
+      </div>
+
+      <button id="cancelTrackerBtn" class="w-full text-sm text-slate-600 mt-3 text-center hover:text-slate-800">Cancelar</button>
+    </div>
+  </div>
+
+ <!-- === MODAL DE EXAME DE IMAGEM === -->
+  <div id="imageExamModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 id="imageExamModalTitle" class="text-lg font-bold text-slate-900">Adicionar Exame de Imagem</h3>
+      <div class="space-y-3 mt-4">
+        <div>
+          <label class="text-sm font-medium text-slate-700">Data do Exame</label>
+          <input id="image-exam-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-slate-700">Nome do Exame</label>
+          <input id="image-exam-name" type="text" placeholder="Ex: TC Tórax" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-slate-700">Resumo / Laudo</label>
+          <textarea id="image-exam-summary" placeholder="Resumo dos achados..." class="w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button id="cancelImageExamBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
+        <button id="saveImageExamBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- TEMPLATES (Usados pelo JS)                                          -->
+  <!-- =================================================================== -->
+
+  <!-- === TEMPLATE DO CARD DA LISTA (TELA A) === -->
+  <template id="patientListTpl">
+    <div class="list-card bg-white rounded-xl shadow-lg border border-slate-200/50 p-3 transition-all">
+      <div class="flex justify-between items-start">
+        <!-- Lado Esquerdo: Visita, Leito, Nome -->
+        <div class="flex-1 flex gap-3 items-center min-w-0">
+          <div class="visit-check-circle flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer">
+            <!-- JS: ✓ -->
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="bed-id font-bold text-xl text-slate-800"></span>
+              <span class="reminder-tag hidden text-blue-500" title="Lembrete ativo!">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8 2a5 5 0 0 0-5 5c0 1.57-.378 3.054-1.048 4.36A.75.75 0 0 0 2.5 12.5h11a.75.75 0 0 0 .548-1.14C13.378 10.055 13 8.57 13 7a5 5 0 0 0-5-5Zm-2.375 11.25a.75.75 0 0 1 .75-.75h3.25a.75.75 0 0 1 0 1.5h-3.25a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" /></svg>
+              </span>
+              <span class="ext-tag doc-tag hidden" title=""></span>
+            </div>
+            <div class="bed-name text-sm text-slate-600 truncate"></div>
+          </div>
+        </div>
+        <!-- Lado Direito: LOS + Previsão de Alta -->
+        <div class="flex-shrink-0 ml-2 flex flex-col items-end gap-1">
+          <span class="inline-los font-medium text-sky-700 bg-sky-100 rounded-full px-2 py-0.5 text-xs">D-</span>
+          <span class="discharge-tag hidden rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap"></span>
+        </div>
+      </div>
+      <!-- Linha de Baixo: Checks -->
+      <div class="checks flex gap-1.5 justify-end mt-3">
+        <!-- JS: 4 checks renderizados aqui -->
+      </div>
+    </div>
+  </template>
+
+  <!-- === TEMPLATE DO LEITO ARQUIVADO (TELA A) === -->
+  <template id="archivedBedTpl">
+    <div class="list-card bg-white rounded-xl shadow-lg border border-slate-200/50 p-3 transition-all">
+        <div class="flex justify-between items-center">
+            <div>
+                <div class="bed-id font-bold text-xl text-slate-800"></div>
+                <div class="bed-name text-sm text-slate-600 truncate"></div>
+            </div>
+            <div class="flex gap-2">
+                <button class="restore-bed-btn text-sm bg-green-100 text-green-800 font-medium rounded-lg py-2 px-3 hover:bg-green-200 transition-all">Restaurar</button>
+                <button class="delete-bed-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
+            </div>
+        </div>
+    </div>
+  </template>
+
+  <!-- === TEMPLATE DA TAREFA (TELA C) === -->
+  <template id="taskItemTpl">
+    <div class="task-item flex gap-2 items-center group bg-white rounded-lg p-3 border border-slate-200">
+        <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+        <input type="text" class="task-text flex-1 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50">
+        <button class="remove-task text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all print:hidden" title="Remover tarefa">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+        </button>
+    </div>
+  </template>
+
+  <!-- === TEMPLATE DE DETALHES DO PACIENTE (TELA B) === -->
+  <template id="patientDetailTpl">
+    <article class="patient-card space-y-4">
+      
+      <!-- Cabeçalho (Nome, Idade, Admissão) -->
+      <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
+        <div class="flex justify-between items-start gap-2">
+          <div class="flex-1 min-w-0">
+            <input class="inline-bed font-bold text-2xl text-slate-900 p-1 -ml-1 rounded-md w-32 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Leito">
+            <input class="inline-name font-medium text-lg text-slate-800 p-1 rounded-md w-full border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Nome completo">
+          </div>
+          <div class="flex-shrink-0 flex gap-2">
+              <button class="reminder-btn text-slate-400 hover:text-blue-500 rounded-lg p-2" title="Definir lembrete">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 0013.484 0 .75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zM8.05 16.09A.75.75 0 018.8 15h2.4a.75.75 0 01.75.75 1.5 1.5 0 01-3 0z" clip-rule="evenodd" /></svg>
+              </button>
+            <button class="discharge-card text-sm bg-amber-100 text-amber-800 font-medium rounded-lg py-2 px-3 hover:bg-amber-200 transition-all">Dar Alta</button>
+            <button class="archive-bed-btn text-sm bg-slate-100 text-slate-800 font-medium rounded-lg py-2 px-3 hover:bg-slate-200 transition-all">Arquivar</button>
+          </div>
+        </div>
+        
+        <div class="patient-meta flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600 mt-3">
+          <div>
+            <span class="font-medium">Idade:</span>
+            <input class="inline-age p-1 rounded-md w-16 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="-" type="number" min="0">
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-medium">Admissão:</span>
+            <input class="inline-admit p-1 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50" type="date">
+          </div>
+        </div>
+
+        <div class="inline-checks checks flex gap-1.5 flex-shrink-0 mt-4">
+          <!-- JS vai renderizar os 4 checks aqui -->
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label class="section-title text-sm font-semibold text-slate-900 mb-1 block">HPP</label>
+            <input class="inline-hpp w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="HAS, DM2...">
+          </div>
+          <div>
+            <label class="section-title text-sm font-semibold text-slate-900 mb-1 block">Médico Externo</label>
+            <div class="flex gap-2 w-full">
+              <input class="inline-ext-name text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nome do médico">
+              <datalist class="common-ext-docs-list"></datalist>
+              <button class="add-ext-doc-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Salvar médico na lista de sugestões">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M15.75 3a.75.75 0 00-.75.75v3.25H5a.75.75 0 000 1.5h10v3.25a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" clip-rule="evenodd" /><path d="M5.151 3.522A.75.75 0 004 4.25v11.5a.75.75 0 001.5 0V4.25a.75.75 0 00-.349-.649zM6.5 15.75v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM8.5 15.75v-3.5a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0zM10.5 15.75v-5.5a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0zM12.5 15.75v-7.5a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0zM14.5 15.75v-9.5a.75.75 0 00-1.5 0v9.5a.75.75 0 001.5 0z" clip-rule="evenodd" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção: Diagnósticos -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Diagnósticos Principais</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <textarea class="input-dx-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Um diagnóstico por linha"></textarea>
+          <div class="small disp-dxcount text-xs text-slate-500 mt-1"></div>
+        </div>
+      </div>
+      
+      <!-- Seção: Controles e Invasivos (Tracker) -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Controles e Invasivos</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="tracker-list space-y-2">
+            <!-- JS: Trackers renderizados aqui -->
+          </div>
+        </div>
+      </div>
+      
+     <!-- Seção: Exames (Laboratoriais e Imagem) -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Exames (Labs e Imagem)</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <!-- O conteúdo desta seção é renderizado pelo JS (renderExamsSection) -->
+        <div class="collapsible-content exams-content-wrapper p-4 pt-0">
+          <!-- JS vai renderizar as abas e o conteúdo aqui -->
+        </div>
+      </div>
+
+      <!-- Seção: Anotações -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Anotações / Sinais / Exames</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <textarea class="input-notes-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Sinais vitais, labs, achados..."></textarea>
+        </div>
+      </div>
+      
+      <!-- Seção: Condutas -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Condutas</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="flex gap-2 w-full mb-3">
+            <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nova conduta">
+            <datalist class="common-condutas-list"></datalist>
+            <button class="add-conduta-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar e Salvar na lista">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M15.75 3a.75.75 0 00-.75.75v3.25H5a.75.75 0 000 1.5h10v3.25a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" clip-rule="evenodd" /><path d="M5.151 3.522A.75.75 0 004 4.25v11.5a.75.75 0 001.5 0V4.25a.75.75 0 00-.349-.649zM6.5 15.75v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM8.5 15.75v-3.5a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0zM10.5 15.75v-5.5a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0zM12.5 15.75v-7.5a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0zM14.5 15.75v-9.5a.75.75 0 00-1.5 0v9.5a.75.75 0 001.5 0z" clip-rule="evenodd" /></svg>
+            </button>
+            <button class="add-conduta-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar">Add</button>
+          </div>
+          <div class="condutas conduta-list space-y-1">
+            <!-- Condutas são renderizadas aqui -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção: Previsão de Alta -->
+      <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
+        <label class="section-title text-sm font-semibold text-slate-900 mb-2 block">Previsão de Alta</label>
+        <div class="flex gap-2 items-center">
+          <input class="inline-discharge-forecast flex-1 text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" type="date">
+          <button class="clear-discharge-forecast-btn text-sm bg-slate-100 text-slate-700 font-medium rounded-lg py-3 px-4 hover:bg-slate-200 transition-all print:hidden">Limpar</button>
+        </div>
+      </div>
+
+    </article>
+  </template>
+
+
+  <script>
+    // Nova chave de storage
+    const STORAGE_KEY = 'wardBookData_v14_tasks'; // v11 -> v14 (erro meu)
+
+    // --- Variáveis de Estado Global ---
+    const globalNotesTemplate = "S: (Subjetivo)\n\nO: (Objetivo)\n- SSVV:\n- Exame:\n- Labs:\n- Imagem:\n\nA: (Avaliação)\n\nP: (Plano)\n";
+    let state = loadData();
+    let currentSortKey = 'bedNumber';
+    let hideCompleted = false;
+    let currentPatientIndex = null; // Índice do paciente na Tela B
+    let renderedBedIndexes = []; // Mapa de [índice de tela] -> [índice de state.beds]
+    let isViewingArchived = false; 
+    
+    // Para Modais
+    let currentTrackerBedIndex = null;
+    let currentEditingTrackerId = null; 
+    let currentTrackerType = null;
+    let currentReminderIndex = null;
+
+    // --- Seletores de DOM ---
+    const screenList = document.getElementById('screen-list');
+    const screenDetails = document.getElementById('screen-details');
+    const screenTasks = document.getElementById('screen-tasks'); // NOVO
+    const bedsListArea = document.getElementById('bedsListArea');
+    const patientDetailContent = document.getElementById('patientDetailContent');
+    const patientHeaderBed = document.getElementById('patient-header-bed');
+    const patientHeaderName = document.getElementById('patient-header-name');
+    const searchInput = document.getElementById('searchInput');
+    const progressCounter = document.getElementById('progressCounter');
+    
+    // Modais
+    const addBedModal = document.getElementById('addBedModal');
+    const newBedNumberInput = document.getElementById('newBedNumberInput');
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmModalTitle = document.getElementById('confirmModalTitle');
+    const confirmModalMessage = document.getElementById('confirmModalMessage');
+    const confirmActionBtn = document.getElementById('confirmActionBtn');
+    const reminderModal = document.getElementById('reminderModal');
+    const reminderDateInput = document.getElementById('reminderDateInput');
+    const trackerModal = document.getElementById('trackerModal');
+    const trackerStep1 = document.getElementById('tracker-step-1');
+    const trackerStep2 = document.getElementById('tracker-step-2');
+    const trackerFormTitle = document.getElementById('tracker-form-title');
+    
+    // Botões de Filtro
+    const viewArchiveBtn = document.getElementById('viewArchiveBtn');
+    const toggleFiltersBtn = document.getElementById('toggleFiltersBtn');
+    const filtersPanel = document.getElementById('filtersPanel');
+    const filterHideCompleted = document.getElementById('filter-hide-completed');
+    const filterSort = document.getElementById('filter-sort');
+    
+    let confirmCallback = null;
+
+    // --- Funções de Navegação de Tela ---
+    function showScreen(screenName) {
+      // Esconde todas as telas
+      screenList.classList.remove('active');
+      screenDetails.classList.remove('active');
+      screenTasks.classList.remove('active');
+
+      if (screenName === 'details') {
+        screenDetails.classList.add('active');
+        window.scrollTo(0, 0);
+      } else if (screenName === 'tasks') { // NOVO
+        screenTasks.classList.add('active');
+        renderScreenC(); // Renderiza a tela de tarefas
+        window.scrollTo(0, 0);
+      } else { // 'list'
+        screenList.classList.add('active');
+        currentPatientIndex = null;
+      }
+    }
+
+    function openPatientDetails(bedIndex) {
+      currentPatientIndex = bedIndex;
+      renderScreenB();
+      showScreen('details');
+    }
+
+    function closePatientDetails() {
+      showScreen('list');
+      renderScreenA(); // Re-renderiza a lista para atualizar os checks
+    }
+
+    // --- Funções Auxiliares de Modal ---
+    function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function hideModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function showConfirm(message, onConfirm, title = "Ação Irreversível", btnClass = 'bg-red-600', btnText = 'Confirmar') {
+      confirmModalTitle.textContent = title;
+      confirmModalMessage.textContent = message;
+      confirmActionBtn.textContent = btnText;
+      confirmActionBtn.className = "w-full text-white font-medium rounded-lg py-3 transition-all";
+      confirmActionBtn.classList.add(btnClass);
+      confirmCallback = onConfirm;
+      showModal('confirmModal');
+    }
+
+    // --- Listeners dos Modais ---
+    document.getElementById('cancelAddBedBtn').addEventListener('click', () => hideModal('addBedModal'));
+    document.getElementById('confirmCancelBtn').addEventListener('click', () => {
+      hideModal('confirmModal');
+      confirmCallback = null;
+    });
+    document.getElementById('confirmActionBtn').addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+      hideModal('confirmModal');
+      confirmCallback = null;
+    });
+    document.getElementById('cancelReminderBtn').addEventListener('click', () => {
+      hideModal('reminderModal');
+      currentReminderIndex = null;
+    });
+    document.getElementById('clearReminderBtn').addEventListener('click', () => {
+      if (currentReminderIndex !== null) {
+        state.beds[currentReminderIndex].reminderDate = '';
+        saveData(state);
+        renderScreenB(); 
+      }
+      hideModal('reminderModal');
+      currentReminderIndex = null;
+    });
+    document.getElementById('saveReminderBtn').addEventListener('click', () => {
+      if (currentReminderIndex !== null) {
+        state.beds[currentReminderIndex].reminderDate = reminderDateInput.value;
+        saveData(state);
+        renderScreenB(); 
+      }
+      hideModal('reminderModal');
+      currentReminderIndex = null;
+    });
+
+    // --- Listeners do Modal de Tracker ---
+    function openTrackerModal(bedIdx, trackerId = null) {
+        resetTrackerModal(); 
+        currentTrackerBedIndex = bedIdx; 
+        const bed = state.beds[bedIdx];
+        if (!bed) return;
+
+        if (trackerId) {
+            // Edição
+            currentEditingTrackerId = trackerId;
+            const tracker = bed.trackers.find(t => t.id === trackerId);
+            if (!tracker) { return; }
+            currentTrackerType = tracker.type;
+            trackerStep1.classList.remove('active'); 
+            trackerStep2.classList.add('active');
+            let formId, title;
+            if (currentTrackerType === 'atb') {
+                formId = 'tracker-form-atb'; title = 'Editar Antibiótico';
+                document.getElementById('tracker-atb-name').value = tracker.name || '';
+                document.getElementById('tracker-atb-start').value = tracker.startDate || '';
+                document.getElementById('tracker-atb-duration').value = tracker.duration || '';
+            } else if (currentTrackerType === 'culture') {
+                formId = 'tracker-form-culture'; title = 'Editar Cultura';
+                document.getElementById('tracker-culture-name').value = tracker.name || '';
+                document.getElementById('tracker-culture-date').value = tracker.collectionDate || '';
+                document.getElementById('tracker-culture-result').value = tracker.result || '';
+            } else {
+                formId = 'tracker-form-device'; title = 'Editar Dispositivo';
+                document.getElementById('tracker-device-name').value = tracker.name || '';
+                document.getElementById('tracker-device-date').value = tracker.installDate || '';
+            }
+            trackerFormTitle.textContent = title;
+            document.getElementById(formId).classList.add('active');
+            document.getElementById('trackerBackBtn').classList.add('hidden'); 
+        } else {
+            // Adição
+            currentEditingTrackerId = null;
+            trackerStep1.classList.add('active'); 
+            trackerStep2.classList.remove('active');
+            document.getElementById('trackerBackBtn').classList.remove('hidden'); 
+        }
+        showModal('trackerModal');
+    }
+
+    function resetTrackerModal() {
+        trackerStep1.classList.add('active');
+        trackerStep2.classList.remove('active');
+        document.querySelectorAll('#tracker-step-2 .tracker-form').forEach(f => f.classList.remove('active'));
+        document.querySelectorAll('#tracker-step-2 input').forEach(i => i.value = '');
+        currentTrackerBedIndex = null; 
+        currentTrackerType = null;
+        currentEditingTrackerId = null; 
+        document.getElementById('trackerBackBtn').classList.remove('hidden');
+    }
+
+    document.getElementById('cancelTrackerBtn').addEventListener('click', () => {
+        hideModal('trackerModal');
+        resetTrackerModal();
+    });
+    
+    document.getElementById('trackerBackBtn').addEventListener('click', () => {
+        trackerStep2.classList.remove('active');
+        trackerStep1.classList.add('active');
+        document.querySelectorAll('#tracker-step-2 .tracker-form').forEach(f => f.classList.remove('active'));
+        currentTrackerType = null;
+    });
+    
+    document.querySelectorAll('.tracker-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentTrackerType = btn.dataset.type;
+            trackerStep1.classList.remove('active');
+            trackerStep2.classList.add('active');
+            let formId, title;
+            const today = todayISO();
+            if (currentTrackerType === 'atb') {
+                formId = 'tracker-form-atb'; title = 'Novo Antibiótico';
+                document.getElementById('tracker-atb-start').value = today;
+            } else if (currentTrackerType === 'culture') {
+                formId = 'tracker-form-culture'; title = 'Nova Cultura';
+                document.getElementById('tracker-culture-date').value = today;
+                document.getElementById('tracker-culture-result').value = 'Aguardando';
+            } else {
+                formId = 'tracker-form-device'; title = 'Novo Dispositivo';
+                document.getElementById('tracker-device-date').value = today;
+            }
+            trackerFormTitle.textContent = title;
+            document.getElementById(formId).classList.add('active');
+        });
+    });
+
+    document.getElementById('saveTrackerBtn').addEventListener('click', () => {
+        if (currentTrackerBedIndex === null || !currentTrackerType) { return; }
+        const bed = state.beds[currentTrackerBedIndex];
+        if (!bed) { return; }
+        bed.trackers = bed.trackers || [];
+        try {
+            if (currentEditingTrackerId) {
+                // Edição
+                const tracker = bed.trackers.find(t => t.id === currentEditingTrackerId);
+                if (!tracker) throw new Error("Item para editar não encontrado.");
+                if (tracker.type === 'atb') {
+                    tracker.name = document.getElementById('tracker-atb-name').value.trim() || 'Antibiótico';
+                    tracker.startDate = document.getElementById('tracker-atb-start').value;
+                    tracker.duration = parseInt(document.getElementById('tracker-atb-duration').value, 10) || null;
+                    if (!tracker.startDate) throw new Error("Data D1 é obrigatória.");
+                } else if (tracker.type === 'culture') {
+                    tracker.name = document.getElementById('tracker-culture-name').value.trim() || 'Cultura';
+                    tracker.collectionDate = document.getElementById('tracker-culture-date').value;
+                    tracker.result = document.getElementById('tracker-culture-result').value.trim() || 'Aguardando';
+                    if (!tracker.collectionDate) throw new Error("Data da coleta é obrigatória.");
+                } else { // device
+                    tracker.name = document.getElementById('tracker-device-name').value.trim() || 'Dispositivo';
+                    tracker.installDate = document.getElementById('tracker-device-date').value;
+                    if (!tracker.installDate) throw new Error("Data de instalação é obrigatória.");
+                }
+            } else {
+                // Adição
+                const newTracker = { id: crypto.randomUUID(), type: currentTrackerType };
+                if (currentTrackerType === 'atb') {
+                    newTracker.name = document.getElementById('tracker-atb-name').value.trim() || 'Antibiótico';
+                    newTracker.startDate = document.getElementById('tracker-atb-start').value;
+                    newTracker.duration = parseInt(document.getElementById('tracker-atb-duration').value, 10) || null;
+                    if (!newTracker.startDate) throw new Error("Data D1 é obrigatória.");
+                } else if (currentTrackerType === 'culture') {
+                    newTracker.name = document.getElementById('tracker-culture-name').value.trim() || 'Cultura';
+                    newTracker.collectionDate = document.getElementById('tracker-culture-date').value;
+                    newTracker.result = document.getElementById('tracker-culture-result').value.trim() || 'Aguardando';
+                    if (!newTracker.collectionDate) throw new Error("Data da coleta é obrigatória.");
+                } else { // device
+                    newTracker.name = document.getElementById('tracker-device-name').value.trim() || 'Dispositivo';
+                    newTracker.installDate = document.getElementById('tracker-device-date').value;
+                    if (!newTracker.installDate) throw new Error("Data de instalação é obrigatória.");
+                }
+                bed.trackers.push(newTracker);
+            }
+            saveData(state);
+            renderScreenB(); 
+            hideModal('trackerModal');
+            resetTrackerModal();
+        } catch (err) {
+            showConfirm(err.message, () => showModal('trackerModal'), "Erro de Validação", 'bg-red-600', 'Entendi');
+        }
+    });
+
+
+    // --- Funções de Data e Estado ---
+    function todayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    
+    function getDayNumber(startDate) {
+        if (!startDate) return null;
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const start = new Date(startDate + 'T00:00:00');
+            if (isNaN(start.getTime())) return null;
+            const diffTime = today.getTime() - start.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) return 0; 
+            return diffDays + 1; // D1
+        } catch (e) { return null; }
+    }
+
+    function calculateDaysSince(startDate) {
+      const dayNum = getDayNumber(startDate);
+      if (dayNum === null) return 'D-';
+      return `D${dayNum}`;
+    }
+
+    function daysBetween(fromISO, toISO) {
+      const a = new Date(fromISO + 'T00:00:00');
+      const b = new Date(toISO + 'T00:00:00');
+      if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+      return Math.round((b.getTime() - a.getTime()) / 86400000);
+    }
+
+    // Retorna: null | 'overdue' | 'today' | 'soon' | 'future'
+    function getDischargeStatus(dateStr) {
+      if (!dateStr) return null;
+      const diff = daysBetween(todayISO(), dateStr);
+      if (diff === null) return null;
+      if (diff < 0) return 'overdue';
+      if (diff === 0) return 'today';
+      if (diff === 1 || diff === 2) return 'soon';
+      return 'future';
+    }
+
+    const doctorColorPairs = [
+      { bg: '#fecaca', text: '#991b1b' }, { bg: '#fed7aa', text: '#9a3412' },
+      { bg: '#bbf7d0', text: '#166534' }, { bg: '#bfdbfe', text: '#1e40af' },
+      { bg: '#c7d2fe', text: '#4338ca' }, { bg: '#e9d5ff', text: '#581c87' },
+      { bg: '#fbcfe8', text: '#9d174d' }, { bg: '#d1fae5', text: '#065f46' },
+      { bg: '#cffafe', text: '#0e7490' },
+    ];
+
+    function getDoctorColorClasses(name) {
+      if (!name) return 'background-color: #e5e7eb; color: #374151;'; // cinza
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const index = Math.abs(hash) % doctorColorPairs.length;
+      const pair = doctorColorPairs[index];
+      return `background-color: ${pair.bg}; color: ${pair.text};`;
+    }
+
+    function autoResizeTextarea(el) {
+      if (el) {
+        setTimeout(() => {
+          el.style.height = 'auto';
+          el.style.height = (el.scrollHeight) + 'px';
+        }, 0);
+      }
+    }
+    
+      function loadData() {
+      const defaultState = {
+        beds: [], lastReset: todayISO(),
+        commonCondutas: ['Manter ATB', 'Solicitar Labs (Rotina)', 'Aguardar resultado de cultura', 'Monitorar SSVV', 'Dieta livre'],
+        commonExtDocs: [], 
+        notesTemplate: globalNotesTemplate,
+        generalTasks: [] ,
+        generalExams: [],
+        pinnedExams: ['Hb', 'Ht', 'Leucócitos', 'Plaquetas', 'Cr', 'Ur', 'Na', 'K', 'PCR', 'Glicemia']
+      };
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return defaultState;
+        const parsed = JSON.parse(raw);
+        const mergedState = { ...defaultState, ...parsed };
+        mergedState.beds = mergedState.beds.map(b => ({
+          isVisited: false, reminderDate: '', trackers: [], 
+          isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
+         isArchived: b.isArchived || false, 
+	exams: b.exams || [],
+	isExamsMinimized: b.isExamsMinimized !== undefined ? b.isExamsMinimized : true,
+	dischargeForecast: b.dischargeForecast || '',
+          ...b
+        }));
+        mergedState.generalTasks = mergedState.generalTasks || []; // NOVO
+       mergedState.generalExams = mergedState.generalExams || defaultState.generalExams;
+        mergedState.pinnedExams = mergedState.pinnedExams || defaultState.pinnedExams;
+        return mergedState;
+      } catch (e) { return defaultState; }
+    }
+    function saveData(s) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    }
+    function ensureDailyReset() {
+      const today = todayISO();
+      if (state.lastReset !== today) {
+        state.beds.forEach(b => {
+          b.checks = { ev: false, p: false, ex: false, tev: false };
+          b.isVisited = false;
+        });
+        // NOVO: Reseta tarefas diárias? Por enquanto, não.
+        // state.generalTasks = state.generalTasks.filter(t => !t.done); 
+        state.lastReset = today;
+        saveData(state);
+      }
+    }
+    function allChecksTrue(c) {
+      return c && c.ev && c.p && c.ex && c.tev;
+    }
+    
+    function isBedCompleted(bed) {
+      const isEmpty = !bed.patientName || bed.patientName.trim() === '';
+      if (isEmpty) return true; 
+      if (bed.externalDoctor && bed.externalDoctor.active) return true; 
+      const allTaskChecks = allChecksTrue(bed.checks);
+      return bed.isVisited && allTaskChecks;
+    }
+
+    // --- Funções de Renderização (TELA A) ---
+    function renderScreenA() {
+      const searchTerm = searchInput.value.toLowerCase();
+      bedsListArea.innerHTML = '';
+      const today = todayISO(); 
+      renderedBedIndexes = []; 
+      
+      if (isViewingArchived) {
+          progressCounter.innerHTML = `Visualizando Leitos Arquivados`;
+          filterHideCompleted.classList.add('hidden');
+          filterSort.classList.add('hidden');
+      } else {
+          progressCounter.innerHTML = ''; // Limpa antes de recalcular
+          filterHideCompleted.classList.remove('hidden');
+          filterSort.classList.remove('hidden');
+      }
+
+      // Renderiza Leitos ATIVOS
+      if (!isViewingArchived) {
+          const activeBeds = state.beds.filter(b => !b.isArchived);
+          
+          const totalBeds = activeBeds.length;
+          const occupiedBeds = activeBeds.filter(b => b.patientName && b.patientName.trim() !== '');
+          const externalBeds = occupiedBeds.filter(b => b.externalDoctor && b.externalDoctor.active).length;
+          const visitedBeds = occupiedBeds.filter(b => b.isVisited && !(b.externalDoctor && b.externalDoctor.active)).length;
+          const pendingBeds = occupiedBeds.length - visitedBeds - externalBeds;
+          
+          if (totalBeds > 0) {
+              progressCounter.innerHTML = `
+                <span class="text-slate-800" title="Total">T: <b class="text-lg">${totalBeds}</b></span> |
+                <span class="text-green-600" title="Visitados">V: <b class="text-lg">${visitedBeds}</b></span> |
+                <span class="text-amber-600" title="Pendentes">P: <b class="text-lg">${pendingBeds}</b></span> |
+                <span class="text-purple-600" title="Externos">E: <b class="text-lg">${externalBeds}</b></span>
+              `;
+          } else {
+              progressCounter.innerHTML = 'Nenhum leito adicionado';
+          }
+      
+          let bedsToRender = state.beds
+            .map((bed, index) => ({ bed, originalIndex: index }))
+            .filter(({ bed }) => {
+              if (bed.isArchived) return false; 
+              if (hideCompleted && isBedCompleted(bed)) return false; 
+              if (!searchTerm) return true;
+              const name = (bed.patientName || '').toLowerCase();
+              const num = (bed.bedNumber || '').toLowerCase();
+              const dx = (bed.diagnoses || []).join(' ').toLowerCase();
+              const hpp = (bed.hpp || '').toLowerCase();
+              return name.includes(searchTerm) || num.includes(searchTerm) || dx.includes(searchTerm) || hpp.includes(searchTerm);
+            });
+
+          bedsToRender.sort((a, b) => {
+            const bedA = a.bed; const bedB = b.bed;
+            switch (currentSortKey) {
+              case 'admitDate': return (bedA.admitDate || '9999-12-31').localeCompare(bedB.admitDate || '9999-12-31');
+              case 'patientName': return (bedA.patientName || 'zzzz').toLowerCase().localeCompare((bedB.patientName || 'zzzz').toLowerCase());
+              case 'bedNumber': default: return (bedA.bedNumber || 'zzzz').toLowerCase().localeCompare((bedB.bedNumber || 'zzzz').toLowerCase());
+            }
+          });
+          
+          if (bedsToRender.length === 0) {
+            bedsListArea.innerHTML = `<p class="text-sm text-slate-500 text-center py-4">Nenhum leito${state.beds.length > 0 ? ' visível' : ' adicionado'}.</p>`;
+            return;
+          }
+
+          // Renderiza Leitos ATIVOS
+          bedsToRender.forEach(({ bed: b, originalIndex: idx }) => {
+            renderedBedIndexes.push(idx); 
+            const tpl = document.getElementById('patientListTpl');
+            const node = tpl.content.cloneNode(true);
+            const card = node.querySelector('.list-card');
+            const visitCheck = node.querySelector('.visit-check-circle');
+            
+            const isReminderActive = b.reminderDate && b.reminderDate <= today;
+            if (isReminderActive) {
+              card.classList.add('reminder-list-active');
+              node.querySelector('.reminder-tag').classList.remove('hidden');
+            }
+            
+            const extTag = node.querySelector('.ext-tag');
+            if (b.externalDoctor && b.externalDoctor.active && b.externalDoctor.name) {
+              extTag.classList.remove('hidden');
+              const firstName = b.externalDoctor.name.split(' ')[0]; 
+              extTag.textContent = firstName;
+              extTag.title = b.externalDoctor.name;
+              extTag.style = getDoctorColorClasses(b.externalDoctor.name);
+            }
+
+            if (isBedCompleted(b)) {
+              card.classList.add('opacity-60');
+            }
+
+            node.querySelector('.bed-id').textContent = b.bedNumber || '—';
+            node.querySelector('.bed-name').textContent = b.patientName || 'Vazio';
+            node.querySelector('.inline-los').textContent = calculateDaysSince(b.admitDate);
+
+            const dischargeTag = node.querySelector('.discharge-tag');
+            const isOccupied = b.patientName && b.patientName.trim() !== '';
+            const dStatus = getDischargeStatus(b.dischargeForecast);
+            if (isOccupied && dStatus) {
+              dischargeTag.classList.remove('hidden');
+              const dStr = formatDate(b.dischargeForecast);
+              if (dStatus === 'today') {
+                dischargeTag.textContent = 'Alta hoje';
+                dischargeTag.classList.add('bg-green-100', 'text-green-800');
+              } else if (dStatus === 'overdue') {
+                dischargeTag.textContent = `Alta: ${dStr} (atrasado)`;
+                dischargeTag.classList.add('bg-red-100', 'text-red-700');
+              } else if (dStatus === 'soon') {
+                dischargeTag.textContent = `Alta: ${dStr}`;
+                dischargeTag.classList.add('bg-amber-100', 'text-amber-800');
+              } else { // future
+                dischargeTag.textContent = `Alta: ${dStr}`;
+                dischargeTag.classList.add('bg-slate-100', 'text-slate-600');
+              }
+            }
+
+            if (b.isVisited) {
+              visitCheck.classList.add('bg-green-500', 'border-green-500', 'text-white');
+              visitCheck.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>`;
+            } else {
+              visitCheck.classList.add('bg-slate-100', 'border-slate-200', 'text-slate-400');
+            }
+            visitCheck.addEventListener('click', (e) => {
+              e.stopPropagation(); 
+              if (b.patientName && b.patientName.trim() !== '' && !(b.externalDoctor && b.externalDoctor.active)) {
+                b.isVisited = !b.isVisited;
+                saveData(state);
+                renderScreenA();
+              }
+            });
+            
+            const checksArea = node.querySelector('.checks');
+            checksArea.innerHTML = ['ev', 'p', 'ex', 'tev'].map(k => `
+              <div class="dot w-7 h-7 rounded-md border-2 ${b.checks && b.checks[k] ? 'bg-sky-500 border-sky-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-400'} flex items-center justify-center text-xs font-bold cursor-pointer" data-check-key="${k}" data-bed-index="${idx}" title="${k.toUpperCase()}">
+                ${b.checks && b.checks[k] ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>` : k.toUpperCase()[0]}
+              </div>
+            `).join('');
+            
+            checksArea.querySelectorAll('.dot').forEach(dot => {
+              dot.addEventListener('click', (e) => {
+                e.stopPropagation(); 
+                const k = e.currentTarget.dataset.checkKey;
+                b.checks = b.checks || { ev: false, p: false, ex: false, tev: false };
+                b.checks[k] = !b.checks[k];
+                saveData(state);
+                renderScreenA();
+              });
+            });
+
+            card.addEventListener('click', () => {
+                openPatientDetails(idx);
+            });
+
+            bedsListArea.appendChild(node);
+          });
+      } else {
+          // Renderiza Leitos ARQUIVADOS
+          const bedsToRender = state.beds
+            .map((bed, index) => ({ bed, originalIndex: index }))
+            .filter(({ bed }) => {
+              if (!bed.isArchived) return false; 
+              if (!searchTerm) return true;
+              const name = (bed.patientName || '').toLowerCase();
+              const num = (bed.bedNumber || '').toLowerCase();
+              return name.includes(searchTerm) || num.includes(searchTerm);
+            });
+            
+          if (bedsToRender.length === 0) {
+            bedsListArea.innerHTML = `<p class="text-sm text-slate-500 text-center py-4">Nenhum leito arquivado.</p>`;
+            return;
+          }
+          
+          bedsToRender.forEach(({ bed: b, originalIndex: idx }) => {
+            const tpl = document.getElementById('archivedBedTpl');
+            const node = tpl.content.cloneNode(true);
+            node.querySelector('.bed-id').textContent = b.bedNumber || '—';
+            node.querySelector('.bed-name').textContent = b.patientName || 'Vazio';
+            
+            node.querySelector('.restore-bed-btn').addEventListener('click', () => {
+                b.isArchived = false;
+                saveData(state);
+                renderScreenA(); 
+            });
+            
+            node.querySelector('.delete-bed-btn').addEventListener('click', () => {
+                showConfirm(`Deletar PERMANENTEMENTE o leito ${b.bedNumber}? Todos os dados serão perdidos.`, () => {
+                    state.beds.splice(idx, 1);
+                    saveData(state);
+                    renderScreenA();
+                });
+            });
+            
+            bedsListArea.appendChild(node);
+          });
+      }
+    }
+
+    // --- Funções de Renderização (TELA B) ---
+    function renderScreenB() {
+      if (currentPatientIndex === null) return;
+      
+      const b = state.beds[currentPatientIndex];
+      if (!b) {
+        closePatientDetails();
+        return;
+      }
+      
+      const idx = currentPatientIndex; 
+      const today = todayISO();
+      
+      patientHeaderBed.textContent = b.bedNumber || '—';
+      patientHeaderName.textContent = b.patientName || 'Vazio';
+      
+      patientDetailContent.innerHTML = '';
+      const tpl = document.getElementById('patientDetailTpl');
+      const node = tpl.content.cloneNode(true);
+      const art = node.querySelector('article');
+
+      // Bind de Dados (Cabeçalho)
+      art.querySelector('.inline-bed').value = b.bedNumber || '';
+      art.querySelector('.inline-bed').addEventListener('input', (e) => { b.bedNumber = e.target.value; saveData(state); patientHeaderBed.textContent = b.bedNumber; });
+      art.querySelector('.inline-name').value = b.patientName || '';
+      art.querySelector('.inline-name').addEventListener('input', (e) => { b.patientName = e.target.value; saveData(state); patientHeaderName.textContent = b.patientName; });
+      art.querySelector('.inline-age').value = b.age || '';
+      art.querySelector('.inline-age').addEventListener('input', (e) => { b.age = e.target.value; saveData(state); });
+      art.querySelector('.inline-admit').value = b.admitDate || '';
+      art.querySelector('.inline-admit').addEventListener('input', (e) => { b.admitDate = e.target.value; saveData(state); });
+      art.querySelector('.inline-hpp').value = b.hpp || '';
+      art.querySelector('.inline-hpp').addEventListener('input', (e) => { b.hpp = e.target.value; saveData(state); });
+      
+      const extNameInput = art.querySelector('.inline-ext-name');
+      const extDatalist = art.querySelector('.common-ext-docs-list');
+      const extDatalistId = `common-ext-docs-list-${idx}`;
+      extDatalist.id = extDatalistId;
+      extNameInput.setAttribute('list', extDatalistId);
+      extNameInput.value = (b.externalDoctor && b.externalDoctor.name) || '';
+      
+      extDatalist.innerHTML = ''; 
+      state.commonExtDocs.forEach(docName => {
+          const opt = document.createElement('option');
+          opt.value = docName;
+          extDatalist.appendChild(opt);
+      });
+      
+      extNameInput.addEventListener('input', (e) => { 
+          const name = e.target.value.trim();
+          b.externalDoctor = { active: !!name, name: name };
+          saveData(state);
+      });
+      
+      art.querySelector('.add-ext-doc-to-list-btn').addEventListener('click', () => { 
+          const v = extNameInput.value.trim();
+          if (v && !state.commonExtDocs.includes(v)) {
+              state.commonExtDocs.push(v);
+              state.commonExtDocs.sort();
+              saveData(state);
+              renderScreenB(); 
+          }
+      });
+
+      // Botões de Ação do Card
+      art.querySelector('.discharge-card').addEventListener('click', () => {
+        showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? Os dados serão limpos, mas o leito será mantido.`, () => {
+          Object.assign(b, {
+              patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '',
+              checks: { ev: false, p: false, ex: false, tev: false },
+              condutas: [], externalDoctor: { active: false, name: '' },
+              isVisited: false, reminderDate: '', trackers: [], 
+              isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
+              isArchived: false,
+	      exams: [], isExamsMinimized: true,
+	      dischargeForecast: ''
+          });
+          saveData(state);
+          closePatientDetails();
+        });
+      });
+      
+      art.querySelector('.archive-bed-btn').addEventListener('click', () => {
+        showConfirm(`Arquivar o leito ${b.bedNumber}? Ele sairá da lista principal, mas poderá ser restaurado.`, () => {
+          b.isArchived = true;
+          saveData(state);
+          closePatientDetails();
+        }, "Arquivar Leito", 'bg-slate-600', 'Arquivar'); 
+      });
+      
+      const reminderBtn = art.querySelector('.reminder-btn');
+      if (b.reminderDate && b.reminderDate <= today) {
+        reminderBtn.classList.add('active');
+      }
+      reminderBtn.addEventListener('click', () => {
+        currentReminderIndex = idx;
+        reminderDateInput.value = b.reminderDate || '';
+        showModal('reminderModal');
+      });
+
+      // Renderiza os checkmarks sincronizados
+      const inlineChecks = art.querySelector('.inline-checks');
+      inlineChecks.innerHTML = ['ev', 'p', 'ex', 'tev'].map(k => `
+        <div class="dot w-7 h-7 rounded-md border-2 ${b.checks && b.checks[k] ? 'bg-sky-500 border-sky-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-400'} flex items-center justify-center text-xs font-bold cursor-pointer" data-check-key="${k}" title="${k.toUpperCase()}">
+          ${b.checks && b.checks[k] ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>` : k.toUpperCase()[0]}
+        </div>
+      `).join('');
+      
+      inlineChecks.querySelectorAll('.dot').forEach(dot => {
+        dot.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const k = ev.currentTarget.dataset.checkKey;
+          const b = state.beds[idx]; 
+          if (b) {
+            b.checks = b.checks || { ev: false, p: false, ex: false, tev: false };
+            b.checks[k] = !b.checks[k];
+            saveData(state);
+            renderScreenB(); 
+          }
+        });
+      });
+
+      // Seções Colapsáveis
+      setupCollapsibleSection(art, '.input-dx-inline', 'isDxMinimized', b, (el) => autoResizeTextarea(el));
+      setupCollapsibleSection(art, '.tracker-list', 'isTrackerMinimized', b, (el) => renderTrackerList(el, b, idx)); 
+      setupCollapsibleSection(art, '.exams-content-wrapper', 'isExamsMinimized', b, (el) => renderExamsSection(el, b, idx));
+      setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
+      setupCollapsibleSection(art, '.conduta-list', 'isCondutaMinimized', b, (el) => renderCondutaList(el, b, idx));
+
+      // Bind de Textareas e Listas
+      const dxInput = art.querySelector('.input-dx-inline');
+      dxInput.value = (b.diagnoses || []).join('\n');
+      dxInput.addEventListener('input', (e) => {
+        const raw = e.target.value;
+        b.diagnoses = raw.trim() ? raw.trim().split('\n').map(s => s.trim()).filter(Boolean) : [];
+        saveData(state);
+        art.querySelector('.disp-dxcount').textContent = b.diagnoses.length ? `${b.diagnoses.length} diagnóstico(s)` : '';
+        autoResizeTextarea(e.target);
+      });
+      art.querySelector('.disp-dxcount').textContent = b.diagnoses && b.diagnoses.length ? `${b.diagnoses.length} diagnóstico(s)` : '';
+
+      const notesInput = art.querySelector('.input-notes-inline');
+      notesInput.value = b.notes || '';
+      notesInput.addEventListener('input', (e) => {
+        b.notes = e.target.value;
+        saveData(state);
+        autoResizeTextarea(e.target);
+      });
+
+      const dischargeInput = art.querySelector('.inline-discharge-forecast');
+      dischargeInput.value = b.dischargeForecast || '';
+      dischargeInput.addEventListener('input', (e) => {
+        b.dischargeForecast = e.target.value;
+        saveData(state);
+      });
+      art.querySelector('.clear-discharge-forecast-btn').addEventListener('click', () => {
+        b.dischargeForecast = '';
+        saveData(state);
+        renderScreenB();
+      });
+
+      patientDetailContent.appendChild(node);
+
+      if (!b.isDxMinimized) autoResizeTextarea(dxInput);
+      if (!b.isNotesMinimized) autoResizeTextarea(notesInput);
+    }
+    
+   function setupCollapsibleSection(article, contentSelector, stateKey, bed, renderCallback) {
+        const section = article.querySelector(contentSelector).closest('.collapsible-section');
+        const btn = section.querySelector('.collapsible-toggle-btn');
+        const content = section.querySelector('.collapsible-content');
+        const icon = section.querySelector('.toggle-icon');
+        
+        let contentEl = null;
+        if (content.matches(contentSelector)) {
+            contentEl = content;
+        } else {
+            contentEl = content.querySelector(contentSelector);
+        }
+        
+        if (bed[stateKey]) {
+            content.classList.add('hidden');
+            icon.classList.remove('rotate-90');
+        } else {
+            content.classList.remove('hidden');
+            icon.classList.add('rotate-90');
+            if (renderCallback) renderCallback(contentEl, bed, currentPatientIndex);
+        }
+        
+        btn.addEventListener('click', () => {
+            bed[stateKey] = !bed[stateKey];
+            saveData(state);
+            content.classList.toggle('hidden');
+            icon.classList.toggle('rotate-90');
+            if (!bed[stateKey] && renderCallback) {
+                renderCallback(contentEl, bed, currentPatientIndex);
+            }
+        });
+    }
+
+    // --- Renderização de Sub-listas (Tela B) ---
+    function renderTrackerList(listElement, bed, bedIdx) {
+        listElement.innerHTML = ''; 
+        if (!bed.trackers || bed.trackers.length === 0) {
+            listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum item adicionado.</p>`;
+            return;
+        }
+        
+        bed.trackers.forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'tracker-item flex justify-between items-center group text-sm p-2 rounded-md hover:bg-slate-50';
+            let html = '';
+            
+            const formatDate = (dateStr) => {
+                if (!dateStr) return '';
+                try {
+                    const [y, m, d] = dateStr.split('-');
+                    return `${d}/${m}`;
+                } catch { return ''; }
+            };
+
+            if (t.type === 'atb') {
+                const dayNum = getDayNumber(t.startDate);
+                const d1Date = formatDate(t.startDate);
+                let dayDisplay = `D${dayNum}`;
+                
+                if (t.duration) {
+                    if (dayNum > t.duration) {
+                        dayDisplay = `D${t.duration}/${t.duration} (Finalizado)`;
+                    } else {
+                        dayDisplay = `D${dayNum}/${t.duration}`;
+                    }
+                }
+                
+                html = `<div>
+                            <span class="font-medium text-sky-700">ATB:</span> <span class="text-slate-800">${t.name}</span>
+                            <span class="text-xs font-semibold bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-full ml-1">${dayDisplay}</span>
+                            <span class="text-xs text-slate-500 ml-1">(D1: ${d1Date})</span>
+                        </div>`;
+            } else if (t.type === 'culture') {
+                const d1Date = formatDate(t.collectionDate);
+                html = `<div>
+                            <span class="font-medium text-amber-700">Cultura:</span> <span class="text-slate-800">${t.name} (${calculateDaysSince(t.collectionDate)})</span>
+                            <span class="text-xs text-slate-500 ml-1">- ${t.result}</span>
+                            <span class="text-xs text-slate-500 ml-1">(Coleta: ${d1Date})</span>
+                        </div>`;
+            } else { // device
+                const d1Date = formatDate(t.installDate);
+                html = `<div>
+                            <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${t.name}</span>
+                            <span class="text-xs font-semibold bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded-full ml-1">${calculateDaysSince(t.installDate)}</span>
+                            <span class="text-xs text-slate-500 ml-1">(Início: ${d1Date})</span>
+                        </div>`;
+            }
+            
+            html += `<div class="flex-shrink-0">
+                        <button class="edit-tracker-btn text-slate-400 hover:text-sky-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-tracker-id="${t.id}" title="Editar">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                        </button>
+                        <button class="remove-tracker-btn text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-tracker-id="${t.id}" title="Remover">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+                        </button>
+                     </div>`;
+            
+            item.innerHTML = html;
+            listElement.appendChild(item);
+        });
+
+        listElement.querySelectorAll('.edit-tracker-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const trackerId = btn.dataset.trackerId;
+                openTrackerModal(bedIdx, trackerId); 
+            });
+        });
+
+        listElement.querySelectorAll('.remove-tracker-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const trackerId = btn.dataset.trackerId;
+                const trackerIndex = bed.trackers.findIndex(t => t.id === trackerId);
+                if (trackerIndex > -1) {
+                    bed.trackers.splice(trackerIndex, 1);
+                    saveData(state);
+                    renderScreenB(); 
+                }
+            });
+        });
+    }
+
+    function renderCondutaList(listElement, bed, bedIdx) {
+        listElement.innerHTML = ''; 
+        
+        if (!bed.condutas || bed.condutas.length === 0) {
+            listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhuma conduta adicionada.</p>`;
+        }
+        
+        (bed.condutas || []).forEach((c, ci) => {
+          const it = document.createElement('div');
+          it.className = 'conduta flex gap-2 items-center group';
+          it.innerHTML = `
+            <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500" ${c.done ? 'checked' : ''}>
+            <input type="text" class="flex-1 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${c.done ? 'line-through text-slate-500' : ''}" value="${c.text || ''}" placeholder="Descreva a conduta">
+            <button class="remove-conduta text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all print:hidden" data-conduta-index="${ci}">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+            </button>
+          `;
+          it.querySelector('input[type=checkbox]').addEventListener('change', (e) => {
+            updateConduta(bedIdx, ci, { done: e.target.checked });
+            it.querySelector('input[type=text]').classList.toggle('line-through', e.target.checked);
+            it.querySelector('input[type=text]').classList.toggle('text-slate-500', e.target.checked);
+          });
+          it.querySelector('input[type=text]').addEventListener('input', (e) => {
+            updateConduta(bedIdx, ci, { text: e.target.value });
+          });
+          it.querySelector('.remove-conduta').addEventListener('click', () => {
+            bed.condutas.splice(ci, 1);
+            saveData(state);
+            renderScreenB(); 
+          });
+          listElement.appendChild(it);
+        });
+
+        const section = listElement.closest('.collapsible-section');
+        const datalist = section.querySelector('.common-condutas-list');
+        const newCondInput = section.querySelector('.new-conduta-input');
+        
+        const datalistId = `common-condutas-list-${bedIdx}`;
+        datalist.id = datalistId;
+        newCondInput.setAttribute('list', datalistId);
+        datalist.innerHTML = '';
+        state.commonCondutas.forEach(cText => {
+          const opt = document.createElement('option');
+          opt.value = cText;
+          datalist.appendChild(opt);
+        });
+
+        section.querySelector('.add-conduta-btn').addEventListener('click', () => {
+          const v = newCondInput.value.trim();
+          if (v) { addCondutaToPatient(bedIdx, v); }
+        });
+        section.querySelector('.add-conduta-to-list-btn').addEventListener('click', () => {
+          const v = newCondInput.value.trim();
+          if (!v) return;
+          if (!state.commonCondutas.includes(v)) {
+            state.commonCondutas.push(v);
+            state.commonCondutas.sort();
+          }
+          addCondutaToPatient(bedIdx, v);
+        });
+    }
+    
+// --- NOVO (v12): Renderização da Seção de Exames ---
+
+let currentImageExamEditingId = null;
+
+/**
+ * Função principal que renderiza o conteúdo da seção "Exames" (abas, etc.)
+ */
+function renderExamsSection(wrapperElement, bed, bedIdx) {
+    wrapperElement.innerHTML = `
+        <div class="border-b border-slate-200">
+            <nav class="-mb-px flex space-x-4" aria-label="Tabs">
+                <button class="exam-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-sky-500 text-sky-600" data-tab="labs">
+                    Laboratoriais
+                </button>
+                <button class="exam-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300" data-tab="images">
+                    Imagem
+                </button>
+            </nav>
+        </div>
+        <div class="exam-tab-content pt-4" data-tab-content="labs">
+            <!-- Conteúdo dos Labs renderizado pelo JS -->
+        </div>
+        <div class="exam-tab-content hidden pt-4" data-tab-content="images">
+            <!-- Conteúdo de Imagem renderizado pelo JS -->
+        </div>
+    `;
+
+    const tabs = wrapperElement.querySelectorAll('.exam-tab-btn');
+    const contents = wrapperElement.querySelectorAll('.exam-tab-content');
+
+    // Renderiza o conteúdo da aba de labs por padrão
+    const labContentEl = wrapperElement.querySelector('[data-tab-content="labs"]');
+    renderLabTab(labContentEl, bed, bedIdx);
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove classes ativas de todas as abas
+            tabs.forEach(t => {
+                t.classList.remove('border-sky-500', 'text-sky-600');
+                t.classList.add('border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300');
+            });
+            // Adiciona classe ativa na aba clicada
+            tab.classList.add('border-sky-500', 'text-sky-600');
+            tab.classList.remove('border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300');
+
+            const tabName = tab.dataset.tab;
+
+            // Esconde todos os conteúdos
+            contents.forEach(content => content.classList.add('hidden'));
+
+            // Mostra o conteúdo correto e renderiza
+            const activeContent = wrapperElement.querySelector(`[data-tab-content="${tabName}"]`);
+            activeContent.classList.remove('hidden');
+
+            if (tabName === 'labs') {
+                renderLabTab(activeContent, bed, bedIdx);
+            } else if (tabName === 'images') {
+                renderImageTab(activeContent, bed, bedIdx);
+            }
+        });
+    });
+}
+
+/**
+ * Renderiza o conteúdo da aba "Laboratoriais"
+ */
+function renderLabTab(contentEl, bed, bedIdx) {
+    // Define as datas padrão para o filtro (últimos 7 dias)
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 7);
+    const defaultStartDate = pastDate.toISOString().split('T')[0];
+    const defaultEndDate = today.toISOString().split('T')[0];
+
+    contentEl.innerHTML = `
+        <button id="toggle-lab-entry-btn" class="w-full text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-2 px-4 hover:bg-sky-100 transition-all mb-3">
+            + Adicionar Nova Coleta
+        </button>
+        <div id="lab-entry-form" class="hidden space-y-3 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-sm font-medium text-slate-700">Data da Coleta</label>
+                    <input id="lab-entry-date" type="date" value="${todayISO()}" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+            </div>
+            <div>
+                <label class="text-sm font-medium text-slate-700">Resultados (Ex: Hb: 9.5)</label>
+                <textarea id="lab-entry-textarea" placeholder="Hb: 9.5\nPlaq: 120k\nUr: 28\nCr: 1.1" class="w-full text-sm p-3 rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" rows="4"></textarea>
+            </div>
+            <button id="save-lab-entry-btn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">
+                Salvar Coleta
+            </button>
+        </div>
+
+        <div class="lab-filters space-y-2 mb-3">
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="text-xs font-medium text-slate-600">De:</label>
+                    <input id="lab-filter-start" type="date" value="${defaultStartDate}" class="w-full text-sm border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-slate-600">Até:</label>
+                    <input id="lab-filter-end" type="date" value="${defaultEndDate}" class="w-full text-sm border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                </div>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-slate-600">Filtrar Exame (ex: Hb, FAN):</label>
+                <input id="lab-filter-name" type="search" placeholder="Buscar por nome..." class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            </div>
+        </div>
+
+        <div id="exam-flowsheet-container" class="w-full overflow-x-auto">
+            </div>
+    `;
+
+    const flowsheetContainer = contentEl.querySelector('#exam-flowsheet-container');
+    const filterNameInput = contentEl.querySelector('#lab-filter-name');
+    const filterStartInput = contentEl.querySelector('#lab-filter-start');
+    const filterEndInput = contentEl.querySelector('#lab-filter-end');
+
+    // Função para obter filtros e re-renderizar a tabela
+    const rerenderFlowsheet = () => {
+        const filters = {
+            name: filterNameInput.value,
+            start: filterStartInput.value,
+            end: filterEndInput.value
+        };
+        renderLabFlowsheet(flowsheetContainer, bed, filters);
+    };
+
+    // Listeners dos Filtros
+    filterNameInput.addEventListener('input', rerenderFlowsheet);
+    filterStartInput.addEventListener('input', rerenderFlowsheet);
+    filterEndInput.addEventListener('input', rerenderFlowsheet);
+
+    // Listeners do Formulário de Entrada
+    contentEl.querySelector('#toggle-lab-entry-btn').addEventListener('click', (e) => {
+        const form = contentEl.querySelector('#lab-entry-form');
+        form.classList.toggle('hidden');
+        e.currentTarget.textContent = form.classList.contains('hidden') ? '+ Adicionar Nova Coleta' : 'Fechar Formulário';
+    });
+
+    contentEl.querySelector('#save-lab-entry-btn').addEventListener('click', () => {
+        const date = contentEl.querySelector('#lab-entry-date').value;
+        const text = contentEl.querySelector('#lab-entry-textarea').value;
+        parseAndSaveLabs(text, date, bed);
+        // Re-renderiza toda a aba de laboratório
+        renderLabTab(contentEl, bed, bedIdx);
+    });
+   
+    // CORREÇÃO: Listeners de Editar/Deletar/Fixar (movidos para cá)
+    flowsheetContainer.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('.edit-collection-btn');
+        const deleteBtn = e.target.closest('.delete-collection-btn');
+        const pinBtn = e.target.closest('.pin-exam-btn');
+        const labEntryForm = contentEl.querySelector('#lab-entry-form');
+        const labEntryTextarea = contentEl.querySelector('#lab-entry-textarea');
+        const labEntryDate = contentEl.querySelector('#lab-entry-date');
+
+        // Editar Coleta
+        if (editBtn) {
+            const date = editBtn.dataset.date;
+            const entry = bed.exams.find(ex => ex.type === 'lab' && ex.date === date);
+            if (entry) {
+                // Preenche o formulário com os dados da coleta
+                labEntryDate.value = entry.date;
+                labEntryTextarea.value = entry.results.map(r => `${r.name}: ${r.value}`).join('\n');
+                
+                // Abre o formulário
+                labEntryForm.classList.remove('hidden');
+                contentEl.querySelector('#toggle-lab-entry-btn').textContent = 'Fechar Formulário';
+                autoResizeTextarea(labEntryTextarea);
+                labEntryForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // Deletar Coleta
+        if (deleteBtn) {
+            const date = deleteBtn.dataset.date;
+            const entryIndex = bed.exams.findIndex(ex => ex.type === 'lab' && ex.date === date);
+            if (entryIndex > -1) {
+                showConfirm(`Deletar todos os exames da coleta do dia ${formatDate(date)}?`, () => {
+                    bed.exams.splice(entryIndex, 1);
+                    saveData(state);
+                    rerenderFlowsheet(); // Apenas re-renderiza a tabela
+                });
+            }
+        }
+
+        // Fixar Exame
+        if (pinBtn) {
+            const examName = pinBtn.dataset.examName;
+            if (!examName) return;
+            
+            const pinIndex = state.pinnedExams.indexOf(examName);
+            if (pinIndex > -1) {
+                // Já está fixado, remove
+                state.pinnedExams.splice(pinIndex, 1);
+            } else {
+                // Não está fixado, adiciona ao topo
+                state.pinnedExams.unshift(examName);
+            }
+            saveData(state);
+            rerenderFlowsheet(); // Re-renderiza a tabela com a nova ordem
+        }
+    });
+
+    // Renderização inicial da tabela
+    rerenderFlowsheet();
+}
+/**
+ * Converte o texto da textarea em dados e salva no state
+ */
+function parseAndSaveLabs(text, date, bed) {
+    if (!text || !date) {
+        console.error("Data e texto são obrigatórios");
+        return;
+    }
+
+    const lines = text.trim().split('\n');
+    const newResults = [];
+    lines.forEach(line => {
+        const parts = line.split(':');
+        if (parts.length >= 2) {
+            const name = parts[0].trim();
+            const value = parts.slice(1).join(':').trim(); // Permite ":" no valor
+            if (name && value) {
+                newResults.push({ name, value });
+            }
+        }
+    });
+
+    if (newResults.length === 0) return;
+
+    bed.exams = bed.exams || [];
+
+    // Verifica se já existe uma coleta para esta data
+    let existingEntry = bed.exams.find(e => e.type === 'lab' && e.date === date);
+
+    if (existingEntry) {
+        // Atualiza a coleta existente
+        newResults.forEach(newRes => {
+            const existingRes = existingEntry.results.find(r => r.name.toLowerCase() === newRes.name.toLowerCase());
+            if (existingRes) {
+                existingRes.value = newRes.value; // Sobrescreve
+            } else {
+                existingEntry.results.push(newRes); // Adiciona novo
+            }
+        });
+    } else {
+        // Cria uma nova entrada de coleta
+        bed.exams.push({
+            id: crypto.randomUUID(),
+            type: 'lab',
+            date: date,
+            results: newResults
+        });
+    }
+
+    saveData(state);
+}
+
+/**
+ * Renderiza a Tabela Evolutiva (Flowsheet)
+ */
+function renderLabFlowsheet(container, bed, filters) {
+    const labEntries = bed.exams.filter(e => e.type === 'lab');
+    if (labEntries.length === 0) {
+        container.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum exame laboratorial adicionado.</p>`;
+        return;
+    }
+
+    const searchName = (filters.name || '').toLowerCase().trim();
+    const dateMap = new Map(); // <string (date), Map<string (exam_name_lowercase), string (value)>>
+    const allExamNames = new Set();
+    const allDates = new Set();
+
+    // 1. Mapeia todos os dados
+    labEntries.forEach(entry => {
+        const date = entry.date;
+        allDates.add(date);
+        if (!dateMap.has(date)) {
+            dateMap.set(date, new Map());
+        }
+        entry.results.forEach(res => {
+            allExamNames.add(res.name);
+            dateMap.get(date).set(res.name.toLowerCase(), res.value);
+        });
+    });
+
+    // 2. Aplica Filtros (Lógica Principal)
+    let filteredExamNames;
+    let filteredDates;
+
+    if (searchName) {
+        // Se busca por nome, IGNORE o filtro de data
+        filteredExamNames = [...allExamNames].filter(name => name.toLowerCase().includes(searchName));
+        filteredDates = [...allDates].sort(); // Mostra TODAS as datas
+    } else {
+        // Se NÃO busca por nome, USE o filtro de data
+        filteredExamNames = [...allExamNames];
+        filteredDates = [...allDates].filter(date => {
+            return (!filters.start || date >= filters.start) && 
+                   (!filters.end || date <= filters.end);
+        }).sort();
+    }
+
+    if (filteredDates.length === 0 || filteredExamNames.length === 0) {
+         container.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum resultado encontrado para os filtros aplicados.</p>`;
+        return;
+    }
+
+    // 3. Constrói a Tabela
+    let tableHtml = '<table class="min-w-full divide-y divide-slate-200 text-sm">';
+
+    // Cabeçalho (Datas)
+    tableHtml += '<thead class="bg-slate-50">';
+    tableHtml += '<tr><th class="sticky left-0 bg-slate-50 px-3 py-2 text-left font-medium text-slate-600">Exame</th>';
+    filteredDates.forEach(date => {
+        const [y, m, d] = date.split('-');
+        
+        // CORREÇÃO: Adiciona os ícones de editar/deletar na data
+        tableHtml += `
+            <th class="px-3 py-2 text-center font-medium text-slate-600 whitespace-nowrap">
+                <div class="flex items-center justify-center gap-1">
+                    <span>${d}/${m}</span>
+                    <svg class="edit-collection-btn w-3 h-3 text-slate-400 hover:text-sky-600 cursor-pointer" data-date="${date}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                    <svg class="delete-collection-btn w-3 h-3 text-slate-400 hover:text-red-600 cursor-pointer" data-date="${date}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+                </div>
+            </th>
+        `;
+    });
+    tableHtml += '</tr></thead>';
+
+    // Corpo (Resultados)
+    // Lógica de ordenação por exames fixados
+    filteredExamNames.sort((a, b) => {
+        const aPinned = state.pinnedExams.includes(a);
+        const bPinned = state.pinnedExams.includes(b);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        if (aPinned && bPinned) {
+            return state.pinnedExams.indexOf(a) - state.pinnedExams.indexOf(b);
+        }
+        return a.localeCompare(b);
+    });
+
+    tableHtml += '<tbody class="divide-y divide-slate-100 bg-white">';
+    filteredExamNames.forEach(examName => {
+        const isPinned = state.pinnedExams.includes(examName);
+        tableHtml += '<tr>';
+        // Adiciona ícone de "pin"
+        tableHtml += `
+            <td class="sticky left-0 bg-white px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
+                <div class="flex items-center gap-1.5">
+                    <svg class="pin-exam-btn w-3.5 h-3.5 ${isPinned ? 'text-sky-600' : 'text-slate-300'} hover:text-sky-500 cursor-pointer" data-exam-name="${examName}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10.868 2.884c-.521-.26-1.115-.26-1.636 0l-7 3.5A.75.75 0 002 7.22v4.574c0 .89.223 1.756.65 2.553l.004.008.018.038.004.008.058.115.008.013.012.02l.033.055.004.005.01.016.03.045.015.021.042.056.022.028.02.023.01.01a.75.75 0 001.072 0l.01-.01.02-.023.022-.028.042-.056.015-.021.03-.045.01-.016.004-.005.033-.055.012-.02.008-.013.058-.115.004-.008.018-.038.004-.008A5.965 5.965 0 0018 11.794V7.22a.75.75 0 00-.368-.656l-7-3.5zM10 5.113L16.22 8.5 10 11.887 3.78 8.5 10 5.113zM15.5 10.165v1.629a4.465 4.465 0 01-1.123 2.98l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5A4.465 4.465 0 014.5 11.794v-1.629L10 13.18l5.5-3.015z" clip-rule="evenodd" />
+                    </svg>
+                    <span>${examName}</span>
+                </div>
+            </td>
+        `;
+        
+        const examNameLower = examName.toLowerCase();
+        filteredDates.forEach(date => {
+            const value = dateMap.get(date)?.get(examNameLower) || '—';
+            tableHtml += `<td class="px-3 py-2 text-center text-slate-600">${value}</td>`;
+        });
+        tableHtml += '</tr>';
+    });
+    tableHtml += '</tbody></table>';
+
+    container.innerHTML = tableHtml;
+}
+
+/**
+ * Renderiza o conteúdo da aba "Imagem"
+ */
+function renderImageTab(contentEl, bed, bedIdx) {
+    contentEl.innerHTML = `
+        <button id="add-image-exam-btn" class="w-full text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-2 px-4 hover:bg-sky-100 transition-all mb-3">
+            + Adicionar Exame de Imagem
+        </button>
+        <div id="image-exam-list" class="space-y-2">
+            <!-- Lista de exames de imagem -->
+        </div>
+    `;
+
+    contentEl.querySelector('#add-image-exam-btn').addEventListener('click', () => {
+        openImageExamModal(bedIdx, null); // Abre em modo de adição
+    });
+
+    const listEl = contentEl.querySelector('#image-exam-list');
+    const imageExams = bed.exams.filter(e => e.type === 'image').sort((a, b) => (b.date || '').localeCompare(a.date || '')); // Mais recentes primeiro
+
+    if (imageExams.length === 0) {
+        listEl.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum exame de imagem adicionado.</p>`;
+        return;
+    }
+
+    imageExams.forEach(exam => {
+        const item = document.createElement('div');
+        item.className = 'image-exam-item group text-sm p-2 rounded-md hover:bg-slate-50';
+        const [y, m, d] = (exam.date || '---').split('-');
+        item.innerHTML = `
+            <div class="flex justify-between items-center">
+                <span class="font-medium text-slate-800">${exam.name || 'Exame'}</span>
+                <span class="text-xs font-medium text-slate-500">${d}/${m}</span>
+            </div>
+            <p class="text-slate-600 whitespace-pre-wrap">${exam.summary || 'Sem resumo.'}</p>
+            <div class="text-right -mt-2">
+                <button class="edit-image-btn text-slate-400 hover:text-sky-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Editar">
+                    <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                </button>
+                <button class="remove-image-btn text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Remover">
+                    <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+                </button>
+            </div>
+        `;
+        listEl.appendChild(item);
+
+        // Listeners
+        item.querySelector('.edit-image-btn').addEventListener('click', () => {
+            openImageExamModal(bedIdx, exam.id);
+        });
+        item.querySelector('.remove-image-btn').addEventListener('click', () => {
+            const examIndex = bed.exams.findIndex(e => e.id === exam.id);
+            if (examIndex > -1) {    
+                        showConfirm(`Deletar o exame "${exam.name}" de ${formatDate(exam.date)}?`, () => {
+                        bed.exams.splice(examIndex, 1);
+                        saveData(state);
+                        renderImageTab(contentEl, bed, bedIdx); // Re-renderiza só esta aba
+                    });
+                }
+            });
+        });
+    }
+
+// --- Modal de Exame de Imagem (Ações) ---
+
+function openImageExamModal(bedIdx, examId) {
+    currentPatientIndex = bedIdx; // Garante que temos o índice do paciente
+    const modal = document.getElementById('imageExamModal');
+    const title = modal.querySelector('#imageExamModalTitle');
+    const dateInput = modal.querySelector('#image-exam-date');
+    const nameInput = modal.querySelector('#image-exam-name');
+    const summaryInput = modal.querySelector('#image-exam-summary');
+
+    if (examId) {
+        // Modo Edição
+        currentImageExamEditingId = examId;
+        const bed = state.beds[bedIdx];
+        const exam = bed.exams.find(e => e.id === examId);
+        if (!exam) return;
+
+        title.textContent = "Editar Exame de Imagem";
+        dateInput.value = exam.date || '';
+        nameInput.value = exam.name || '';
+        summaryInput.value = exam.summary || '';
+    } else {
+        // Modo Adição
+        currentImageExamEditingId = null;
+        title.textContent = "Adicionar Exame de Imagem";
+        dateInput.value = todayISO();
+        nameInput.value = '';
+        summaryInput.value = '';
+    }
+    autoResizeTextarea(summaryInput); // Ajusta altura
+    showModal('imageExamModal');
+}
+
+document.getElementById('cancelImageExamBtn').addEventListener('click', () => {
+    hideModal('imageExamModal');
+    currentImageExamEditingId = null;
+});
+
+document.getElementById('saveImageExamBtn').addEventListener('click', () => {
+    const bed = state.beds[currentPatientIndex];
+    if (!bed) return;
+
+    const examData = {
+        type: 'image',
+        date: document.getElementById('image-exam-date').value,
+        name: document.getElementById('image-exam-name').value.trim() || 'Exame',
+        summary: document.getElementById('image-exam-summary').value.trim()
+    };
+
+    if (!examData.date || !examData.name) {
+        showConfirm("Data e Nome do Exame são obrigatórios.", () => showModal('imageExamModal'), "Erro", 'bg-red-600', 'Entendi');
+        return;
+    }
+
+    if (currentImageExamEditingId) {
+        // Atualiza
+        const examIndex = bed.exams.findIndex(e => e.id === currentImageExamEditingId);
+        if (examIndex > -1) {
+            const oldExam = bed.exams[examIndex];
+            bed.exams[examIndex] = { ...oldExam, ...examData };
+        }
+    } else {
+        // Adiciona
+        bed.exams.push({ ...examData, id: crypto.randomUUID() });
+    }
+
+    saveData(state);
+    renderScreenB(); // Re-renderiza a tela B
+    hideModal('imageExamModal');
+});
+
+// Ajusta o textarea do modal de imagem
+document.getElementById('image-exam-summary').addEventListener('input', (e) => autoResizeTextarea(e.target));
+
+   // NOVO: Adiciona um helper para formatar a data (usado nos botões de deletar)
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}`;
+        } catch { return ''; }
+    };
+
+// --- FIM DO NOVO CÓDIGO (v12) ---
+
+    // --- Funções de Renderização (TELA C - NOVO) ---
+    function renderScreenC() {
+        const tasksListArea = document.getElementById('tasksListArea');
+        tasksListArea.innerHTML = '';
+        
+        const tasks = state.generalTasks || [];
+        
+        if (tasks.length === 0) {
+            tasksListArea.innerHTML = '<p class="text-sm text-slate-500 text-center py-4">Nenhuma tarefa adicionada.</p>';
+            return;
+        }
+
+        tasks.forEach((task, index) => {
+            const tpl = document.getElementById('taskItemTpl');
+            const node = tpl.content.cloneNode(true);
+            const checkbox = node.querySelector('input[type=checkbox]');
+            const textInput = node.querySelector('.task-text');
+            const removeBtn = node.querySelector('.remove-task');
+
+            checkbox.checked = task.done;
+            textInput.value = task.text;
+            if (task.done) {
+                textInput.classList.add('line-through', 'text-slate-500');
+            }
+
+            checkbox.addEventListener('change', () => {
+                task.done = checkbox.checked;
+                saveData(state);
+                renderScreenC(); // Re-renderiza para aplicar estilo
+            });
+
+            textInput.addEventListener('input', () => {
+                task.text = textInput.value;
+                saveData(state); // Salva a cada tecla
+            });
+
+            removeBtn.addEventListener('click', () => {
+                state.generalTasks.splice(index, 1);
+                saveData(state);
+                renderScreenC(); // Re-renderiza a lista
+            });
+
+            tasksListArea.appendChild(node);
+        });
+    }
+
+    // --- Funções de Ação (Globais) ---
+    
+    function addCondutaToPatient(bIdx, text = '') {
+      const b = state.beds[bIdx];
+      if (!b) return;
+      b.condutas = b.condutas || [];
+      b.condutas.push({ text, done: false });
+      b.isCondutaMinimized = false; 
+      saveData(state);
+      renderScreenB(); 
+    }
+
+    function updateConduta(bIdx, cIdx, { text, done }) {
+      const b = state.beds[bIdx];
+      if (!b || !b.condutas || !b.condutas[cIdx]) return;
+      if (typeof text === 'string') b.condutas[cIdx].text = text;
+      if (typeof done === 'boolean') b.condutas[cIdx].done = done;
+      saveData(state);
+    }
+    
+    function handleAddNewBed() {
+      const v = newBedNumberInput.value.trim();
+      if (!v) return;
+      const bedObj = {
+        bedNumber: v, patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '',
+        checks: { ev: false, p: false, ex: false, tev: false },
+        condutas: [], externalDoctor: { active: false, name: '' },
+        isVisited: false, reminderDate: '', trackers: [], 
+        isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
+        isArchived: false,
+	exams: [], isExamsMinimized: true,
+	dischargeForecast: ''
+      };
+      state.beds.push(bedObj);
+      saveData(state);
+      renderScreenA();
+      hideModal('addBedModal');
+      newBedNumberInput.value = '';
+      
+      const newIdx = state.beds.findIndex(b => b.bedNumber === v);
+      if (newIdx > -1) {
+        setTimeout(() => {
+            openPatientDetails(newIdx);
+            const nameInput = document.getElementById('patientDetailContent').querySelector('.inline-name');
+            if(nameInput) nameInput.focus();
+        }, 100);
+      }
+    }
+
+    // --- Inicialização e Eventos Globais ---
+    
+    // Navegação Tela A
+    document.getElementById('addBedBtn').addEventListener('click', () => {
+      showModal('addBedModal');
+      newBedNumberInput.focus();
+    });
+    document.getElementById('saveAddBedBtn').addEventListener('click', handleAddNewBed);
+    newBedNumberInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') handleAddNewBed(); });
+    document.getElementById('resetChecksBtn').addEventListener('click', () => {
+      showConfirm('Resetar todos os checks de visita (círculo e quadrados) para todos os pacientes ATIVOS?', () => {
+        state.beds.forEach(b => {
+          if (!b.isArchived) { 
+            b.checks = { ev: false, p: false, ex: false, tev: false };
+            b.isVisited = false;
+          }
+        });
+        state.lastReset = todayISO();
+        saveData(state);
+        renderScreenA();
+      });
+    });
+    document.getElementById('printBtn').addEventListener('click', () => {
+        const activeBeds = state.beds.map((b,i) => ({b,i})).filter(item => !item.b.isArchived);
+        const originalStates = activeBeds.map(item => ({ 
+            min: item.b.isMinimized, tmin: item.b.isTrackerMinimized, 
+            nmin: item.b.isNotesMinimized, cmin: item.b.isCondutaMinimized 
+        }));
+        activeBeds.forEach(item => {
+            item.b.isMinimized = false;
+            item.b.isDxMinimized = false; item.b.isTrackerMinimized = false; 
+            item.b.isNotesMinimized = false; item.b.isCondutaMinimized = false;
+        });
+        const printContainer = document.createElement('div');
+        printContainer.id = "print-area";
+        printContainer.className = "print:block hidden";
+        activeBeds.forEach(item => {
+            currentPatientIndex = item.i;
+            renderScreenB(); 
+            const cardHTML = patientDetailContent.innerHTML;
+            printContainer.innerHTML += cardHTML;
+        });
+        document.body.appendChild(printContainer);
+        window.print(); 
+        document.body.removeChild(printContainer);
+        activeBeds.forEach((item, idx) => {
+            item.b.isMinimized = originalStates[idx].min;
+            item.b.isTrackerMinimized = originalStates[idx].tmin;
+            item.b.isNotesMinimized = originalStates[idx].nmin;
+            item.b.isCondutaMinimized = originalStates[idx].cmin;
+        });
+        currentPatientIndex = null;
+        showScreen('list');
+        renderScreenA();
+    });
+    searchInput.addEventListener('input', renderScreenA);
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentSortKey = btn.dataset.sortKey;
+        renderScreenA();
+      });
+    });
+    const hideCompletedBtn = document.getElementById('hideCompletedBtn');
+    const hideCompletedSpan = hideCompletedBtn.querySelector('span');
+    hideCompletedBtn.addEventListener('click', () => {
+        hideCompleted = !hideCompleted;
+        hideCompletedBtn.setAttribute('aria-checked', hideCompleted);
+        hideCompletedBtn.classList.toggle('bg-sky-600', hideCompleted);
+        hideCompletedBtn.classList.toggle('bg-slate-200', !hideCompleted);
+        hideCompletedSpan.classList.toggle('translate-x-5', hideCompleted);
+        hideCompletedSpan.classList.toggle('translate-x-0', !hideCompleted);
+        renderScreenA();
+    });
+    toggleFiltersBtn.addEventListener('click', (e) => {
+        filtersPanel.classList.toggle('hidden');
+        e.currentTarget.classList.toggle('bg-slate-100');
+        const pt = filtersPanel.classList.contains('hidden') ? '120px' : '280px'; 
+        bedsListArea.style.paddingTop = pt;
+    });
+    
+    viewArchiveBtn.addEventListener('click', () => {
+        isViewingArchived = !isViewingArchived;
+        viewArchiveBtn.textContent = isViewingArchived ? "Ver Leitos Ativos" : "Ver Arquivados";
+        if (isViewingArchived) {
+            viewArchiveBtn.classList.add('bg-sky-100', 'text-sky-700');
+        } else {
+            viewArchiveBtn.classList.remove('bg-sky-100', 'text-sky-700');
+        }
+        searchInput.value = ''; 
+        renderScreenA();
+    });
+    
+    // NOVO: Listener do Botão de Tarefas
+    document.getElementById('openTasksBtn').addEventListener('click', () => showScreen('tasks'));
+
+    // Navegação Tela B
+    document.getElementById('backToListBtn').addEventListener('click', closePatientDetails);
+    
+    document.getElementById('prevPatientBtn').addEventListener('click', () => {
+        if (currentPatientIndex === null) return;
+        const currentListIndex = renderedBedIndexes.indexOf(currentPatientIndex);
+        if (currentListIndex === -1) return; 
+        const prevListIndex = (currentListIndex - 1 + renderedBedIndexes.length) % renderedBedIndexes.length;
+        openPatientDetails(renderedBedIndexes[prevListIndex]);
+    });
+    document.getElementById('nextPatientBtn').addEventListener('click', () => {
+        if (currentPatientIndex === null) return;
+        const currentListIndex = renderedBedIndexes.indexOf(currentPatientIndex);
+        if (currentListIndex === -1) return; 
+        const nextListIndex = (currentListIndex + 1) % renderedBedIndexes.length;
+        openPatientDetails(renderedBedIndexes[nextListIndex]);
+    });
+    
+    // Ações do Rodapé (Tela B)
+    document.getElementById('footerActionConduta').addEventListener('click', () => {
+        if (currentPatientIndex === null) return;
+        state.beds[currentPatientIndex].isCondutaMinimized = false;
+        renderScreenB();
+        setTimeout(() => {
+            const input = patientDetailContent.querySelector('.new-conduta-input');
+            if(input) {
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                input.focus();
+            }
+        }, 100);
+    });
+    document.getElementById('footerActionNote').addEventListener('click', () => {
+        if (currentPatientIndex === null) return;
+        state.beds[currentPatientIndex].isNotesMinimized = false;
+        renderScreenB();
+        setTimeout(() => {
+            const input = patientDetailContent.querySelector('.input-notes-inline');
+            if(input) {
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                input.focus();
+                if (input.value.trim() === '') {
+                    input.value = state.notesTemplate || globalNotesTemplate;
+                    input.dispatchEvent(new Event('input', { bubbles: true })); 
+                }
+                input.scrollTop = input.scrollHeight; 
+            }
+        }, 100);
+    });
+    document.getElementById('footerActionTracker').addEventListener('click', () => {
+        if (currentPatientIndex === null) return;
+        openTrackerModal(currentPatientIndex, null); // Abre em modo de ADIÇÃO
+    });
+    
+    // NOVO: Navegação e Ações (Tela C)
+    document.getElementById('backToListFromTasksBtn').addEventListener('click', () => showScreen('list'));
+    
+    const newTaskInput = document.getElementById('newTaskInput');
+    document.getElementById('addNewTaskBtn').addEventListener('click', () => {
+        const text = newTaskInput.value.trim();
+        if (text) {
+            state.generalTasks.push({
+                id: crypto.randomUUID(),
+                text: text,
+                done: false
+            });
+            saveData(state);
+            renderScreenC();
+            newTaskInput.value = '';
+        }
+    });
+    newTaskInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('addNewTaskBtn').click();
+        }
+    });
+
+    // Backup (Importar/Exportar)
+    document.getElementById('exportDataBtn').addEventListener('click', () => {
+      try {
+        const dataStr = JSON.stringify(state, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        const link = document.createElement('a');
+        link.href = dataUri;
+        link.download = `backup_caderno_visitas_${todayISO()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (e) { showConfirm(`Erro ao exportar: ${e.message}`, () => {}, "Erro", 'bg-red-600', 'Entendi'); }
+    });
+    document.getElementById('importDataInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const newState = JSON.parse(event.target.result);
+          if (!newState || typeof newState !== 'object' || !Array.isArray(newState.beds)) throw new Error("Formato inválido.");
+          showConfirm("Isso substituirá TODOS os dados atuais. Continuar?", () => {
+            const defaultState = loadData();
+            state.commonCondutas = newState.commonCondutas || defaultState.commonCondutas;
+            state.commonExtDocs = newState.commonExtDocs || defaultState.commonExtDocs; 
+            state.notesTemplate = newState.notesTemplate || defaultState.notesTemplate;
+            state.generalTasks = newState.generalTasks || defaultState.generalTasks; // NOVO
+            state.beds = newState.beds.map(b => ({ 
+                isVisited: false, reminderDate: '', trackers: [], 
+                isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
+                isArchived: b.isArchived || false,
+                dischargeForecast: b.dischargeForecast || '',
+                ...b
+            }));
+            state.lastReset = newState.lastReset || todayISO();
+            saveData(state);
+            renderScreenA();
+          }, "Importar Backup?", 'bg-green-600', 'Importar');
+        } catch (err) { showConfirm(`Falha ao ler o arquivo: ${err.message}`, () => {}, "Erro", 'bg-red-600', 'Entendi'); } 
+        finally { e.target.value = null; }
+      };
+      reader.readAsText(file);
+    });
+
+    // --- Renderização Inicial ---
+    
+    function getPastDate(daysAgo) {
+        const d = new Date(); d.setDate(d.getDate() - daysAgo);
+        return d.toISOString().split('T')[0];
+    }
+    if (state.beds.length === 0) {
+      state.beds = [
+        { bedNumber: '1012-A', patientName: 'Mariana Silva Dias', age: 32, admitDate: getPastDate(5), diagnoses: ['Pneumonia Comunitária', 'Insuficiência Respiratória'], hpp: 'HAS / DM2', notes: 'Evolução estável.\nLab: Hb 12.1, PCR 3.2\nExame físico: FC 70, PA 120x80, SpO2 98% em ar ambiente.\nEstertores crepitantes em base direita.', checks: { ev: true, p: true, ex: true, tev: true }, condutas: [{ text: 'Manter ATB (Ceftriaxona)', done: true }, { text: 'Aguardar resultado de cultura', done: false }], externalDoctor: { active: false, name: '' }, isVisited: true, reminderDate: '', trackers: [{id: 'abc', type: 'atb', name: 'Ceftriaxona', startDate: getPastDate(5), duration: 7}], isDxMinimized: false, isTrackerMinimized: false, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false },
+        { bedNumber: '1014-B', patientName: 'Carlos Andrade', age: 58, admitDate: getPastDate(2), diagnoses: ['Infarto Agudo do Miocárdio'], hpp: 'Tabagista', notes: 'Pós-cateterismo (Stent em DA)\nDor torácica resolvida\nCKMB e Troponina em queda', checks: { ev: true, p: false, ex: false, tev: true }, condutas: [{ text: 'Manter dupla antiagregação', done: true }], externalDoctor: { active: true, name: 'Dra. Beatriz (Cardio)' }, isVisited: false, reminderDate: getPastDate(-1), trackers: [], isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false },
+        { bedNumber: '1015-A', patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '', checks: { ev: false, p: false, ex: false, tev: false }, condutas: [], externalDoctor: { active: false, name: '' }, isVisited: false, reminderDate: '', trackers: [], isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false }
+      ];
+      state.lastReset = todayISO();
+      state.commonExtDocs = ['Dra. Beatriz (Cardio)'];
+      state.generalTasks = [{id: 'xyz', text: 'Ligar para Dr. João (Cardio)', done: false}];
+      saveData(state);
+    }
+
+    // Chama a renderização inicial
+    ensureDailyReset();
+    renderScreenA();
+  </script>
+</body>
+</html>
