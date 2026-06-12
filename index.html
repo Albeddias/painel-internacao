@@ -1185,12 +1185,15 @@
             const tpl = document.getElementById('archivedBedTpl');
             const node = tpl.content.cloneNode(true);
             node.querySelector('.bed-id').textContent = b.bedNumber || '—';
-            node.querySelector('.bed-name').textContent = b.patientName || 'Vazio';
-            
+            const altaInfo = b.archiveReason === 'alta' && b.dischargedAt ? ` · Alta em ${formatDate(b.dischargedAt)}` : '';
+            node.querySelector('.bed-name').textContent = (b.patientName || 'Vazio') + altaInfo;
+
             node.querySelector('.restore-bed-btn').addEventListener('click', () => {
                 b.isArchived = false;
+                b.archiveReason = null;
+                b.dischargedAt = '';
                 saveData(state);
-                renderScreenA(); 
+                renderScreenA();
             });
             
             node.querySelector('.delete-bed-btn').addEventListener('click', () => {
@@ -1271,28 +1274,25 @@
 
       // Botões de Ação do Card
       art.querySelector('.discharge-card').addEventListener('click', () => {
-        showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? Os dados serão limpos, mas o leito será mantido.`, () => {
-          Object.assign(b, {
-              patientName: '', age: '', admitDate: '', problems: [], hpp: '', notes: '',
-              checks: { ev: false, p: false, ex: false, tev: false },
-              condutas: [], externalDoctor: { active: false, name: '' },
-              isVisited: false, reminderDate: '', trackers: [], 
-              isProblemsMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-              isArchived: false,
-	      exams: [], isExamsMinimized: true,
-	      dischargeForecast: ''
-          });
+        showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? O registro completo será guardado em Arquivados e o leito ficará livre.`, () => {
+          const snapshot = JSON.parse(JSON.stringify(b));
+          snapshot.isArchived = true;
+          snapshot.archiveReason = 'alta';
+          snapshot.dischargedAt = todayISO();
+          state.beds.push(snapshot);
+          Object.assign(b, PainelCore.migrateBed({ bedNumber: b.bedNumber }));
           saveData(state);
           closePatientDetails();
-        });
+        }, "Dar Alta", 'bg-amber-600', 'Dar Alta');
       });
       
       art.querySelector('.archive-bed-btn').addEventListener('click', () => {
         showConfirm(`Arquivar o leito ${b.bedNumber}? Ele sairá da lista principal, mas poderá ser restaurado.`, () => {
           b.isArchived = true;
+          b.archiveReason = 'arquivado';
           saveData(state);
           closePatientDetails();
-        }, "Arquivar Leito", 'bg-slate-600', 'Arquivar'); 
+        }, "Arquivar Leito", 'bg-slate-600', 'Arquivar');
       });
       
       const reminderBtn = art.querySelector('.reminder-btn');
