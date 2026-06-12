@@ -497,15 +497,18 @@
         </div>
       </div>
 
-      <!-- Seção: Diagnósticos -->
+      <!-- Seção: Lista de Problemas -->
       <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900">Diagnósticos Principais</span>
+          <span class="text-base font-bold text-slate-900">Lista de Problemas</span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
-          <textarea class="input-dx-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Um diagnóstico por linha"></textarea>
-          <div class="small disp-dxcount text-xs text-slate-500 mt-1"></div>
+          <div class="problem-list space-y-1"></div>
+          <div class="flex gap-2 w-full mt-3">
+            <input class="new-problem-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo problema">
+            <button class="add-problem-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
+          </div>
         </div>
       </div>
       
@@ -1017,7 +1020,7 @@
               if (!searchTerm) return true;
               const name = (bed.patientName || '').toLowerCase();
               const num = (bed.bedNumber || '').toLowerCase();
-              const dx = (bed.diagnoses || []).join(' ').toLowerCase();
+              const dx = (bed.problems || []).map(p => p.descricao).join(' ').toLowerCase();
               const hpp = (bed.hpp || '').toLowerCase();
               return name.includes(searchTerm) || num.includes(searchTerm) || dx.includes(searchTerm) || hpp.includes(searchTerm);
             });
@@ -1236,11 +1239,11 @@
       art.querySelector('.discharge-card').addEventListener('click', () => {
         showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? Os dados serão limpos, mas o leito será mantido.`, () => {
           Object.assign(b, {
-              patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '',
+              patientName: '', age: '', admitDate: '', problems: [], hpp: '', notes: '',
               checks: { ev: false, p: false, ex: false, tev: false },
               condutas: [], externalDoctor: { active: false, name: '' },
               isVisited: false, reminderDate: '', trackers: [], 
-              isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
+              isProblemsMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
               isArchived: false,
 	      exams: [], isExamsMinimized: true,
 	      dischargeForecast: ''
@@ -1291,24 +1294,13 @@
       });
 
       // Seções Colapsáveis
-      setupCollapsibleSection(art, '.input-dx-inline', 'isDxMinimized', b, (el) => autoResizeTextarea(el));
+      setupCollapsibleSection(art, '.problem-list', 'isProblemsMinimized', b, (el) => renderProblemList(el, b, idx));
       setupCollapsibleSection(art, '.tracker-list', 'isTrackerMinimized', b, (el) => renderTrackerList(el, b, idx)); 
       setupCollapsibleSection(art, '.exams-content-wrapper', 'isExamsMinimized', b, (el) => renderExamsSection(el, b, idx));
       setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.conduta-list', 'isCondutaMinimized', b, (el) => renderCondutaList(el, b, idx));
 
       // Bind de Textareas e Listas
-      const dxInput = art.querySelector('.input-dx-inline');
-      dxInput.value = (b.diagnoses || []).join('\n');
-      dxInput.addEventListener('input', (e) => {
-        const raw = e.target.value;
-        b.diagnoses = raw.trim() ? raw.trim().split('\n').map(s => s.trim()).filter(Boolean) : [];
-        saveData(state);
-        art.querySelector('.disp-dxcount').textContent = b.diagnoses.length ? `${b.diagnoses.length} diagnóstico(s)` : '';
-        autoResizeTextarea(e.target);
-      });
-      art.querySelector('.disp-dxcount').textContent = b.diagnoses && b.diagnoses.length ? `${b.diagnoses.length} diagnóstico(s)` : '';
-
       const notesInput = art.querySelector('.input-notes-inline');
       notesInput.value = b.notes || '';
       notesInput.addEventListener('input', (e) => {
@@ -1331,7 +1323,6 @@
 
       patientDetailContent.appendChild(node);
 
-      if (!b.isDxMinimized) autoResizeTextarea(dxInput);
       if (!b.isNotesMinimized) autoResizeTextarea(notesInput);
     }
     
@@ -1454,6 +1445,67 @@
                 }
             });
         });
+    }
+
+    const PROBLEM_STATUS_NEXT = { ativo: 'resolvido', resolvido: 'cronico', cronico: 'ativo' };
+    const PROBLEM_STATUS_STYLE = {
+      ativo: 'bg-amber-100 text-amber-800',
+      resolvido: 'bg-green-100 text-green-800',
+      cronico: 'bg-slate-200 text-slate-700',
+    };
+    const PROBLEM_STATUS_LABEL = { ativo: 'Ativo', resolvido: 'Resolvido', cronico: 'Crônico' };
+
+    function renderProblemList(listElement, bed, bedIdx) {
+      listElement.innerHTML = '';
+      if (!bed.problems || bed.problems.length === 0) {
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum problema adicionado.</p>`;
+      }
+      (bed.problems || []).forEach((p, pi) => {
+        const it = document.createElement('div');
+        it.className = 'problem-item group py-1 border-b border-slate-100 last:border-b-0';
+        it.innerHTML = `
+          <div class="flex gap-2 items-center">
+            <button class="problem-status-chip flex-shrink-0 text-xs font-medium rounded-full px-2 py-1 ${PROBLEM_STATUS_STYLE[p.status] || PROBLEM_STATUS_STYLE.ativo}">${PROBLEM_STATUS_LABEL[p.status] || 'Ativo'}</button>
+            <input type="text" class="problem-desc flex-1 min-w-0 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${p.status === 'resolvido' ? 'line-through text-slate-500' : ''}" placeholder="Descreva o problema">
+            <button class="remove-problem flex-shrink-0 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+          <input type="text" class="problem-plan w-full text-xs p-1.5 pl-12 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 text-slate-600" placeholder="Plano (opcional)...">
+        `;
+        it.querySelector('.problem-desc').value = p.descricao || '';
+        it.querySelector('.problem-plan').value = p.plano || '';
+        it.querySelector('.problem-status-chip').addEventListener('click', () => {
+          p.status = PROBLEM_STATUS_NEXT[p.status] || 'ativo';
+          saveData(state);
+          renderScreenB();
+        });
+        it.querySelector('.problem-desc').addEventListener('input', (e) => { p.descricao = e.target.value; saveData(state); });
+        it.querySelector('.problem-plan').addEventListener('input', (e) => { p.plano = e.target.value; saveData(state); });
+        it.querySelector('.remove-problem').addEventListener('click', () => {
+          bed.problems.splice(pi, 1);
+          saveData(state);
+          renderScreenB();
+        });
+        listElement.appendChild(it);
+      });
+
+      const section = listElement.closest('.collapsible-section');
+      const addBtn = section.querySelector('.add-problem-btn');
+      const input = section.querySelector('.new-problem-input');
+      if (!addBtn.dataset.bound) {
+        addBtn.dataset.bound = '1';
+        const addProblem = () => {
+          const v = input.value.trim();
+          if (!v) return;
+          bed.problems.push({ id: PainelCore.uuid(), descricao: v, status: 'ativo', plano: '', ordem: bed.problems.length });
+          input.value = '';
+          saveData(state);
+          renderScreenB();
+        };
+        addBtn.addEventListener('click', addProblem);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addProblem(); });
+      }
     }
 
     function renderCondutaList(listElement, bed, bedIdx) {
@@ -2157,8 +2209,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         }));
         activeBeds.forEach(item => {
             item.b.isMinimized = false;
-            item.b.isDxMinimized = false; item.b.isTrackerMinimized = false; 
+            item.b.isProblemsMinimized = false; item.b.isTrackerMinimized = false;
             item.b.isNotesMinimized = false; item.b.isCondutaMinimized = false;
+            item.b.isAnamneseMinimized = false;
         });
         const printContainer = document.createElement('div');
         printContainer.id = "print-area";
