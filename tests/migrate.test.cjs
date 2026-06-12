@@ -66,3 +66,26 @@ test('defaultState: tem a forma esperada', () => {
   assert.ok(Array.isArray(s.commonCondutas));
   assert.ok(Array.isArray(s.pinnedExams));
 });
+
+test('migrateBed: conduta null/corrompida é descartada sem quebrar a migração', () => {
+  const s = PainelCore.migrateState({ beds: [{ ...V14_BED, condutas: [null, { text: 'OK', done: false }, 'lixo'] }] }, '2026-06-12');
+  assert.strictEqual(s.beds[0].condutas.length, 1);
+  assert.strictEqual(s.beds[0].condutas[0].text, 'OK');
+});
+
+test('migrateBed: problems vazio com diagnoses preenchido promove os diagnoses', () => {
+  const s = PainelCore.migrateState({ beds: [{ ...V14_BED, problems: [] }] }, '2026-06-12');
+  assert.strictEqual(s.beds[0].problems.length, 2);
+});
+
+test('migrateBed: arrays não compartilham referência com a entrada', () => {
+  const input = { ...V14_BED };
+  const s = PainelCore.migrateState({ beds: [input] }, '2026-06-12');
+  s.beds[0].trackers.push({ id: 'x', type: 'device', name: 'X', installDate: '2026-06-12' });
+  assert.strictEqual(input.trackers.length, 1);
+});
+
+test('migrateBed: archiveReason existente é preservado', () => {
+  const s = PainelCore.migrateState({ beds: [{ ...V14_BED, isArchived: true, archiveReason: 'alta' }] }, '2026-06-12');
+  assert.strictEqual(s.beds[0].archiveReason, 'alta');
+});

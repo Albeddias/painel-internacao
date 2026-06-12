@@ -57,17 +57,20 @@
       bedNumber: b.bedNumber || '', patientName: b.patientName || '',
       age: b.age === 0 ? 0 : (b.age || ''), admitDate: b.admitDate || '',
       hpp: b.hpp || '', anamneseInicial: b.anamneseInicial || '',
-      problems: b.problems || (b.diagnoses || []).map(function (d, i) {
-        return { id: uuid(), descricao: d, status: 'ativo', plano: '', ordem: i };
-      }),
+      problems: (b.problems && b.problems.length > 0)
+        ? b.problems
+        : (b.diagnoses || []).map(function (d, i) {
+            return { id: uuid(), descricao: d, status: 'ativo', plano: '', ordem: i };
+          }),
       notes: b.notes || '',
       condutas: (b.condutas || []).map(function (c) {
+        if (!c || typeof c !== 'object') return null;
         return { id: c.id || uuid(), text: c.text || '', done: !!c.done };
-      }),
-      trackers: b.trackers || [],
-      exams: b.exams || [],
-      rawTexts: b.rawTexts || [],
-      generatedDocs: b.generatedDocs || [],
+      }).filter(Boolean),
+      trackers: (b.trackers || []).filter(Boolean).slice(),
+      exams: (b.exams || []).filter(Boolean).slice(),
+      rawTexts: (b.rawTexts || []).filter(Boolean).slice(),
+      generatedDocs: (b.generatedDocs || []).filter(Boolean).slice(),
       externalDoctor: b.externalDoctor || { active: false, name: '' },
       checks: b.checks || { ev: false, p: false, ex: false, tev: false },
       isVisited: !!b.isVisited, reminderDate: b.reminderDate || '',
