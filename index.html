@@ -1578,6 +1578,7 @@
         det.appendChild(body);
         summary.querySelector('.remove-rawtext').addEventListener('click', (e) => {
           e.preventDefault();
+          e.stopPropagation();
           showConfirm('Remover este texto salvo?', () => {
             const i = bed.rawTexts.findIndex(x => x.id === r.id);
             if (i > -1) { bed.rawTexts.splice(i, 1); saveData(state); renderScreenB(); }
@@ -2305,13 +2306,14 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         const originalStates = activeBeds.map(item => ({
             min: item.b.isMinimized, tmin: item.b.isTrackerMinimized,
             nmin: item.b.isNotesMinimized, cmin: item.b.isCondutaMinimized,
-            pmin: item.b.isProblemsMinimized, amin: item.b.isAnamneseMinimized
+            pmin: item.b.isProblemsMinimized, amin: item.b.isAnamneseMinimized,
+            rmin: item.b.isRawTextsMinimized
         }));
         activeBeds.forEach(item => {
             item.b.isMinimized = false;
             item.b.isProblemsMinimized = false; item.b.isTrackerMinimized = false;
             item.b.isNotesMinimized = false; item.b.isCondutaMinimized = false;
-            item.b.isAnamneseMinimized = false;
+            item.b.isAnamneseMinimized = false; item.b.isRawTextsMinimized = false;
         });
         const printContainer = document.createElement('div');
         printContainer.id = "print-area";
@@ -2332,6 +2334,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             item.b.isCondutaMinimized = originalStates[idx].cmin;
             item.b.isProblemsMinimized = originalStates[idx].pmin;
             item.b.isAnamneseMinimized = originalStates[idx].amin;
+            item.b.isRawTextsMinimized = originalStates[idx].rmin;
         });
         currentPatientIndex = null;
         showScreen('list');
