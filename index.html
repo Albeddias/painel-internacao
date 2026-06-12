@@ -497,6 +497,17 @@
         </div>
       </div>
 
+      <!-- Seção: Anamnese Inicial -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Anamnese Inicial</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <textarea class="input-anamnese-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="História da admissão (escrita uma vez)..." rows="3"></textarea>
+        </div>
+      </div>
+
       <!-- Seção: Lista de Problemas -->
       <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
@@ -1295,6 +1306,7 @@
 
       // Seções Colapsáveis
       setupCollapsibleSection(art, '.problem-list', 'isProblemsMinimized', b, (el) => renderProblemList(el, b, idx));
+      setupCollapsibleSection(art, '.input-anamnese-inline', 'isAnamneseMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.tracker-list', 'isTrackerMinimized', b, (el) => renderTrackerList(el, b, idx)); 
       setupCollapsibleSection(art, '.exams-content-wrapper', 'isExamsMinimized', b, (el) => renderExamsSection(el, b, idx));
       setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
@@ -1305,6 +1317,14 @@
       notesInput.value = b.notes || '';
       notesInput.addEventListener('input', (e) => {
         b.notes = e.target.value;
+        saveData(state);
+        autoResizeTextarea(e.target);
+      });
+
+      const anamneseInput = art.querySelector('.input-anamnese-inline');
+      anamneseInput.value = b.anamneseInicial || '';
+      anamneseInput.addEventListener('input', (e) => {
+        b.anamneseInicial = e.target.value;
         saveData(state);
         autoResizeTextarea(e.target);
       });
