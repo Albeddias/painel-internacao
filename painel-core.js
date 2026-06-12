@@ -17,7 +17,8 @@
     });
   }
 
-  const IGNORED_WORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  // a palavra isolada "e" é mais provavelmente uma inicial abreviada do que conectivo
+  const IGNORED_WORDS = new Set(['de', 'da', 'do', 'das', 'dos']);
 
   function initialsFromName(name) {
     const words = String(name || '').trim().split(/\s+/)
@@ -30,7 +31,8 @@
   function fillPatientName(text, fullName) {
     const name = String(fullName || '').trim();
     if (!name) return text;
-    return String(text || '').split('[NOME]').join(name);
+    if (text == null) return text; // preserva null/undefined (ex.: conteudo ainda não gerado)
+    return String(text).split('[NOME]').join(name);
   }
 
   return {
