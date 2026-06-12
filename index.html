@@ -580,6 +580,29 @@
         </div>
       </div>
 
+      <!-- Seção: Texto do Prontuário -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Texto do Prontuário</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="rawtext-list space-y-2"></div>
+          <div class="mt-3 space-y-2">
+            <div class="flex gap-2">
+              <select class="new-rawtext-tipo text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1">
+                <option value="evolucao">Evolução</option>
+                <option value="prescricao">Prescrição</option>
+                <option value="admissao">Admissão</option>
+              </select>
+              <input class="new-rawtext-date text-sm p-2 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" type="date">
+            </div>
+            <textarea class="new-rawtext-textarea w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" rows="4" placeholder="Cole aqui o texto cru do prontuário..."></textarea>
+            <button class="add-rawtext-btn w-full text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-2 px-4 hover:bg-sky-100 transition-all print:hidden">Salvar texto</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Seção: Previsão de Alta -->
       <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
         <label class="section-title text-sm font-semibold text-slate-900 mb-2 block">Previsão de Alta</label>
@@ -1311,6 +1334,7 @@
       setupCollapsibleSection(art, '.exams-content-wrapper', 'isExamsMinimized', b, (el) => renderExamsSection(el, b, idx));
       setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.conduta-list', 'isCondutaMinimized', b, (el) => renderCondutaList(el, b, idx));
+      setupCollapsibleSection(art, '.rawtext-list', 'isRawTextsMinimized', b, (el) => renderRawTextList(el, b, idx));
 
       // Bind de Textareas e Listas
       const notesInput = art.querySelector('.input-notes-inline');
@@ -1525,6 +1549,61 @@
         };
         addBtn.addEventListener('click', addProblem);
         input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addProblem(); });
+      }
+    }
+
+    const RAWTEXT_LABEL = { evolucao: 'Evolução', prescricao: 'Prescrição', admissao: 'Admissão' };
+
+    function renderRawTextList(listElement, bed, bedIdx) {
+      listElement.innerHTML = '';
+      if (!bed.rawTexts || bed.rawTexts.length === 0) {
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum texto salvo. Cole abaixo o texto do prontuário — a IA usa esses textos para preencher a base e gerar documentos.</p>`;
+      }
+      (bed.rawTexts || []).slice().sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach((r) => {
+        const det = document.createElement('details');
+        det.className = 'group text-sm p-2 rounded-md bg-slate-50 border border-slate-200';
+        const summary = document.createElement('summary');
+        summary.className = 'cursor-pointer flex justify-between items-center gap-2';
+        summary.innerHTML = `
+          <span class="rawtext-label font-medium text-slate-700"></span>
+          <button class="remove-rawtext text-slate-400 hover:text-red-600 p-1 print:hidden" title="Remover">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+          </button>
+        `;
+        summary.querySelector('.rawtext-label').textContent = `${RAWTEXT_LABEL[r.tipo] || r.tipo} · ${formatDate(r.data)} · ${(r.texto || '').length} caracteres`;
+        const body = document.createElement('p');
+        body.className = 'text-slate-600 whitespace-pre-wrap mt-2 text-xs';
+        body.textContent = r.texto || '';
+        det.appendChild(summary);
+        det.appendChild(body);
+        summary.querySelector('.remove-rawtext').addEventListener('click', (e) => {
+          e.preventDefault();
+          showConfirm('Remover este texto salvo?', () => {
+            const i = bed.rawTexts.findIndex(x => x.id === r.id);
+            if (i > -1) { bed.rawTexts.splice(i, 1); saveData(state); renderScreenB(); }
+          });
+        });
+        listElement.appendChild(det);
+      });
+
+      const section = listElement.closest('.collapsible-section');
+      const addBtn = section.querySelector('.add-rawtext-btn');
+      if (!addBtn.dataset.bound) {
+        addBtn.dataset.bound = '1';
+        section.querySelector('.new-rawtext-date').value = todayISO();
+        addBtn.addEventListener('click', () => {
+          const texto = section.querySelector('.new-rawtext-textarea').value.trim();
+          if (!texto) return;
+          bed.rawTexts = bed.rawTexts || [];
+          bed.rawTexts.push({
+            id: PainelCore.uuid(),
+            tipo: section.querySelector('.new-rawtext-tipo').value,
+            data: section.querySelector('.new-rawtext-date').value || todayISO(),
+            texto: texto,
+          });
+          saveData(state);
+          renderScreenB();
+        });
       }
     }
 
