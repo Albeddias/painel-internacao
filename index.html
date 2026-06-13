@@ -2663,12 +2663,24 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     document.getElementById('authLoginBtn').addEventListener('click', doAuthLogin);
     document.getElementById('authPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') doAuthLogin(); });
 
+    function clearStoredSessionKeys() {
+      // Remove diretamente o token salvo — garante logout mesmo se a lib não tiver carregado.
+      try {
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && /^sb-.*-auth-token$/.test(k)) toRemove.push(k);
+        }
+        toRemove.forEach(k => localStorage.removeItem(k));
+      } catch (e) {}
+    }
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       try {
         await ensureSupabaseLib();
         if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         await sbClient.auth.signOut({ scope: 'local' }); // local: limpa a sessão mesmo offline
-      } catch (e) { /* offline: tudo bem, a sessão local é removida assim mesmo */ }
+      } catch (e) { /* offline ou lib indisponível: limpamos o token manualmente abaixo */ }
+      clearStoredSessionKeys();
       showAuthGate();
     });
 
