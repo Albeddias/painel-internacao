@@ -97,8 +97,16 @@
             <div id="progressCounter" class="text-sm font-medium text-slate-600">
               <!-- JS: T: 8 | V: 2 | P: 6 | E: 0 -->
             </div>
+            <div id="syncStatus" class="text-xs text-slate-500"></div>
           </div>
           <div class="flex gap-2">
+            <!-- Botões de Sync (Nuvem) -->
+            <button id="syncPushBtn" class="p-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all print:hidden" title="Enviar para a nuvem">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" /></svg>
+            </button>
+            <button id="syncPullBtn" class="p-2 bg-indigo-400 text-white font-medium rounded-lg hover:bg-indigo-500 transition-all print:hidden" title="Receber da nuvem">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-2.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" transform="rotate(180 10 11.5)" /></svg>
+            </button>
             <!-- Botão de Exportar (Seta Cima Azul) -->
             <button id="exportDataBtn" class="p-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 transition-all print:hidden" title="Exportar Backup">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 15.25a.75.75 0 00-1.5 0v-8.614L6.295 9.765a.75.75 0 10-1.09-1.03l4.25-4.5a.75.75 0 001.09 0l4.25 4.5a.75.75 0 00-1.09 1.03l-2.955-3.129v8.614Z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
@@ -380,6 +388,21 @@
     </div>
   </div>
 
+  <!-- === MODAL DE LOGIN (SYNC) === -->
+  <div id="syncLoginModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 class="text-lg font-bold text-slate-900">Login do Sync</h3>
+      <p class="text-sm text-slate-600 mt-1">Entre com sua conta do Supabase (feito uma vez por aparelho).</p>
+      <input id="syncEmailInput" type="email" placeholder="E-mail" autocomplete="username" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <input id="syncPasswordInput" type="password" placeholder="Senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <p id="syncLoginError" class="text-sm text-red-600 mt-2 hidden"></p>
+      <div class="flex gap-3 mt-5">
+        <button id="syncLoginCancelBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
+        <button id="syncLoginBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Entrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- =================================================================== -->
   <!-- TEMPLATES (Usados pelo JS)                                          -->
   <!-- =================================================================== -->
@@ -497,15 +520,29 @@
         </div>
       </div>
 
-      <!-- Seção: Diagnósticos -->
+      <!-- Seção: Anamnese Inicial -->
       <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900">Diagnósticos Principais</span>
+          <span class="text-base font-bold text-slate-900">Anamnese Inicial</span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
-          <textarea class="input-dx-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Um diagnóstico por linha"></textarea>
-          <div class="small disp-dxcount text-xs text-slate-500 mt-1"></div>
+          <textarea class="input-anamnese-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="História da admissão (escrita uma vez)..." rows="3"></textarea>
+        </div>
+      </div>
+
+      <!-- Seção: Lista de Problemas -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Lista de Problemas</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="problem-list space-y-1"></div>
+          <div class="flex gap-2 w-full mt-3">
+            <input class="new-problem-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo problema">
+            <button class="add-problem-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
+          </div>
         </div>
       </div>
       
@@ -566,6 +603,40 @@
         </div>
       </div>
 
+      <!-- Seção: Texto do Prontuário -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Texto do Prontuário</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="rawtext-list space-y-2"></div>
+          <div class="mt-3 space-y-2">
+            <div class="flex gap-2">
+              <select class="new-rawtext-tipo text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1">
+                <option value="evolucao">Evolução</option>
+                <option value="prescricao">Prescrição</option>
+                <option value="admissao">Admissão</option>
+              </select>
+              <input class="new-rawtext-date text-sm p-2 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" type="date">
+            </div>
+            <textarea class="new-rawtext-textarea w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" rows="4" placeholder="Cole aqui o texto cru do prontuário..."></textarea>
+            <button class="add-rawtext-btn w-full text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-2 px-4 hover:bg-sky-100 transition-all print:hidden">Salvar texto</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção: Documentos Gerados -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Documentos Gerados</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="gendoc-list space-y-2"></div>
+        </div>
+      </div>
+
       <!-- Seção: Previsão de Alta -->
       <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
         <label class="section-title text-sm font-semibold text-slate-900 mb-2 block">Previsão de Alta</label>
@@ -579,9 +650,11 @@
   </template>
 
 
+  <script src="painel-core.js"></script>
   <script>
     // Nova chave de storage
-    const STORAGE_KEY = 'wardBookData_v14_tasks'; // v11 -> v14 (erro meu)
+    const STORAGE_KEY = 'wardBookData_v16';
+    const OLD_STORAGE_KEY = 'wardBookData_v14_tasks';
 
     // --- Variáveis de Estado Global ---
     const globalNotesTemplate = "S: (Subjetivo)\n\nO: (Objetivo)\n- SSVV:\n- Exame:\n- Labs:\n- Imagem:\n\nA: (Avaliação)\n\nP: (Plano)\n";
@@ -928,35 +1001,18 @@
       }
     }
     
-      function loadData() {
-      const defaultState = {
-        beds: [], lastReset: todayISO(),
-        commonCondutas: ['Manter ATB', 'Solicitar Labs (Rotina)', 'Aguardar resultado de cultura', 'Monitorar SSVV', 'Dieta livre'],
-        commonExtDocs: [], 
-        notesTemplate: globalNotesTemplate,
-        generalTasks: [] ,
-        generalExams: [],
-        pinnedExams: ['Hb', 'Ht', 'Leucócitos', 'Plaquetas', 'Cr', 'Ur', 'Na', 'K', 'PCR', 'Glicemia']
-      };
+    function loadData() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return defaultState;
-        const parsed = JSON.parse(raw);
-        const mergedState = { ...defaultState, ...parsed };
-        mergedState.beds = mergedState.beds.map(b => ({
-          isVisited: false, reminderDate: '', trackers: [], 
-          isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-         isArchived: b.isArchived || false, 
-	exams: b.exams || [],
-	isExamsMinimized: b.isExamsMinimized !== undefined ? b.isExamsMinimized : true,
-	dischargeForecast: b.dischargeForecast || '',
-          ...b
-        }));
-        mergedState.generalTasks = mergedState.generalTasks || []; // NOVO
-       mergedState.generalExams = mergedState.generalExams || defaultState.generalExams;
-        mergedState.pinnedExams = mergedState.pinnedExams || defaultState.pinnedExams;
-        return mergedState;
-      } catch (e) { return defaultState; }
+        let raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          // migração automática a partir da versão antiga (mesmo navegador)
+          raw = localStorage.getItem(OLD_STORAGE_KEY);
+          if (!raw) return PainelCore.defaultState(todayISO());
+        }
+        const migrated = PainelCore.migrateState(JSON.parse(raw), todayISO());
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        return migrated;
+      } catch (e) { return PainelCore.defaultState(todayISO()); }
     }
     function saveData(s) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
@@ -1032,7 +1088,7 @@
               if (!searchTerm) return true;
               const name = (bed.patientName || '').toLowerCase();
               const num = (bed.bedNumber || '').toLowerCase();
-              const dx = (bed.diagnoses || []).join(' ').toLowerCase();
+              const dx = (bed.problems || []).map(p => p.descricao).join(' ').toLowerCase();
               const hpp = (bed.hpp || '').toLowerCase();
               return name.includes(searchTerm) || num.includes(searchTerm) || dx.includes(searchTerm) || hpp.includes(searchTerm);
             });
@@ -1163,12 +1219,15 @@
             const tpl = document.getElementById('archivedBedTpl');
             const node = tpl.content.cloneNode(true);
             node.querySelector('.bed-id').textContent = b.bedNumber || '—';
-            node.querySelector('.bed-name').textContent = b.patientName || 'Vazio';
-            
+            const altaInfo = b.archiveReason === 'alta' && b.dischargedAt ? ` · Alta em ${formatDate(b.dischargedAt)}` : '';
+            node.querySelector('.bed-name').textContent = (b.patientName || 'Vazio') + altaInfo;
+
             node.querySelector('.restore-bed-btn').addEventListener('click', () => {
                 b.isArchived = false;
+                b.archiveReason = null;
+                b.dischargedAt = '';
                 saveData(state);
-                renderScreenA(); 
+                renderScreenA();
             });
             
             node.querySelector('.delete-bed-btn').addEventListener('click', () => {
@@ -1249,28 +1308,25 @@
 
       // Botões de Ação do Card
       art.querySelector('.discharge-card').addEventListener('click', () => {
-        showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? Os dados serão limpos, mas o leito será mantido.`, () => {
-          Object.assign(b, {
-              patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '',
-              checks: { ev: false, p: false, ex: false, tev: false },
-              condutas: [], externalDoctor: { active: false, name: '' },
-              isVisited: false, reminderDate: '', trackers: [], 
-              isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-              isArchived: false,
-	      exams: [], isExamsMinimized: true,
-	      dischargeForecast: ''
-          });
+        showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? O registro completo será guardado em Arquivados e o leito ficará livre.`, () => {
+          const snapshot = JSON.parse(JSON.stringify(b));
+          snapshot.isArchived = true;
+          snapshot.archiveReason = 'alta';
+          snapshot.dischargedAt = todayISO();
+          state.beds.push(snapshot);
+          Object.assign(b, PainelCore.migrateBed({ bedNumber: b.bedNumber }));
           saveData(state);
           closePatientDetails();
-        });
+        }, "Dar Alta", 'bg-amber-600', 'Dar Alta');
       });
       
       art.querySelector('.archive-bed-btn').addEventListener('click', () => {
         showConfirm(`Arquivar o leito ${b.bedNumber}? Ele sairá da lista principal, mas poderá ser restaurado.`, () => {
           b.isArchived = true;
+          b.archiveReason = 'arquivado';
           saveData(state);
           closePatientDetails();
-        }, "Arquivar Leito", 'bg-slate-600', 'Arquivar'); 
+        }, "Arquivar Leito", 'bg-slate-600', 'Arquivar');
       });
       
       const reminderBtn = art.querySelector('.reminder-btn');
@@ -1306,28 +1362,28 @@
       });
 
       // Seções Colapsáveis
-      setupCollapsibleSection(art, '.input-dx-inline', 'isDxMinimized', b, (el) => autoResizeTextarea(el));
+      setupCollapsibleSection(art, '.problem-list', 'isProblemsMinimized', b, (el) => renderProblemList(el, b, idx));
+      setupCollapsibleSection(art, '.input-anamnese-inline', 'isAnamneseMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.tracker-list', 'isTrackerMinimized', b, (el) => renderTrackerList(el, b, idx)); 
       setupCollapsibleSection(art, '.exams-content-wrapper', 'isExamsMinimized', b, (el) => renderExamsSection(el, b, idx));
       setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.conduta-list', 'isCondutaMinimized', b, (el) => renderCondutaList(el, b, idx));
+      setupCollapsibleSection(art, '.rawtext-list', 'isRawTextsMinimized', b, (el) => renderRawTextList(el, b, idx));
+      setupCollapsibleSection(art, '.gendoc-list', 'isDocsMinimized', b, (el) => renderGeneratedDocsList(el, b, idx));
 
       // Bind de Textareas e Listas
-      const dxInput = art.querySelector('.input-dx-inline');
-      dxInput.value = (b.diagnoses || []).join('\n');
-      dxInput.addEventListener('input', (e) => {
-        const raw = e.target.value;
-        b.diagnoses = raw.trim() ? raw.trim().split('\n').map(s => s.trim()).filter(Boolean) : [];
-        saveData(state);
-        art.querySelector('.disp-dxcount').textContent = b.diagnoses.length ? `${b.diagnoses.length} diagnóstico(s)` : '';
-        autoResizeTextarea(e.target);
-      });
-      art.querySelector('.disp-dxcount').textContent = b.diagnoses && b.diagnoses.length ? `${b.diagnoses.length} diagnóstico(s)` : '';
-
       const notesInput = art.querySelector('.input-notes-inline');
       notesInput.value = b.notes || '';
       notesInput.addEventListener('input', (e) => {
         b.notes = e.target.value;
+        saveData(state);
+        autoResizeTextarea(e.target);
+      });
+
+      const anamneseInput = art.querySelector('.input-anamnese-inline');
+      anamneseInput.value = b.anamneseInicial || '';
+      anamneseInput.addEventListener('input', (e) => {
+        b.anamneseInicial = e.target.value;
         saveData(state);
         autoResizeTextarea(e.target);
       });
@@ -1346,7 +1402,6 @@
 
       patientDetailContent.appendChild(node);
 
-      if (!b.isDxMinimized) autoResizeTextarea(dxInput);
       if (!b.isNotesMinimized) autoResizeTextarea(notesInput);
     }
     
@@ -1469,6 +1524,174 @@
                 }
             });
         });
+    }
+
+    const PROBLEM_STATUS_NEXT = { ativo: 'resolvido', resolvido: 'cronico', cronico: 'ativo' };
+    const PROBLEM_STATUS_STYLE = {
+      ativo: 'bg-amber-100 text-amber-800',
+      resolvido: 'bg-green-100 text-green-800',
+      cronico: 'bg-slate-200 text-slate-700',
+    };
+    const PROBLEM_STATUS_LABEL = { ativo: 'Ativo', resolvido: 'Resolvido', cronico: 'Crônico' };
+
+    function renderProblemList(listElement, bed, bedIdx) {
+      listElement.innerHTML = '';
+      if (!bed.problems || bed.problems.length === 0) {
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum problema adicionado.</p>`;
+      }
+      (bed.problems || []).forEach((p, pi) => {
+        const it = document.createElement('div');
+        it.className = 'problem-item group py-1 border-b border-slate-100 last:border-b-0';
+        it.innerHTML = `
+          <div class="flex gap-2 items-center">
+            <button class="problem-status-chip flex-shrink-0 text-xs font-medium rounded-full px-2 py-1 ${PROBLEM_STATUS_STYLE[p.status] || PROBLEM_STATUS_STYLE.ativo}">${PROBLEM_STATUS_LABEL[p.status] || 'Ativo'}</button>
+            <input type="text" class="problem-desc flex-1 min-w-0 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${p.status === 'resolvido' ? 'line-through text-slate-500' : ''}" placeholder="Descreva o problema">
+            <button class="remove-problem flex-shrink-0 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+          <input type="text" class="problem-plan w-full text-xs p-1.5 pl-12 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 text-slate-600" placeholder="Plano (opcional)...">
+        `;
+        it.querySelector('.problem-desc').value = p.descricao || '';
+        it.querySelector('.problem-plan').value = p.plano || '';
+        it.querySelector('.problem-status-chip').addEventListener('click', () => {
+          p.status = PROBLEM_STATUS_NEXT[p.status] || 'ativo';
+          saveData(state);
+          renderScreenB();
+        });
+        it.querySelector('.problem-desc').addEventListener('input', (e) => { p.descricao = e.target.value; saveData(state); });
+        it.querySelector('.problem-plan').addEventListener('input', (e) => { p.plano = e.target.value; saveData(state); });
+        it.querySelector('.remove-problem').addEventListener('click', () => {
+          bed.problems.splice(pi, 1);
+          saveData(state);
+          renderScreenB();
+        });
+        listElement.appendChild(it);
+      });
+
+      const section = listElement.closest('.collapsible-section');
+      const addBtn = section.querySelector('.add-problem-btn');
+      const input = section.querySelector('.new-problem-input');
+      if (!addBtn.dataset.bound) {
+        addBtn.dataset.bound = '1';
+        const addProblem = () => {
+          const v = input.value.trim();
+          if (!v) return;
+          bed.problems.push({ id: PainelCore.uuid(), descricao: v, status: 'ativo', plano: '', ordem: bed.problems.length });
+          input.value = '';
+          saveData(state);
+          renderScreenB();
+        };
+        addBtn.addEventListener('click', addProblem);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addProblem(); });
+      }
+    }
+
+    const RAWTEXT_LABEL = { evolucao: 'Evolução', prescricao: 'Prescrição', admissao: 'Admissão' };
+
+    function renderRawTextList(listElement, bed, bedIdx) {
+      listElement.innerHTML = '';
+      if (!bed.rawTexts || bed.rawTexts.length === 0) {
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum texto salvo. Cole abaixo o texto do prontuário — a IA usa esses textos para preencher a base e gerar documentos.</p>`;
+      }
+      (bed.rawTexts || []).slice().sort((a, b) => (b.data || '').localeCompare(a.data || '')).forEach((r) => {
+        const det = document.createElement('details');
+        det.className = 'group text-sm p-2 rounded-md bg-slate-50 border border-slate-200';
+        const summary = document.createElement('summary');
+        summary.className = 'cursor-pointer flex justify-between items-center gap-2';
+        summary.innerHTML = `
+          <span class="rawtext-label font-medium text-slate-700"></span>
+          <button class="remove-rawtext text-slate-400 hover:text-red-600 p-1 print:hidden" title="Remover">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+          </button>
+        `;
+        summary.querySelector('.rawtext-label').textContent = `${RAWTEXT_LABEL[r.tipo] || r.tipo} · ${formatDate(r.data)} · ${(r.texto || '').length} caracteres`;
+        const body = document.createElement('p');
+        body.className = 'text-slate-600 whitespace-pre-wrap mt-2 text-xs';
+        body.textContent = r.texto || '';
+        det.appendChild(summary);
+        det.appendChild(body);
+        summary.querySelector('.remove-rawtext').addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showConfirm('Remover este texto salvo?', () => {
+            const i = bed.rawTexts.findIndex(x => x.id === r.id);
+            if (i > -1) { bed.rawTexts.splice(i, 1); saveData(state); renderScreenB(); }
+          });
+        });
+        listElement.appendChild(det);
+      });
+
+      const section = listElement.closest('.collapsible-section');
+      const addBtn = section.querySelector('.add-rawtext-btn');
+      if (!addBtn.dataset.bound) {
+        addBtn.dataset.bound = '1';
+        section.querySelector('.new-rawtext-date').value = todayISO();
+        addBtn.addEventListener('click', () => {
+          const texto = section.querySelector('.new-rawtext-textarea').value.trim();
+          if (!texto) return;
+          bed.rawTexts = bed.rawTexts || [];
+          bed.rawTexts.push({
+            id: PainelCore.uuid(),
+            tipo: section.querySelector('.new-rawtext-tipo').value,
+            data: section.querySelector('.new-rawtext-date').value || todayISO(),
+            texto: texto,
+          });
+          saveData(state);
+          renderScreenB();
+        });
+      }
+    }
+
+    const GENDOC_LABEL = { sumario_alta: 'Sumário de Alta', receituario: 'Receituário', laudo: 'Laudo' };
+
+    async function copyTextToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      }
+    }
+
+    function renderGeneratedDocsList(listElement, bed, bedIdx) {
+      listElement.innerHTML = '';
+      if (!bed.generatedDocs || bed.generatedDocs.length === 0) {
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum documento. Peça à IA para gerar (ex.: sumário de alta) e toque em Receber.</p>`;
+        return;
+      }
+      bed.generatedDocs.forEach((doc) => {
+        const det = document.createElement('details');
+        det.className = 'text-sm p-2 rounded-md bg-slate-50 border border-slate-200';
+        const createdStr = doc.createdAt ? new Date(doc.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        const summary = document.createElement('summary');
+        summary.className = 'cursor-pointer flex justify-between items-center gap-2';
+        summary.innerHTML = `
+          <span class="gendoc-label font-medium text-slate-700"></span>
+          <button class="copy-gendoc text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden">Copiar</button>
+        `;
+        summary.querySelector('.gendoc-label').textContent = `${GENDOC_LABEL[doc.tipo] || doc.tipo} ${createdStr}`.trim();
+        const body = document.createElement('p');
+        body.className = 'text-slate-600 whitespace-pre-wrap mt-2 text-xs';
+        body.textContent = PainelCore.fillPatientName(doc.conteudo || '', bed.patientName);
+        det.appendChild(summary);
+        det.appendChild(body);
+        summary.querySelector('.copy-gendoc').addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const ok = await copyTextToClipboard(PainelCore.fillPatientName(doc.conteudo || '', bed.patientName));
+          e.target.textContent = ok ? 'Copiado ✓' : 'Falhou';
+          setTimeout(() => { e.target.textContent = 'Copiar'; }, 2000);
+        });
+        listElement.appendChild(det);
+      });
     }
 
     function renderCondutaList(listElement, bed, bedIdx) {
@@ -2125,16 +2348,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     function handleAddNewBed() {
       const v = newBedNumberInput.value.trim();
       if (!v) return;
-      const bedObj = {
-        bedNumber: v, patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '',
-        checks: { ev: false, p: false, ex: false, tev: false },
-        condutas: [], externalDoctor: { active: false, name: '' },
-        isVisited: false, reminderDate: '', trackers: [], 
-        isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-        isArchived: false,
-	exams: [], isExamsMinimized: true,
-	dischargeForecast: ''
-      };
+      const bedObj = PainelCore.migrateBed({ bedNumber: v });
       state.beds.push(bedObj);
       saveData(state);
       renderScreenA();
@@ -2175,14 +2389,17 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     });
     document.getElementById('printBtn').addEventListener('click', () => {
         const activeBeds = state.beds.map((b,i) => ({b,i})).filter(item => !item.b.isArchived);
-        const originalStates = activeBeds.map(item => ({ 
-            min: item.b.isMinimized, tmin: item.b.isTrackerMinimized, 
-            nmin: item.b.isNotesMinimized, cmin: item.b.isCondutaMinimized 
+        const originalStates = activeBeds.map(item => ({
+            min: item.b.isMinimized, tmin: item.b.isTrackerMinimized,
+            nmin: item.b.isNotesMinimized, cmin: item.b.isCondutaMinimized,
+            pmin: item.b.isProblemsMinimized, amin: item.b.isAnamneseMinimized,
+            rmin: item.b.isRawTextsMinimized
         }));
         activeBeds.forEach(item => {
             item.b.isMinimized = false;
-            item.b.isDxMinimized = false; item.b.isTrackerMinimized = false; 
+            item.b.isProblemsMinimized = false; item.b.isTrackerMinimized = false;
             item.b.isNotesMinimized = false; item.b.isCondutaMinimized = false;
+            item.b.isAnamneseMinimized = false; item.b.isRawTextsMinimized = false;
         });
         const printContainer = document.createElement('div');
         printContainer.id = "print-area";
@@ -2201,6 +2418,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             item.b.isTrackerMinimized = originalStates[idx].tmin;
             item.b.isNotesMinimized = originalStates[idx].nmin;
             item.b.isCondutaMinimized = originalStates[idx].cmin;
+            item.b.isProblemsMinimized = originalStates[idx].pmin;
+            item.b.isAnamneseMinimized = originalStates[idx].amin;
+            item.b.isRawTextsMinimized = originalStates[idx].rmin;
         });
         currentPatientIndex = null;
         showScreen('list');
@@ -2346,19 +2566,8 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
           const newState = JSON.parse(event.target.result);
           if (!newState || typeof newState !== 'object' || !Array.isArray(newState.beds)) throw new Error("Formato inválido.");
           showConfirm("Isso substituirá TODOS os dados atuais. Continuar?", () => {
-            const defaultState = loadData();
-            state.commonCondutas = newState.commonCondutas || defaultState.commonCondutas;
-            state.commonExtDocs = newState.commonExtDocs || defaultState.commonExtDocs; 
-            state.notesTemplate = newState.notesTemplate || defaultState.notesTemplate;
-            state.generalTasks = newState.generalTasks || defaultState.generalTasks; // NOVO
-            state.beds = newState.beds.map(b => ({ 
-                isVisited: false, reminderDate: '', trackers: [], 
-                isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true,
-                isArchived: b.isArchived || false,
-                dischargeForecast: b.dischargeForecast || '',
-                ...b
-            }));
-            state.lastReset = newState.lastReset || todayISO();
+            const migrated = PainelCore.migrateState(newState, todayISO());
+            state = migrated;
             saveData(state);
             renderScreenA();
           }, "Importar Backup?", 'bg-green-600', 'Importar');
@@ -2368,25 +2577,131 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       reader.readAsText(file);
     });
 
-    // --- Renderização Inicial ---
-    
-    function getPastDate(daysAgo) {
-        const d = new Date(); d.setDate(d.getDate() - daysAgo);
-        return d.toISOString().split('T')[0];
-    }
-    if (state.beds.length === 0) {
-      state.beds = [
-        { bedNumber: '1012-A', patientName: 'Mariana Silva Dias', age: 32, admitDate: getPastDate(5), diagnoses: ['Pneumonia Comunitária', 'Insuficiência Respiratória'], hpp: 'HAS / DM2', notes: 'Evolução estável.\nLab: Hb 12.1, PCR 3.2\nExame físico: FC 70, PA 120x80, SpO2 98% em ar ambiente.\nEstertores crepitantes em base direita.', checks: { ev: true, p: true, ex: true, tev: true }, condutas: [{ text: 'Manter ATB (Ceftriaxona)', done: true }, { text: 'Aguardar resultado de cultura', done: false }], externalDoctor: { active: false, name: '' }, isVisited: true, reminderDate: '', trackers: [{id: 'abc', type: 'atb', name: 'Ceftriaxona', startDate: getPastDate(5), duration: 7}], isDxMinimized: false, isTrackerMinimized: false, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false },
-        { bedNumber: '1014-B', patientName: 'Carlos Andrade', age: 58, admitDate: getPastDate(2), diagnoses: ['Infarto Agudo do Miocárdio'], hpp: 'Tabagista', notes: 'Pós-cateterismo (Stent em DA)\nDor torácica resolvida\nCKMB e Troponina em queda', checks: { ev: true, p: false, ex: false, tev: true }, condutas: [{ text: 'Manter dupla antiagregação', done: true }], externalDoctor: { active: true, name: 'Dra. Beatriz (Cardio)' }, isVisited: false, reminderDate: getPastDate(-1), trackers: [], isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false },
-        { bedNumber: '1015-A', patientName: '', age: '', admitDate: '', diagnoses: [], hpp: '', notes: '', checks: { ev: false, p: false, ex: false, tev: false }, condutas: [], externalDoctor: { active: false, name: '' }, isVisited: false, reminderDate: '', trackers: [], isDxMinimized: false, isTrackerMinimized: true, isNotesMinimized: true, isCondutaMinimized: true, isArchived: false }
-      ];
-      state.lastReset = todayISO();
-      state.commonExtDocs = ['Dra. Beatriz (Cardio)'];
-      state.generalTasks = [{id: 'xyz', text: 'Ligar para Dr. João (Cardio)', done: false}];
-      saveData(state);
+    // --- Sincronização com Supabase ---
+    // A anon key é pública por design; a segurança vem do RLS (restrito ao dono) + login.
+    const SUPABASE_URL = 'https://kuhymtikommkoupynhkj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1aHltdGlrb21ta291cHluaGtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxOTQwNjEsImV4cCI6MjA4NDc3MDA2MX0.8yCEVzQ6KLBCgRhzDNgV9ar4l_UO1AakNS1VTgrVCLQ';
+    const TABLE_PREFIX = 'painel_'; // tabelas convivem com outro app no mesmo projeto
+    const SYNC_CHILD_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'exams', 'condutas', 'raw_texts'];
+    let sbClient = null;
+
+    function setSyncStatus(msg, isError = false) {
+      const el = document.getElementById('syncStatus');
+      el.textContent = msg;
+      el.className = 'text-xs ' + (isError ? 'text-red-600' : 'text-slate-500');
     }
 
-    // Chama a renderização inicial
+    async function ensureSupabaseLib() {
+      if (window.supabase) return;
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('sem conexão (não carregou a biblioteca)'));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function getSupabaseClient() {
+      await ensureSupabaseLib();
+      if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data } = await sbClient.auth.getSession();
+      if (!data.session) {
+        showModal('syncLoginModal');
+        throw new Error('faça login para sincronizar');
+      }
+      return sbClient;
+    }
+
+    document.getElementById('syncLoginCancelBtn').addEventListener('click', () => hideModal('syncLoginModal'));
+    document.getElementById('syncPasswordInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('syncLoginBtn').click();
+    });
+    document.getElementById('syncLoginBtn').addEventListener('click', async () => {
+      const errEl = document.getElementById('syncLoginError');
+      errEl.classList.add('hidden');
+      try {
+        await ensureSupabaseLib();
+        if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { error } = await sbClient.auth.signInWithPassword({
+          email: document.getElementById('syncEmailInput').value.trim(),
+          password: document.getElementById('syncPasswordInput').value,
+        });
+        if (error) throw error;
+        hideModal('syncLoginModal');
+        setSyncStatus('Login OK — toque em Enviar ou Receber.');
+      } catch (e) {
+        errEl.textContent = 'Erro: ' + e.message;
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    async function pushToSupabase() {
+      const btn = document.getElementById('syncPushBtn');
+      if (btn.disabled) return;
+      btn.disabled = true;
+      setSyncStatus('Enviando...');
+      try {
+        const sb = await getSupabaseClient();
+        const payload = PainelCore.buildPushPayload(state);
+        if (payload.patients.length === 0) { setSyncStatus('Nada para enviar.'); return; }
+        let res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
+        if (res.error) throw res.error;
+        const ids = payload.patients.map(p => p.id);
+        // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
+        // os filhos somem do banco até o próximo push (estado local é a fonte da verdade).
+        for (const t of SYNC_CHILD_TABLES) {
+          res = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
+          if (res.error) throw res.error;
+          if (payload[t].length) {
+            res = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
+            if (res.error) throw res.error;
+          }
+        }
+        res = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
+        if (res.error) throw res.error;
+        state.lastSyncAt = new Date().toISOString();
+        saveData(state);
+        setSyncStatus('Enviado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      } catch (e) {
+        setSyncStatus('Falha ao enviar: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function pullFromSupabase() {
+      const btn = document.getElementById('syncPullBtn');
+      if (btn.disabled) return;
+      btn.disabled = true;
+      setSyncStatus('Recebendo...');
+      try {
+        const sb = await getSupabaseClient();
+        const pulled = {};
+        for (const t of ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs']) {
+          const { data, error } = await sb.from(TABLE_PREFIX + t).select('*');
+          if (error) throw error;
+          pulled[t] = data;
+        }
+        PainelCore.applyPull(state, pulled);
+        state.lastSyncAt = new Date().toISOString();
+        saveData(state);
+        renderScreenA();
+        setSyncStatus('Recebido ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      } catch (e) {
+        setSyncStatus('Falha ao receber: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('syncPushBtn').addEventListener('click', pushToSupabase);
+    document.getElementById('syncPullBtn').addEventListener('click', pullFromSupabase);
+    if (state.lastSyncAt) {
+      setSyncStatus('Último sync: ' + new Date(state.lastSyncAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
+    }
+
+    // --- Renderização Inicial ---
     ensureDailyReset();
     renderScreenA();
   </script>

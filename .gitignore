@@ -1,0 +1,3 @@
+node_modules/
+*.local.json
+backup_caderno_visitas_*.json
