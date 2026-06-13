@@ -84,6 +84,21 @@
 <body class="bg-slate-50 text-slate-800 antialiased">
 
   <!-- =================================================================== -->
+  <!-- PORTÃO DE AUTENTICAÇÃO (visível por padrão = fail-closed)           -->
+  <!-- =================================================================== -->
+  <div id="authGate" class="fixed inset-0 bg-slate-100 z-[60] flex items-center justify-center p-4" style="display:flex;">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h1 class="text-xl font-bold text-slate-900">Caderno de Visitas</h1>
+      <p class="text-sm text-slate-600 mt-1">Entre com sua conta para acessar o painel.</p>
+      <input id="authEmail" type="email" placeholder="E-mail" autocomplete="username" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <input id="authPassword" type="password" placeholder="Senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <p id="authError" class="text-sm text-red-600 mt-2 hidden"></p>
+      <button id="authLoginBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 mt-4 hover:bg-sky-700 transition-all">Entrar</button>
+      <p class="text-xs text-slate-400 mt-3">Após o primeiro login, o app abre offline neste aparelho.</p>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
   <!-- TELA A: LISTA DE LEITOS (HOME)                                      -->
   <!-- =================================================================== -->
   <div id="screen-list" class="screen active">
@@ -156,6 +171,7 @@
             <button id="resetChecksBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Resetar dia</button>
             <button id="printBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all print:hidden">Imprimir</button>
             <button id="viewArchiveBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Ver Arquivados</button>
+            <button id="logoutBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Sair</button>
           </div>
         </div>
       </div>
@@ -388,20 +404,6 @@
     </div>
   </div>
 
-  <!-- === MODAL DE LOGIN (SYNC) === -->
-  <div id="syncLoginModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-      <h3 class="text-lg font-bold text-slate-900">Login do Sync</h3>
-      <p class="text-sm text-slate-600 mt-1">Entre com sua conta do Supabase (feito uma vez por aparelho).</p>
-      <input id="syncEmailInput" type="email" placeholder="E-mail" autocomplete="username" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
-      <input id="syncPasswordInput" type="password" placeholder="Senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
-      <p id="syncLoginError" class="text-sm text-red-600 mt-2 hidden"></p>
-      <div class="flex gap-3 mt-5">
-        <button id="syncLoginCancelBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
-        <button id="syncLoginBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Entrar</button>
-      </div>
-    </div>
-  </div>
 
   <!-- =================================================================== -->
   <!-- TEMPLATES (Usados pelo JS)                                          -->
@@ -2607,34 +2609,71 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const { data } = await sbClient.auth.getSession();
       if (!data.session) {
-        showModal('syncLoginModal');
-        throw new Error('faça login para sincronizar');
+        showAuthGate();
+        throw new Error('sessão expirada — faça login novamente');
       }
       return sbClient;
     }
 
-    document.getElementById('syncLoginCancelBtn').addEventListener('click', () => hideModal('syncLoginModal'));
-    document.getElementById('syncPasswordInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('syncLoginBtn').click();
-    });
-    document.getElementById('syncLoginBtn').addEventListener('click', async () => {
-      const errEl = document.getElementById('syncLoginError');
+    // --- Portão de autenticação ---
+    // Verifica de forma SÍNCRONA (sem rede) se já existe sessão Supabase salva neste aparelho.
+    // Assim o app abre offline após o primeiro login; sem sessão salva, o portão bloqueia.
+    function hasStoredSession() {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && /^sb-.*-auth-token$/.test(k)) {
+            const v = localStorage.getItem(k);
+            if (v && v.length > 20) return true;
+          }
+        }
+      } catch (e) {}
+      return false;
+    }
+    function showAuthGate() { document.getElementById('authGate').style.display = 'flex'; }
+    function hideAuthGate() { document.getElementById('authGate').style.display = 'none'; }
+
+    async function doAuthLogin() {
+      const errEl = document.getElementById('authError');
+      const btn = document.getElementById('authLoginBtn');
+      if (btn.disabled) return;
       errEl.classList.add('hidden');
+      btn.disabled = true;
+      const oldLabel = btn.textContent;
+      btn.textContent = 'Entrando...';
       try {
         await ensureSupabaseLib();
         if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const { error } = await sbClient.auth.signInWithPassword({
-          email: document.getElementById('syncEmailInput').value.trim(),
-          password: document.getElementById('syncPasswordInput').value,
+          email: document.getElementById('authEmail').value.trim(),
+          password: document.getElementById('authPassword').value,
         });
         if (error) throw error;
-        hideModal('syncLoginModal');
-        setSyncStatus('Login OK — toque em Enviar ou Receber.');
+        document.getElementById('authPassword').value = '';
+        hideAuthGate();
+        setSyncStatus('Login OK.');
       } catch (e) {
         errEl.textContent = 'Erro: ' + e.message;
         errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = oldLabel;
       }
+    }
+    document.getElementById('authLoginBtn').addEventListener('click', doAuthLogin);
+    document.getElementById('authPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') doAuthLogin(); });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try {
+        await ensureSupabaseLib();
+        if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        await sbClient.auth.signOut({ scope: 'local' }); // local: limpa a sessão mesmo offline
+      } catch (e) { /* offline: tudo bem, a sessão local é removida assim mesmo */ }
+      showAuthGate();
     });
+
+    // Na carga: se já há sessão salva, libera o app (mesmo offline); senão, mantém o portão.
+    if (hasStoredSession()) hideAuthGate();
 
     async function pushToSupabase() {
       const btn = document.getElementById('syncPushBtn');
