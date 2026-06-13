@@ -626,6 +626,17 @@
         </div>
       </div>
 
+      <!-- Seção: Documentos Gerados -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Documentos Gerados</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="gendoc-list space-y-2"></div>
+        </div>
+      </div>
+
       <!-- Seção: Previsão de Alta -->
       <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
         <label class="section-title text-sm font-semibold text-slate-900 mb-2 block">Previsão de Alta</label>
@@ -1358,6 +1369,7 @@
       setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.conduta-list', 'isCondutaMinimized', b, (el) => renderCondutaList(el, b, idx));
       setupCollapsibleSection(art, '.rawtext-list', 'isRawTextsMinimized', b, (el) => renderRawTextList(el, b, idx));
+      setupCollapsibleSection(art, '.gendoc-list', 'isDocsMinimized', b, (el) => renderGeneratedDocsList(el, b, idx));
 
       // Bind de Textareas e Listas
       const notesInput = art.querySelector('.input-notes-inline');
@@ -1629,6 +1641,57 @@
           renderScreenB();
         });
       }
+    }
+
+    const GENDOC_LABEL = { sumario_alta: 'Sumário de Alta', receituario: 'Receituário', laudo: 'Laudo' };
+
+    async function copyTextToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      }
+    }
+
+    function renderGeneratedDocsList(listElement, bed, bedIdx) {
+      listElement.innerHTML = '';
+      if (!bed.generatedDocs || bed.generatedDocs.length === 0) {
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum documento. Peça à IA para gerar (ex.: sumário de alta) e toque em Receber.</p>`;
+        return;
+      }
+      bed.generatedDocs.forEach((doc) => {
+        const det = document.createElement('details');
+        det.className = 'text-sm p-2 rounded-md bg-slate-50 border border-slate-200';
+        const createdStr = doc.createdAt ? new Date(doc.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        const summary = document.createElement('summary');
+        summary.className = 'cursor-pointer flex justify-between items-center gap-2';
+        summary.innerHTML = `
+          <span class="gendoc-label font-medium text-slate-700"></span>
+          <button class="copy-gendoc text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden">Copiar</button>
+        `;
+        summary.querySelector('.gendoc-label').textContent = `${GENDOC_LABEL[doc.tipo] || doc.tipo} ${createdStr}`.trim();
+        const body = document.createElement('p');
+        body.className = 'text-slate-600 whitespace-pre-wrap mt-2 text-xs';
+        body.textContent = PainelCore.fillPatientName(doc.conteudo || '', bed.patientName);
+        det.appendChild(summary);
+        det.appendChild(body);
+        summary.querySelector('.copy-gendoc').addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const ok = await copyTextToClipboard(PainelCore.fillPatientName(doc.conteudo || '', bed.patientName));
+          e.target.textContent = ok ? 'Copiado ✓' : 'Falhou';
+          setTimeout(() => { e.target.textContent = 'Copiar'; }, 2000);
+        });
+        listElement.appendChild(det);
+      });
     }
 
     function renderCondutaList(listElement, bed, bedIdx) {
