@@ -2,7 +2,9 @@
 -- Aplicado em 2026-06-12 no projeto Supabase "Gestão Médica" (kuhymtikommkoupynhkj).
 -- Tabelas com prefixo painel_ (convivem com o app Gestão Médica neste projeto).
 -- Privacidade: painel_patients.initials guarda APENAS iniciais; o nome completo nunca chega aqui.
--- RLS: acesso restrito EXCLUSIVAMENTE ao usuário __OWNER_EMAIL__ (projeto compartilhado com outros usuários).
+-- RLS: acesso restrito EXCLUSIVAMENTE ao usuário dono (projeto compartilhado com outros usuários).
+-- O e-mail do dono é substituído por __OWNER_EMAIL__ neste arquivo versionado; as policies
+-- aplicadas no banco usam o e-mail real. Ao re-aplicar, troque __OWNER_EMAIL__ pelo e-mail desejado.
 
 create extension if not exists moddatetime schema extensions;
 
