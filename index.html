@@ -97,8 +97,16 @@
             <div id="progressCounter" class="text-sm font-medium text-slate-600">
               <!-- JS: T: 8 | V: 2 | P: 6 | E: 0 -->
             </div>
+            <div id="syncStatus" class="text-xs text-slate-500"></div>
           </div>
           <div class="flex gap-2">
+            <!-- Botões de Sync (Nuvem) -->
+            <button id="syncPushBtn" class="p-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all print:hidden" title="Enviar para a nuvem">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" /></svg>
+            </button>
+            <button id="syncPullBtn" class="p-2 bg-indigo-400 text-white font-medium rounded-lg hover:bg-indigo-500 transition-all print:hidden" title="Receber da nuvem">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-2.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" transform="rotate(180 10 11.5)" /></svg>
+            </button>
             <!-- Botão de Exportar (Seta Cima Azul) -->
             <button id="exportDataBtn" class="p-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 transition-all print:hidden" title="Exportar Backup">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 15.25a.75.75 0 00-1.5 0v-8.614L6.295 9.765a.75.75 0 10-1.09-1.03l4.25-4.5a.75.75 0 001.09 0l4.25 4.5a.75.75 0 00-1.09 1.03l-2.955-3.129v8.614Z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
@@ -376,6 +384,21 @@
       <div class="flex gap-3 mt-5">
         <button id="cancelImageExamBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
         <button id="saveImageExamBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- === MODAL DE LOGIN (SYNC) === -->
+  <div id="syncLoginModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 class="text-lg font-bold text-slate-900">Login do Sync</h3>
+      <p class="text-sm text-slate-600 mt-1">Entre com sua conta do Supabase (feito uma vez por aparelho).</p>
+      <input id="syncEmailInput" type="email" placeholder="E-mail" autocomplete="username" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <input id="syncPasswordInput" type="password" placeholder="Senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <p id="syncLoginError" class="text-sm text-red-600 mt-2 hidden"></p>
+      <div class="flex gap-3 mt-5">
+        <button id="syncLoginCancelBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
+        <button id="syncLoginBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Entrar</button>
       </div>
     </div>
   </div>
@@ -2490,6 +2513,115 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       };
       reader.readAsText(file);
     });
+
+    // --- Sincronização com Supabase ---
+    // A anon key é pública por design; a segurança vem do RLS (restrito ao dono) + login.
+    const SUPABASE_URL = 'https://kuhymtikommkoupynhkj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1aHltdGlrb21ta291cHluaGtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxOTQwNjEsImV4cCI6MjA4NDc3MDA2MX0.8yCEVzQ6KLBCgRhzDNgV9ar4l_UO1AakNS1VTgrVCLQ';
+    const TABLE_PREFIX = 'painel_'; // tabelas convivem com outro app no mesmo projeto
+    const SYNC_CHILD_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'exams', 'condutas', 'raw_texts'];
+    let sbClient = null;
+
+    function setSyncStatus(msg, isError = false) {
+      const el = document.getElementById('syncStatus');
+      el.textContent = msg;
+      el.className = 'text-xs ' + (isError ? 'text-red-600' : 'text-slate-500');
+    }
+
+    async function ensureSupabaseLib() {
+      if (window.supabase) return;
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('sem conexão (não carregou a biblioteca)'));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function getSupabaseClient() {
+      await ensureSupabaseLib();
+      if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data } = await sbClient.auth.getSession();
+      if (!data.session) {
+        showModal('syncLoginModal');
+        throw new Error('faça login para sincronizar');
+      }
+      return sbClient;
+    }
+
+    document.getElementById('syncLoginCancelBtn').addEventListener('click', () => hideModal('syncLoginModal'));
+    document.getElementById('syncLoginBtn').addEventListener('click', async () => {
+      const errEl = document.getElementById('syncLoginError');
+      errEl.classList.add('hidden');
+      try {
+        await ensureSupabaseLib();
+        if (!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { error } = await sbClient.auth.signInWithPassword({
+          email: document.getElementById('syncEmailInput').value.trim(),
+          password: document.getElementById('syncPasswordInput').value,
+        });
+        if (error) throw error;
+        hideModal('syncLoginModal');
+        setSyncStatus('Login OK — toque em Enviar ou Receber.');
+      } catch (e) {
+        errEl.textContent = 'Erro: ' + e.message;
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    async function pushToSupabase() {
+      setSyncStatus('Enviando...');
+      try {
+        const sb = await getSupabaseClient();
+        const payload = PainelCore.buildPushPayload(state);
+        if (payload.patients.length === 0) { setSyncStatus('Nada para enviar.'); return; }
+        let res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
+        if (res.error) throw res.error;
+        const ids = payload.patients.map(p => p.id);
+        for (const t of SYNC_CHILD_TABLES) {
+          res = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
+          if (res.error) throw res.error;
+          if (payload[t].length) {
+            res = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
+            if (res.error) throw res.error;
+          }
+        }
+        res = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
+        if (res.error) throw res.error;
+        state.lastSyncAt = new Date().toISOString();
+        saveData(state);
+        setSyncStatus('Enviado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      } catch (e) {
+        setSyncStatus('Falha ao enviar: ' + e.message, true);
+      }
+    }
+
+    async function pullFromSupabase() {
+      setSyncStatus('Recebendo...');
+      try {
+        const sb = await getSupabaseClient();
+        const pulled = {};
+        for (const t of ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs']) {
+          const { data, error } = await sb.from(TABLE_PREFIX + t).select('*');
+          if (error) throw error;
+          pulled[t] = data;
+        }
+        PainelCore.applyPull(state, pulled);
+        state.lastSyncAt = new Date().toISOString();
+        saveData(state);
+        renderScreenA();
+        setSyncStatus('Recebido ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      } catch (e) {
+        setSyncStatus('Falha ao receber: ' + e.message, true);
+      }
+    }
+
+    document.getElementById('syncPushBtn').addEventListener('click', pushToSupabase);
+    document.getElementById('syncPullBtn').addEventListener('click', pullFromSupabase);
+    if (state.lastSyncAt) {
+      setSyncStatus('Último sync: ' + new Date(state.lastSyncAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
+    }
 
     // --- Renderização Inicial ---
     ensureDailyReset();
