@@ -2551,6 +2551,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     }
 
     document.getElementById('syncLoginCancelBtn').addEventListener('click', () => hideModal('syncLoginModal'));
+    document.getElementById('syncPasswordInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('syncLoginBtn').click();
+    });
     document.getElementById('syncLoginBtn').addEventListener('click', async () => {
       const errEl = document.getElementById('syncLoginError');
       errEl.classList.add('hidden');
@@ -2571,6 +2574,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     });
 
     async function pushToSupabase() {
+      const btn = document.getElementById('syncPushBtn');
+      if (btn.disabled) return;
+      btn.disabled = true;
       setSyncStatus('Enviando...');
       try {
         const sb = await getSupabaseClient();
@@ -2579,6 +2585,8 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         let res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
         if (res.error) throw res.error;
         const ids = payload.patients.map(p => p.id);
+        // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
+        // os filhos somem do banco até o próximo push (estado local é a fonte da verdade).
         for (const t of SYNC_CHILD_TABLES) {
           res = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
           if (res.error) throw res.error;
@@ -2594,10 +2602,15 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         setSyncStatus('Enviado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
       } catch (e) {
         setSyncStatus('Falha ao enviar: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
       }
     }
 
     async function pullFromSupabase() {
+      const btn = document.getElementById('syncPullBtn');
+      if (btn.disabled) return;
+      btn.disabled = true;
       setSyncStatus('Recebendo...');
       try {
         const sb = await getSupabaseClient();
@@ -2614,6 +2627,8 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         setSyncStatus('Recebido ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
       } catch (e) {
         setSyncStatus('Falha ao receber: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
       }
     }
 
