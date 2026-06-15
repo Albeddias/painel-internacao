@@ -103,7 +103,7 @@
   <!-- =================================================================== -->
   <div id="screen-list" class="screen active">
     <!-- CABEÇALHO FIXO (TELA A) -->
-    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
+    <header id="listHeader" class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
       <div class="container mx-auto max-w-7xl">
         <!-- Linha 1: Título e Ações Principais -->
         <div class="flex justify-between items-center">
@@ -178,7 +178,7 @@
     </header>
 
     <!-- LISTA DE LEITOS (TELA A) -->
-    <main id="bedsListArea" class="container mx-auto max-w-7xl p-3 space-y-2" style="padding-top: 120px;">
+    <main id="bedsListArea" class="container mx-auto max-w-7xl p-3 space-y-2" style="padding-top: 120px;"><!-- padding-top é ajustado dinamicamente por adjustListPadding() conforme a altura real do header -->
       <!-- Cards da Lista são renderizados aqui pelo JS -->
     </main>
   </div>
@@ -2448,12 +2448,25 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         hideCompletedSpan.classList.toggle('translate-x-0', !hideCompleted);
         renderScreenA();
     });
+    const listHeader = document.getElementById('listHeader');
+    // Mede a altura real do header fixo e reserva esse espaço na lista (+ folga),
+    // evitando que o header sobreponha o primeiro card — com ou sem painel de filtros aberto.
+    function adjustListPadding() {
+        if (!listHeader) return;
+        bedsListArea.style.paddingTop = (listHeader.offsetHeight + 12) + 'px';
+    }
+
     toggleFiltersBtn.addEventListener('click', (e) => {
         filtersPanel.classList.toggle('hidden');
         e.currentTarget.classList.toggle('bg-slate-100');
-        const pt = filtersPanel.classList.contains('hidden') ? '120px' : '280px'; 
-        bedsListArea.style.paddingTop = pt;
+        adjustListPadding();
     });
+
+    window.addEventListener('resize', adjustListPadding);
+    if (listHeader && typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(adjustListPadding).observe(listHeader);
+    }
+    adjustListPadding();
     
     viewArchiveBtn.addEventListener('click', () => {
         isViewingArchived = !isViewingArchived;
