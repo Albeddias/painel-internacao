@@ -94,8 +94,71 @@ test('applyPull: paciente desconhecido vira leito novo com iniciais como nome pr
   assert.strictEqual(state.beds[0].patientId, 'novo-1');
 });
 
-test('applyPull: não deleta leitos locais ausentes do banco', () => {
+test('applyPull: NÃO deleta leito local nunca sincronizado (criado offline, ainda não enviado)', () => {
   const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  // syncedPatientIds vazio => leito é novo local => pull não pode removê-lo
   PainelCore.applyPull(state, { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [] });
+  assert.strictEqual(state.beds.length, 1, 'leito novo local deve ser preservado');
+});
+
+test('applyPull: REMOVE leito já sincronizado que sumiu do banco (deletado em outro aparelho)', () => {
+  const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  const pid = state.beds[0].patientId;
+  // simula que esse paciente já foi sincronizado antes
+  state.syncedPatientIds = [pid];
+  // banco volta vazio => paciente foi deletado em outro aparelho
+  PainelCore.applyPull(state, { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [] });
+  assert.strictEqual(state.beds.length, 0, 'leito sincronizado ausente do banco deve ser removido');
+});
+
+test('applyPull: atualiza syncedPatientIds com os ids vindos do banco', () => {
+  const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  const pid = state.beds[0].patientId;
+  const payload = PainelCore.buildPushPayload(state);
+  PainelCore.applyPull(state, { ...payload, generated_docs: [] });
+  assert.deepStrictEqual(state.syncedPatientIds, [pid]);
+});
+
+test('applyPull: leito sincronizado E presente no banco permanece (não é removido)', () => {
+  const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  const pid = state.beds[0].patientId;
+  state.syncedPatientIds = [pid];
+  const payload = PainelCore.buildPushPayload(state);
+  PainelCore.applyPull(state, { ...payload, generated_docs: [] });
   assert.strictEqual(state.beds.length, 1);
+});
+
+// --- Tombstones: deleção de paciente propaga ao banco ---
+
+test('defaultState/migrateState têm deletedPatientIds', () => {
+  assert.deepStrictEqual(PainelCore.defaultState('2026-06-12').deletedPatientIds, []);
+  const migrated = PainelCore.migrateState({ beds: [] }, '2026-06-12');
+  assert.deepStrictEqual(migrated.deletedPatientIds, []);
+});
+
+test('markPatientDeleted: registra id, deduplica e ignora vazios', () => {
+  const state = PainelCore.defaultState('2026-06-12');
+  PainelCore.markPatientDeleted(state, 'pid-1');
+  PainelCore.markPatientDeleted(state, 'pid-1'); // duplicado
+  PainelCore.markPatientDeleted(state, '');      // ignorado
+  PainelCore.markPatientDeleted(state, null);    // ignorado
+  PainelCore.markPatientDeleted(state, 'pid-2');
+  assert.deepStrictEqual(state.deletedPatientIds, ['pid-1', 'pid-2']);
+});
+
+test('buildPushPayload: expõe deletePatientIds para o push apagar no banco', () => {
+  const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  PainelCore.markPatientDeleted(state, 'pid-removido');
+  const p = PainelCore.buildPushPayload(state);
+  assert.deepStrictEqual(p.deletePatientIds, ['pid-removido']);
+});
+
+test('applyPull: não ressuscita paciente deletado localmente (tombstone pendente)', () => {
+  const state = PainelCore.defaultState('2026-06-12');
+  PainelCore.markPatientDeleted(state, 'morto-1');
+  PainelCore.applyPull(state, {
+    patients: [{ id: 'morto-1', bed_number: '3003-C', initials: 'X.Y.', status: 'arquivado' }],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [],
+  });
+  assert.strictEqual(state.beds.length, 0, 'paciente deletado não deve voltar no pull');
 });

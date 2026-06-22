@@ -39,7 +39,7 @@
 
   function defaultState(todayStr) {
     return {
-      beds: [], lastReset: todayStr, lastSyncAt: null,
+      beds: [], lastReset: todayStr, lastSyncAt: null, deletedPatientIds: [], syncedPatientIds: [],
       commonCondutas: ['Manter ATB', 'Solicitar Labs (Rotina)', 'Aguardar resultado de cultura', 'Monitorar SSVV', 'Dieta livre'],
       commonExtDocs: [],
       notesTemplate: GLOBAL_NOTES_TEMPLATE,
@@ -94,14 +94,27 @@
     const s = Object.assign({}, def, parsed || {});
     s.beds = (s.beds || []).map(migrateBed);
     s.lastSyncAt = s.lastSyncAt || null;
+    s.deletedPatientIds = s.deletedPatientIds || [];
+    s.syncedPatientIds = s.syncedPatientIds || [];
     s.generalTasks = s.generalTasks || [];
     s.generalExams = s.generalExams || [];
     s.pinnedExams = s.pinnedExams || def.pinnedExams;
     return s;
   }
 
+  // Registra um "tombstone": paciente deletado localmente que o próximo push deve
+  // apagar do banco (e que o pull não deve ressuscitar enquanto a deleção estiver pendente).
+  function markPatientDeleted(state, patientId) {
+    if (!patientId) return state;
+    state.deletedPatientIds = state.deletedPatientIds || [];
+    if (state.deletedPatientIds.indexOf(patientId) === -1) {
+      state.deletedPatientIds.push(patientId);
+    }
+    return state;
+  }
+
   function buildPushPayload(state) {
-    const out = { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [] };
+    const out = { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], deletePatientIds: (state.deletedPatientIds || []).slice() };
     (state.beds || []).forEach(function (b) {
       if (!b.patientId) return;
       const pid = b.patientId;
@@ -160,7 +173,27 @@
       notes = byPatient(pulled.notes), rawTexts = byPatient(pulled.raw_texts),
       docs = byPatient(pulled.generated_docs);
 
+    const deletedPending = {};
+    (state.deletedPatientIds || []).forEach(function (id) { deletedPending[id] = true; });
+
+    // Conjunto de pacientes presentes neste pull (verdade atual do banco, com escopo RLS do dono).
+    const pulledIds = {};
+    (pulled.patients || []).forEach(function (p) { pulledIds[p.id] = true; });
+
+    // Remove leitos que JÁ foram sincronizados antes mas sumiram do banco (deletados em outro
+    // aparelho). Leitos nunca sincronizados (criados offline, ainda não enviados) são preservados.
+    const previouslySynced = {};
+    (state.syncedPatientIds || []).forEach(function (id) { previouslySynced[id] = true; });
+    state.beds = (state.beds || []).filter(function (b) {
+      if (!b.patientId) return true;                 // leito vazio: mantém
+      if (!previouslySynced[b.patientId]) return true; // novo local: mantém
+      if (deletedPending[b.patientId]) return true;  // deleção local pendente: o push é quem resolve
+      return !!pulledIds[b.patientId];               // sincronizado: só mantém se ainda existe no banco
+    });
+
     (pulled.patients || []).forEach(function (p) {
+      // não ressuscita paciente deletado localmente cujo tombstone ainda não foi sincronizado
+      if (deletedPending[p.id]) return;
       let bed = (state.beds || []).find(function (b) { return b.patientId === p.id; });
       if (!bed) {
         // paciente criado direto no banco (raro): cria leito com iniciais como nome provisório
@@ -211,6 +244,9 @@
         .sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); })
         .map(function (r) { return { id: r.id, tipo: r.tipo, conteudo: r.conteudo, createdAt: r.created_at }; });
     });
+
+    // Verdade do banco após este pull: usado no próximo pull para detectar deleções remotas.
+    state.syncedPatientIds = Object.keys(pulledIds);
     return state;
   }
 
@@ -223,5 +259,6 @@
     migrateState: migrateState,
     buildPushPayload: buildPushPayload,
     applyPull: applyPull,
+    markPatientDeleted: markPatientDeleted,
   };
 });

@@ -169,7 +169,6 @@
           <!-- Ações -->
           <div id="filter-actions" class="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
             <button id="resetChecksBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Resetar dia</button>
-            <button id="printBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all print:hidden">Imprimir</button>
             <button id="viewArchiveBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Ver Arquivados</button>
             <button id="logoutBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Sair</button>
           </div>
@@ -444,13 +443,13 @@
 
   <!-- === TEMPLATE DO LEITO ARQUIVADO (TELA A) === -->
   <template id="archivedBedTpl">
-    <div class="list-card bg-white rounded-xl shadow-lg border border-slate-200/50 p-3 transition-all">
-        <div class="flex justify-between items-center">
-            <div>
+    <div class="list-card bg-white rounded-xl shadow-lg border border-slate-200/50 p-3 transition-all cursor-pointer hover:border-slate-300">
+        <div class="flex justify-between items-center gap-3">
+            <div class="min-w-0 flex-1">
                 <div class="bed-id font-bold text-xl text-slate-800"></div>
                 <div class="bed-name text-sm text-slate-600 truncate"></div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-shrink-0">
                 <button class="restore-bed-btn text-sm bg-green-100 text-green-800 font-medium rounded-lg py-2 px-3 hover:bg-green-200 transition-all">Restaurar</button>
                 <button class="delete-bed-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
             </div>
@@ -727,8 +726,13 @@
       }
     }
 
+    // Aba de exames ativa ('labs' | 'images') — preservada entre re-renders do mesmo paciente,
+    // resetada ao abrir outro paciente. Evita voltar sempre para "Laboratoriais" a cada toque.
+    let currentExamTab = 'labs';
+
     function openPatientDetails(bedIndex) {
       currentPatientIndex = bedIndex;
+      currentExamTab = 'labs';
       renderScreenB();
       showScreen('details');
     }
@@ -983,6 +987,21 @@
       { bg: '#cffafe', text: '#0e7490' },
     ];
 
+    // Escapa texto livre do usuário antes de inseri-lo via innerHTML (evita quebra de markup /
+    // perda de dados na tela quando o texto contém < > " & — ex.: exame "Cr<2", conduta com aspas).
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Extrai o primeiro número de um resultado de lab ("9.5", "120k", "<1,0") para comparar tendência.
+    // Retorna null se não houver número (ex.: "Aguardando", "negativo").
+    function parseLabNumber(v) {
+      const m = String(v == null ? '' : v).replace(',', '.').match(/-?\d+(\.\d+)?/);
+      return m ? parseFloat(m[0]) : null;
+    }
+
     function getDoctorColorClasses(name) {
       if (!name) return 'background-color: #e5e7eb; color: #374151;'; // cinza
       let hash = 0;
@@ -1023,6 +1042,7 @@
       const today = todayISO();
       if (state.lastReset !== today) {
         state.beds.forEach(b => {
+          if (b.isArchived) return; // arquivados não participam do dia (consistente com "Resetar dia")
           b.checks = { ev: false, p: false, ex: false, tev: false };
           b.isVisited = false;
         });
@@ -1220,26 +1240,34 @@
           bedsToRender.forEach(({ bed: b, originalIndex: idx }) => {
             const tpl = document.getElementById('archivedBedTpl');
             const node = tpl.content.cloneNode(true);
+            const card = node.querySelector('.list-card');
             node.querySelector('.bed-id').textContent = b.bedNumber || '—';
             const altaInfo = b.archiveReason === 'alta' && b.dischargedAt ? ` · Alta em ${formatDate(b.dischargedAt)}` : '';
             node.querySelector('.bed-name').textContent = (b.patientName || 'Vazio') + altaInfo;
 
-            node.querySelector('.restore-bed-btn').addEventListener('click', () => {
+            card.addEventListener('click', () => {
+                openPatientDetails(idx);
+            });
+
+            node.querySelector('.restore-bed-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
                 b.isArchived = false;
                 b.archiveReason = null;
                 b.dischargedAt = '';
                 saveData(state);
                 renderScreenA();
             });
-            
-            node.querySelector('.delete-bed-btn').addEventListener('click', () => {
+
+            node.querySelector('.delete-bed-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
                 showConfirm(`Deletar PERMANENTEMENTE o leito ${b.bedNumber}? Todos os dados serão perdidos.`, () => {
+                    PainelCore.markPatientDeleted(state, b.patientId);
                     state.beds.splice(idx, 1);
                     saveData(state);
                     renderScreenA();
                 });
             });
-            
+
             bedsListArea.appendChild(node);
           });
       }
@@ -1464,42 +1492,61 @@
             if (t.type === 'atb') {
                 const dayNum = getDayNumber(t.startDate);
                 const d1Date = formatDate(t.startDate);
-                let dayDisplay = `D${dayNum}`;
-                
-                if (t.duration) {
+                let dayDisplay = dayNum === null ? 'D-' : `D${dayNum}`;
+                let badgeClass = 'bg-sky-100 text-sky-800';
+                let extra = '';
+
+                if (dayNum === 0) {
+                    dayDisplay = 'Agendado';
+                    badgeClass = 'bg-slate-100 text-slate-600';
+                } else if (dayNum !== null && t.duration) {
                     if (dayNum > t.duration) {
                         dayDisplay = `D${t.duration}/${t.duration} (Finalizado)`;
+                        badgeClass = 'bg-red-100 text-red-800';
+                    } else if (dayNum === t.duration) {
+                        dayDisplay = `D${dayNum}/${t.duration} (último dia)`;
+                        badgeClass = 'bg-red-100 text-red-800';
                     } else {
                         dayDisplay = `D${dayNum}/${t.duration}`;
                     }
+                } else if (dayNum !== null && !t.duration && dayNum >= 8) {
+                    badgeClass = 'bg-amber-100 text-amber-800';
+                    extra = `<span class="text-xs font-medium text-amber-700 ml-1">• ATB longo, reavaliar</span>`;
                 }
-                
+
                 html = `<div>
-                            <span class="font-medium text-sky-700">ATB:</span> <span class="text-slate-800">${t.name}</span>
-                            <span class="text-xs font-semibold bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded-full ml-1">${dayDisplay}</span>
-                            <span class="text-xs text-slate-500 ml-1">(D1: ${d1Date})</span>
+                            <span class="font-medium text-sky-700">ATB:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
+                            <span class="text-xs font-semibold ${badgeClass} px-1.5 py-0.5 rounded-full ml-1">${dayDisplay}</span>
+                            <span class="text-xs text-slate-500 ml-1">(D1: ${d1Date})</span>${extra}
                         </div>`;
             } else if (t.type === 'culture') {
                 const d1Date = formatDate(t.collectionDate);
+                const cDays = getDayNumber(t.collectionDate);
+                const resultText = (t.result || '').trim();
+                const pending = resultText === '' || /aguard/i.test(resultText);
+                const alertCulture = pending && cDays !== null && cDays >= 3;
                 html = `<div>
-                            <span class="font-medium text-amber-700">Cultura:</span> <span class="text-slate-800">${t.name} (${calculateDaysSince(t.collectionDate)})</span>
-                            <span class="text-xs text-slate-500 ml-1">- ${t.result}</span>
+                            <span class="font-medium text-amber-700">Cultura:</span> <span class="text-slate-800">${escapeHtml(t.name)} (${calculateDaysSince(t.collectionDate)})</span>
+                            <span class="text-xs ${alertCulture ? 'text-amber-700 font-semibold' : 'text-slate-500'} ml-1">- ${escapeHtml(resultText || 'Aguardando')}${alertCulture ? ' • resultado pendente' : ''}</span>
                             <span class="text-xs text-slate-500 ml-1">(Coleta: ${d1Date})</span>
                         </div>`;
             } else { // device
                 const d1Date = formatDate(t.installDate);
+                const dDays = getDayNumber(t.installDate);
+                const alertDevice = dDays !== null && dDays >= 7;
+                const devBadge = alertDevice ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800';
                 html = `<div>
-                            <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${t.name}</span>
-                            <span class="text-xs font-semibold bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded-full ml-1">${calculateDaysSince(t.installDate)}</span>
+                            <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
+                            <span class="text-xs font-semibold ${devBadge} px-1.5 py-0.5 rounded-full ml-1">${calculateDaysSince(t.installDate)}</span>${alertDevice ? '<span class="text-xs font-medium text-amber-700 ml-1">• tempo prolongado</span>' : ''}
                             <span class="text-xs text-slate-500 ml-1">(Início: ${d1Date})</span>
                         </div>`;
             }
             
             html += `<div class="flex-shrink-0">
-                        <button class="edit-tracker-btn text-slate-400 hover:text-sky-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-tracker-id="${t.id}" title="Editar">
+                        <button class="edit-tracker-btn text-slate-400 hover:text-sky-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-tracker-id="${t.id}" title="Editar">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                         </button>
-                        <button class="remove-tracker-btn text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-tracker-id="${t.id}" title="Remover">
+                        <button class="remove-tracker-btn text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-tracker-id="${t.id}" title="Remover">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
                         </button>
                      </div>`;
@@ -1520,9 +1567,12 @@
                 const trackerId = btn.dataset.trackerId;
                 const trackerIndex = bed.trackers.findIndex(t => t.id === trackerId);
                 if (trackerIndex > -1) {
-                    bed.trackers.splice(trackerIndex, 1);
-                    saveData(state);
-                    renderScreenB(); 
+                    const tName = bed.trackers[trackerIndex].name || 'este item';
+                    showConfirm(`Remover "${tName}"?`, () => {
+                        bed.trackers.splice(trackerIndex, 1);
+                        saveData(state);
+                        renderScreenB();
+                    }, 'Remover item', 'bg-red-600', 'Remover');
                 }
             });
         });
@@ -1548,7 +1598,7 @@
           <div class="flex gap-2 items-center">
             <button class="problem-status-chip flex-shrink-0 text-xs font-medium rounded-full px-2 py-1 ${PROBLEM_STATUS_STYLE[p.status] || PROBLEM_STATUS_STYLE.ativo}">${PROBLEM_STATUS_LABEL[p.status] || 'Ativo'}</button>
             <input type="text" class="problem-desc flex-1 min-w-0 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${p.status === 'resolvido' ? 'line-through text-slate-500' : ''}" placeholder="Descreva o problema">
-            <button class="remove-problem flex-shrink-0 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
+            <button class="remove-problem flex-shrink-0 text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
             </button>
           </div>
@@ -1564,9 +1614,12 @@
         it.querySelector('.problem-desc').addEventListener('input', (e) => { p.descricao = e.target.value; saveData(state); });
         it.querySelector('.problem-plan').addEventListener('input', (e) => { p.plano = e.target.value; saveData(state); });
         it.querySelector('.remove-problem').addEventListener('click', () => {
-          bed.problems.splice(pi, 1);
-          saveData(state);
-          renderScreenB();
+          const pName = (p.descricao || '').trim() || 'este problema';
+          showConfirm(`Remover "${pName}"?`, () => {
+            bed.problems.splice(pi, 1);
+            saveData(state);
+            renderScreenB();
+          }, 'Remover problema', 'bg-red-600', 'Remover');
         });
         listElement.appendChild(it);
       });
@@ -1708,8 +1761,8 @@
           it.className = 'conduta flex gap-2 items-center group';
           it.innerHTML = `
             <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500" ${c.done ? 'checked' : ''}>
-            <input type="text" class="flex-1 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${c.done ? 'line-through text-slate-500' : ''}" value="${c.text || ''}" placeholder="Descreva a conduta">
-            <button class="remove-conduta text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all print:hidden" data-conduta-index="${ci}">
+            <input type="text" class="flex-1 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${c.done ? 'line-through text-slate-500' : ''}" value="${escapeHtml(c.text || '')}" placeholder="Descreva a conduta">
+            <button class="remove-conduta text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden" data-conduta-index="${ci}">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
             </button>
           `;
@@ -1722,9 +1775,12 @@
             updateConduta(bedIdx, ci, { text: e.target.value });
           });
           it.querySelector('.remove-conduta').addEventListener('click', () => {
-            bed.condutas.splice(ci, 1);
-            saveData(state);
-            renderScreenB(); 
+            const cName = (c.text || '').trim() || 'esta conduta';
+            showConfirm(`Remover "${cName}"?`, () => {
+              bed.condutas.splice(ci, 1);
+              saveData(state);
+              renderScreenB();
+            }, 'Remover conduta', 'bg-red-600', 'Remover');
           });
           listElement.appendChild(it);
         });
@@ -1788,49 +1844,43 @@ function renderExamsSection(wrapperElement, bed, bedIdx) {
     const tabs = wrapperElement.querySelectorAll('.exam-tab-btn');
     const contents = wrapperElement.querySelectorAll('.exam-tab-content');
 
-    // Renderiza o conteúdo da aba de labs por padrão
-    const labContentEl = wrapperElement.querySelector('[data-tab-content="labs"]');
-    renderLabTab(labContentEl, bed, bedIdx);
-
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Remove classes ativas de todas as abas
-            tabs.forEach(t => {
-                t.classList.remove('border-sky-500', 'text-sky-600');
-                t.classList.add('border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300');
-            });
-            // Adiciona classe ativa na aba clicada
-            tab.classList.add('border-sky-500', 'text-sky-600');
-            tab.classList.remove('border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300');
-
-            const tabName = tab.dataset.tab;
-
-            // Esconde todos os conteúdos
-            contents.forEach(content => content.classList.add('hidden'));
-
-            // Mostra o conteúdo correto e renderiza
-            const activeContent = wrapperElement.querySelector(`[data-tab-content="${tabName}"]`);
-            activeContent.classList.remove('hidden');
-
-            if (tabName === 'labs') {
-                renderLabTab(activeContent, bed, bedIdx);
-            } else if (tabName === 'images') {
-                renderImageTab(activeContent, bed, bedIdx);
-            }
+    function activateTab(tabName) {
+        currentExamTab = tabName;
+        tabs.forEach(t => {
+            const isActive = t.dataset.tab === tabName;
+            t.classList.toggle('border-sky-500', isActive);
+            t.classList.toggle('text-sky-600', isActive);
+            t.classList.toggle('border-transparent', !isActive);
+            t.classList.toggle('text-slate-500', !isActive);
+            t.classList.toggle('hover:text-slate-700', !isActive);
+            t.classList.toggle('hover:border-slate-300', !isActive);
         });
-    });
+        contents.forEach(content => content.classList.add('hidden'));
+        const activeContent = wrapperElement.querySelector(`[data-tab-content="${tabName}"]`);
+        activeContent.classList.remove('hidden');
+        if (tabName === 'images') {
+            renderImageTab(activeContent, bed, bedIdx);
+        } else {
+            renderLabTab(activeContent, bed, bedIdx);
+        }
+    }
+
+    tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
+
+    // Restaura a aba que estava ativa antes do re-render (default: laboratoriais).
+    activateTab(currentExamTab === 'images' ? 'images' : 'labs');
 }
 
 /**
  * Renderiza o conteúdo da aba "Laboratoriais"
  */
 function renderLabTab(contentEl, bed, bedIdx) {
-    // Define as datas padrão para o filtro (últimos 7 dias)
-    const today = new Date();
+    // Define as datas padrão para o filtro (últimos 7 dias). Usa data LOCAL (não toISOString/UTC)
+    // para casar com as datas das coletas, gravadas via todayISO() em horário local.
     const pastDate = new Date();
-    pastDate.setDate(today.getDate() - 7);
-    const defaultStartDate = pastDate.toISOString().split('T')[0];
-    const defaultEndDate = today.toISOString().split('T')[0];
+    pastDate.setDate(pastDate.getDate() - 7);
+    const defaultStartDate = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
+    const defaultEndDate = todayISO();
 
     contentEl.innerHTML = `
         <button id="toggle-lab-entry-btn" class="w-full text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-2 px-4 hover:bg-sky-100 transition-all mb-3">
@@ -1980,13 +2030,20 @@ function parseAndSaveLabs(text, date, bed) {
     const lines = text.trim().split('\n');
     const newResults = [];
     lines.forEach(line => {
-        const parts = line.split(':');
-        if (parts.length >= 2) {
-            const name = parts[0].trim();
-            const value = parts.slice(1).join(':').trim(); // Permite ":" no valor
-            if (name && value) {
-                newResults.push({ name, value });
-            }
+        const raw = line.trim();
+        if (!raw) return;
+        let name = '', value = '';
+        // Aceita "Nome: valor", "Nome = valor" e também "Nome valor" (ex.: "Hb 9.5").
+        const sep = raw.match(/^([^:=]+?)\s*[:=]\s*(.+)$/);
+        if (sep) {
+            name = sep[1].trim();
+            value = sep[2].trim();
+        } else {
+            const sp = raw.match(/^(\D.*?)\s+([<>]?=?\s*[\d.,].*)$/);
+            if (sp) { name = sp[1].trim(); value = sp[2].trim(); }
+        }
+        if (name && value) {
+            newResults.push({ name, value });
         }
     });
 
@@ -2032,7 +2089,7 @@ function renderLabFlowsheet(container, bed, filters) {
 
     const searchName = (filters.name || '').toLowerCase().trim();
     const dateMap = new Map(); // <string (date), Map<string (exam_name_lowercase), string (value)>>
-    const allExamNames = new Set();
+    const examNames = new Map(); // lowercase -> primeira grafia vista (evita linhas duplicadas Hb/HB)
     const allDates = new Set();
 
     // 1. Mapeia todos os dados
@@ -2043,8 +2100,9 @@ function renderLabFlowsheet(container, bed, filters) {
             dateMap.set(date, new Map());
         }
         entry.results.forEach(res => {
-            allExamNames.add(res.name);
-            dateMap.get(date).set(res.name.toLowerCase(), res.value);
+            const lower = res.name.toLowerCase();
+            if (!examNames.has(lower)) examNames.set(lower, res.name);
+            dateMap.get(date).set(lower, res.value);
         });
     });
 
@@ -2054,11 +2112,11 @@ function renderLabFlowsheet(container, bed, filters) {
 
     if (searchName) {
         // Se busca por nome, IGNORE o filtro de data
-        filteredExamNames = [...allExamNames].filter(name => name.toLowerCase().includes(searchName));
+        filteredExamNames = [...examNames.values()].filter(name => name.toLowerCase().includes(searchName));
         filteredDates = [...allDates].sort(); // Mostra TODAS as datas
     } else {
         // Se NÃO busca por nome, USE o filtro de data
-        filteredExamNames = [...allExamNames];
+        filteredExamNames = [...examNames.values()];
         filteredDates = [...allDates].filter(date => {
             return (!filters.start || date >= filters.start) && 
                    (!filters.end || date <= filters.end);
@@ -2113,18 +2171,29 @@ function renderLabFlowsheet(container, bed, filters) {
         tableHtml += `
             <td class="sticky left-0 bg-white px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
                 <div class="flex items-center gap-1.5">
-                    <svg class="pin-exam-btn w-3.5 h-3.5 ${isPinned ? 'text-sky-600' : 'text-slate-300'} hover:text-sky-500 cursor-pointer" data-exam-name="${examName}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <svg class="pin-exam-btn w-3.5 h-3.5 ${isPinned ? 'text-sky-600' : 'text-slate-300'} hover:text-sky-500 cursor-pointer" data-exam-name="${escapeHtml(examName)}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10.868 2.884c-.521-.26-1.115-.26-1.636 0l-7 3.5A.75.75 0 002 7.22v4.574c0 .89.223 1.756.65 2.553l.004.008.018.038.004.008.058.115.008.013.012.02l.033.055.004.005.01.016.03.045.015.021.042.056.022.028.02.023.01.01a.75.75 0 001.072 0l.01-.01.02-.023.022-.028.042-.056.015-.021.03-.045.01-.016.004-.005.033-.055.012-.02.008-.013.058-.115.004-.008.018-.038.004-.008A5.965 5.965 0 0018 11.794V7.22a.75.75 0 00-.368-.656l-7-3.5zM10 5.113L16.22 8.5 10 11.887 3.78 8.5 10 5.113zM15.5 10.165v1.629a4.465 4.465 0 01-1.123 2.98l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5A4.465 4.465 0 014.5 11.794v-1.629L10 13.18l5.5-3.015z" clip-rule="evenodd" />
                     </svg>
-                    <span>${examName}</span>
+                    <span>${escapeHtml(examName)}</span>
                 </div>
             </td>
         `;
-        
+
         const examNameLower = examName.toLowerCase();
+        let prevNum = null;
         filteredDates.forEach(date => {
-            const value = dateMap.get(date)?.get(examNameLower) || '—';
-            tableHtml += `<td class="px-3 py-2 text-center text-slate-600">${value}</td>`;
+            const raw = dateMap.get(date)?.get(examNameLower);
+            const value = (raw == null || raw === '') ? '—' : raw;
+            // Tendência: compara o valor numérico com a coleta anterior (seta ↑/↓ colorida).
+            const num = parseLabNumber(value);
+            let trend = '';
+            if (num !== null && prevNum !== null && num !== prevNum) {
+                trend = num > prevNum
+                  ? ' <span class="text-red-500" title="subiu">▲</span>'
+                  : ' <span class="text-sky-500" title="caiu">▼</span>';
+            }
+            if (num !== null) prevNum = num;
+            tableHtml += `<td class="px-3 py-2 text-center text-slate-600 whitespace-nowrap">${escapeHtml(value)}${trend}</td>`;
         });
         tableHtml += '</tr>';
     });
@@ -2164,16 +2233,16 @@ function renderImageTab(contentEl, bed, bedIdx) {
         const [y, m, d] = (exam.date || '---').split('-');
         item.innerHTML = `
             <div class="flex justify-between items-center">
-                <span class="font-medium text-slate-800">${exam.name || 'Exame'}</span>
+                <span class="font-medium text-slate-800">${escapeHtml(exam.name || 'Exame')}</span>
                 <span class="text-xs font-medium text-slate-500">${d}/${m}</span>
             </div>
-            <p class="text-slate-600 whitespace-pre-wrap">${exam.summary || 'Sem resumo.'}</p>
+            <p class="text-slate-600 whitespace-pre-wrap">${escapeHtml(exam.summary || 'Sem resumo.')}</p>
             <div class="text-right -mt-2">
-                <button class="edit-image-btn text-slate-400 hover:text-sky-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Editar">
-                    <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                <button class="edit-image-btn text-slate-400 hover:text-sky-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Editar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                 </button>
-                <button class="remove-image-btn text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Remover">
-                    <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+                <button class="remove-image-btn text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Remover">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
                 </button>
             </div>
         `;
@@ -2352,19 +2421,17 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       if (!v) return;
       const bedObj = PainelCore.migrateBed({ bedNumber: v });
       state.beds.push(bedObj);
+      const newIdx = state.beds.length - 1;
       saveData(state);
       renderScreenA();
       hideModal('addBedModal');
       newBedNumberInput.value = '';
-      
-      const newIdx = state.beds.findIndex(b => b.bedNumber === v);
-      if (newIdx > -1) {
-        setTimeout(() => {
-            openPatientDetails(newIdx);
-            const nameInput = document.getElementById('patientDetailContent').querySelector('.inline-name');
-            if(nameInput) nameInput.focus();
-        }, 100);
-      }
+
+      setTimeout(() => {
+          openPatientDetails(newIdx);
+          const nameInput = document.getElementById('patientDetailContent').querySelector('.inline-name');
+          if(nameInput) nameInput.focus();
+      }, 100);
     }
 
     // --- Inicialização e Eventos Globais ---
@@ -2388,45 +2455,6 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         saveData(state);
         renderScreenA();
       });
-    });
-    document.getElementById('printBtn').addEventListener('click', () => {
-        const activeBeds = state.beds.map((b,i) => ({b,i})).filter(item => !item.b.isArchived);
-        const originalStates = activeBeds.map(item => ({
-            min: item.b.isMinimized, tmin: item.b.isTrackerMinimized,
-            nmin: item.b.isNotesMinimized, cmin: item.b.isCondutaMinimized,
-            pmin: item.b.isProblemsMinimized, amin: item.b.isAnamneseMinimized,
-            rmin: item.b.isRawTextsMinimized
-        }));
-        activeBeds.forEach(item => {
-            item.b.isMinimized = false;
-            item.b.isProblemsMinimized = false; item.b.isTrackerMinimized = false;
-            item.b.isNotesMinimized = false; item.b.isCondutaMinimized = false;
-            item.b.isAnamneseMinimized = false; item.b.isRawTextsMinimized = false;
-        });
-        const printContainer = document.createElement('div');
-        printContainer.id = "print-area";
-        printContainer.className = "print:block hidden";
-        activeBeds.forEach(item => {
-            currentPatientIndex = item.i;
-            renderScreenB(); 
-            const cardHTML = patientDetailContent.innerHTML;
-            printContainer.innerHTML += cardHTML;
-        });
-        document.body.appendChild(printContainer);
-        window.print(); 
-        document.body.removeChild(printContainer);
-        activeBeds.forEach((item, idx) => {
-            item.b.isMinimized = originalStates[idx].min;
-            item.b.isTrackerMinimized = originalStates[idx].tmin;
-            item.b.isNotesMinimized = originalStates[idx].nmin;
-            item.b.isCondutaMinimized = originalStates[idx].cmin;
-            item.b.isProblemsMinimized = originalStates[idx].pmin;
-            item.b.isAnamneseMinimized = originalStates[idx].amin;
-            item.b.isRawTextsMinimized = originalStates[idx].rmin;
-        });
-        currentPatientIndex = null;
-        showScreen('list');
-        renderScreenA();
     });
     searchInput.addEventListener('input', renderScreenA);
     document.querySelectorAll('.sort-btn').forEach(btn => {
@@ -2708,22 +2736,44 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       try {
         const sb = await getSupabaseClient();
         const payload = PainelCore.buildPushPayload(state);
-        if (payload.patients.length === 0) { setSyncStatus('Nada para enviar.'); return; }
-        let res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
-        if (res.error) throw res.error;
-        const ids = payload.patients.map(p => p.id);
-        // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
-        // os filhos somem do banco até o próximo push (estado local é a fonte da verdade).
-        for (const t of SYNC_CHILD_TABLES) {
-          res = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
-          if (res.error) throw res.error;
-          if (payload[t].length) {
-            res = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
+        const delIds = payload.deletePatientIds || [];
+        if (payload.patients.length === 0 && delIds.length === 0) { setSyncStatus('Nada para enviar.'); return; }
+        let res;
+
+        // Deleções de pacientes (tombstones): apaga filhos, notes, docs e o próprio paciente.
+        if (delIds.length) {
+          for (const t of [...SYNC_CHILD_TABLES, 'notes', 'generated_docs']) {
+            res = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', delIds);
             if (res.error) throw res.error;
           }
+          res = await sb.from(TABLE_PREFIX + 'patients').delete().in('id', delIds);
+          if (res.error) throw res.error;
         }
-        res = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
-        if (res.error) throw res.error;
+
+        if (payload.patients.length) {
+          res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
+          if (res.error) throw res.error;
+          const ids = payload.patients.map(p => p.id);
+          // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
+          // os filhos somem do banco até o próximo push (estado local é a fonte da verdade).
+          for (const t of SYNC_CHILD_TABLES) {
+            res = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
+            if (res.error) throw res.error;
+            if (payload[t].length) {
+              res = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
+              if (res.error) throw res.error;
+            }
+          }
+          res = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
+          if (res.error) throw res.error;
+        }
+
+        // Atualiza a "verdade do banco": pacientes enviados passam a contar como sincronizados
+        // (permite que um pull futuro detecte se foram deletados em outro aparelho); os deletados saem.
+        const pushedIds = new Set([...(state.syncedPatientIds || []), ...payload.patients.map(p => p.id)]);
+        delIds.forEach(id => pushedIds.delete(id));
+        state.syncedPatientIds = [...pushedIds];
+        state.deletedPatientIds = []; // tombstones aplicados com sucesso
         state.lastSyncAt = new Date().toISOString();
         saveData(state);
         setSyncStatus('Enviado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
