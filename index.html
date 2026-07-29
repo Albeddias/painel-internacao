@@ -122,6 +122,10 @@
             <button id="syncPullBtn" class="p-2 bg-indigo-400 text-white font-medium rounded-lg hover:bg-indigo-500 transition-all print:hidden" title="Receber da nuvem">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-2.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" transform="rotate(180 10 11.5)" /></svg>
             </button>
+            <!-- Botão de Reset local + Receber (Âmbar) -->
+            <button id="resetLocalBtn" class="p-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-all print:hidden" title="Resetar dados locais e receber limpo do servidor">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd" /></svg>
+            </button>
             <!-- Botão de Exportar (Seta Cima Azul) -->
             <button id="exportDataBtn" class="p-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 transition-all print:hidden" title="Exportar Backup">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 15.25a.75.75 0 00-1.5 0v-8.614L6.295 9.765a.75.75 0 10-1.09-1.03l4.25-4.5a.75.75 0 001.09 0l4.25 4.5a.75.75 0 00-1.09 1.03l-2.955-3.129v8.614Z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
@@ -2809,8 +2813,47 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       }
     }
 
+    // Reseta os leitos deste dispositivo e recebe limpo do servidor. Serve para eliminar
+    // dados desatualizados/órfãos que o pull normal preserva (leitos criados/editados aqui e
+    // removidos em outro aparelho antes deste registrar o paciente como sincronizado).
+    async function resetLocalAndPull() {
+      const btn = document.getElementById('resetLocalBtn');
+      if (btn.disabled) return;
+      btn.disabled = true;
+      setSyncStatus('Recebendo...');
+      try {
+        const sb = await getSupabaseClient();
+        // Baixa TUDO primeiro; só zeramos o local depois que o servidor respondeu com sucesso,
+        // para nunca deixar o app vazio se estiver offline / a conexão cair.
+        const pulled = {};
+        for (const t of ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs']) {
+          const { data, error } = await sb.from(TABLE_PREFIX + t).select('*');
+          if (error) throw error;
+          pulled[t] = data;
+        }
+        PainelCore.resetLocalSync(state);   // limpa leitos + bookkeeping, mantém preferências locais
+        PainelCore.applyPull(state, pulled);
+        state.lastSyncAt = new Date().toISOString();
+        saveData(state);
+        renderScreenA();
+        setSyncStatus('Recebido limpo ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      } catch (e) {
+        setSyncStatus('Falha ao resetar/receber: ' + e.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     document.getElementById('syncPushBtn').addEventListener('click', pushToSupabase);
     document.getElementById('syncPullBtn').addEventListener('click', pullFromSupabase);
+    document.getElementById('resetLocalBtn').addEventListener('click', () => {
+      showConfirm(
+        'Isso vai APAGAR todos os leitos deste dispositivo e baixar tudo de novo do servidor. ' +
+        'Use quando este aparelho estiver com dados desatualizados. ' +
+        'Se houver mudanças locais que você ainda não enviou (↑), envie antes — elas serão perdidas. ' +
+        'Suas preferências (templates, exames fixados, condutas comuns) são mantidas. Continuar?',
+        resetLocalAndPull, 'Resetar e receber do servidor', 'bg-amber-500', 'Resetar e receber');
+    });
     if (state.lastSyncAt) {
       setSyncStatus('Último sync: ' + new Date(state.lastSyncAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
     }

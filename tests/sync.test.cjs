@@ -162,3 +162,57 @@ test('applyPull: não ressuscita paciente deletado localmente (tombstone pendent
   });
   assert.strictEqual(state.beds.length, 0, 'paciente deletado não deve voltar no pull');
 });
+
+test('resetLocalSync: limpa leitos e bookkeeping, preservando preferências locais', () => {
+  const state = PainelCore.migrateState({
+    beds: [makeBed()],
+    syncedPatientIds: ['antigo-1'],
+    deletedPatientIds: ['pendente-1'],
+    lastSyncAt: '2026-06-12T10:00:00.000Z',
+    notesTemplate: 'MEU TEMPLATE',
+    pinnedExams: ['Hb', 'Cr'],
+    commonCondutas: ['Minha conduta'],
+    generalTasks: [{ id: 't1', text: 'Ligar para lab', done: false }],
+  }, '2026-06-12');
+
+  const out = PainelCore.resetLocalSync(state);
+
+  // dados sincronizáveis zerados
+  assert.deepStrictEqual(out.beds, []);
+  assert.deepStrictEqual(out.syncedPatientIds, []);
+  assert.deepStrictEqual(out.deletedPatientIds, []);
+  assert.strictEqual(out.lastSyncAt, null);
+  // preferências locais preservadas
+  assert.strictEqual(out.notesTemplate, 'MEU TEMPLATE');
+  assert.deepStrictEqual(out.pinnedExams, ['Hb', 'Cr']);
+  assert.deepStrictEqual(out.commonCondutas, ['Minha conduta']);
+  assert.deepStrictEqual(out.generalTasks, [{ id: 't1', text: 'Ligar para lab', done: false }]);
+});
+
+test('resetLocalSync + applyPull: leito órfão some e vira exatamente a verdade do servidor', () => {
+  // Cenário do bug: leito local nunca registrado como sincronizado (órfão) que o pull normal
+  // preservaria como "novo local". Após reset, o pull limpo reflete só o que existe no servidor.
+  const state = PainelCore.migrateState({
+    beds: [PainelCore.migrateBed({ bedNumber: '9999-Z', patientName: 'Fantasma Stale' })],
+    syncedPatientIds: [], // órfão: nunca entrou em syncedPatientIds
+  }, '2026-06-12');
+  state.beds[0].patientId = 'orfao-1';
+
+  // pull normal preservaria o órfão
+  const normal = PainelCore.migrateState(JSON.parse(JSON.stringify(state)), '2026-06-12');
+  PainelCore.applyPull(normal, {
+    patients: [{ id: 'servidor-1', bed_number: '1012-A', initials: 'M.S.D.', status: 'internado' }],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [],
+  });
+  assert.strictEqual(normal.beds.length, 2, 'pull normal mantém o órfão (comportamento atual)');
+
+  // reset + pull elimina o órfão
+  PainelCore.resetLocalSync(state);
+  PainelCore.applyPull(state, {
+    patients: [{ id: 'servidor-1', bed_number: '1012-A', initials: 'M.S.D.', status: 'internado' }],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [],
+  });
+  assert.strictEqual(state.beds.length, 1, 'após reset só resta o paciente do servidor');
+  assert.strictEqual(state.beds[0].patientId, 'servidor-1');
+  assert.deepStrictEqual(state.syncedPatientIds, ['servidor-1']);
+});
