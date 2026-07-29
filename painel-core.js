@@ -113,6 +113,20 @@
     return state;
   }
 
+  // Zera os dados sincronizáveis (leitos + bookkeeping de sync) para permitir um pull "limpo"
+  // a partir da verdade do servidor. Preserva preferências locais que NÃO vêm do banco
+  // (notesTemplate, pinnedExams, commonCondutas, commonExtDocs, generalTasks, generalExams).
+  // Uso: chamar ANTES de um applyPull, e só depois que o download do servidor já foi obtido com
+  // sucesso — assim dados desatualizados/orfãos somem sem risco de ficar com o app vazio offline.
+  function resetLocalSync(state) {
+    const s = state || {};
+    s.beds = [];
+    s.deletedPatientIds = [];
+    s.syncedPatientIds = [];
+    s.lastSyncAt = null;
+    return s;
+  }
+
   function buildPushPayload(state) {
     const out = { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], deletePatientIds: (state.deletedPatientIds || []).slice() };
     (state.beds || []).forEach(function (b) {
@@ -260,5 +274,6 @@
     buildPushPayload: buildPushPayload,
     applyPull: applyPull,
     markPatientDeleted: markPatientDeleted,
+    resetLocalSync: resetLocalSync,
   };
 });
