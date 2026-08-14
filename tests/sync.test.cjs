@@ -128,6 +128,43 @@ test('applyPull: leito sincronizado E presente no banco permanece (não é remov
   assert.strictEqual(state.beds.length, 1);
 });
 
+// --- Ordem manual dos trackers (drag-and-drop) ---
+
+test('buildPushPayload: grava ordem = posição do tracker na lista unificada', () => {
+  const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  const bed = state.beds[0];
+  // usuário arrastou: dispositivo primeiro, depois cultura, depois ATB
+  bed.trackers = [bed.trackers[2], bed.trackers[1], bed.trackers[0]];
+  const p = PainelCore.buildPushPayload(state);
+  assert.strictEqual(p.devices[0].ordem, 0);
+  assert.strictEqual(p.cultures[0].ordem, 1);
+  assert.strictEqual(p.antibiotics[0].ordem, 2);
+});
+
+test('applyPull: ordem manual dos trackers sobrevive ao round-trip push/pull', () => {
+  const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  const bed = state.beds[0];
+  bed.trackers = [bed.trackers[2], bed.trackers[1], bed.trackers[0]];
+  const payload = PainelCore.buildPushPayload(state);
+  PainelCore.applyPull(state, { ...payload, generated_docs: [] });
+  assert.deepStrictEqual(state.beds[0].trackers.map(t => t.type), ['device', 'culture', 'atb']);
+});
+
+test('applyPull: linhas antigas sem ordem vão para o fim, agrupadas por tipo', () => {
+  const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
+  const pid = state.beds[0].patientId;
+  const payload = PainelCore.buildPushPayload(state);
+  // simula banco anterior à migration: sem coluna ordem + um item novo COM ordem 0
+  payload.antibiotics.forEach(r => delete r.ordem);
+  payload.cultures.forEach(r => delete r.ordem);
+  payload.devices.forEach(r => delete r.ordem);
+  payload.devices.push({ id: 'd2', patient_id: pid, nome: 'SVD', install_date: '2026-06-10', removal_date: null, ordem: 0 });
+  PainelCore.applyPull(state, { ...payload, generated_docs: [] });
+  const types = state.beds[0].trackers.map(t => t.name);
+  assert.strictEqual(types[0], 'SVD', 'item com ordem definida vem primeiro');
+  assert.deepStrictEqual(types.slice(1), ['Ceftriaxona', 'Hemocultura', 'CVC Subclávia D'], 'sem ordem: agrupado por tipo como antes');
+});
+
 // --- Tombstones: deleção de paciente propaga ao banco ---
 
 test('defaultState/migrateState têm deletedPatientIds', () => {

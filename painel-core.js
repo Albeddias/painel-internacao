@@ -146,13 +146,14 @@
       (b.problems || []).forEach(function (p, i) {
         out.problems.push({ id: p.id, patient_id: pid, descricao: p.descricao || '', status: p.status || 'ativo', plano: p.plano || '', ordem: i });
       });
-      (b.trackers || []).forEach(function (t) {
+      (b.trackers || []).forEach(function (t, i) {
+        // "ordem" é a posição do item na lista unificada de trackers (reordenável por arrasto)
         if (t.type === 'atb') {
-          out.antibiotics.push({ id: t.id, patient_id: pid, nome: t.name || '', start_date: t.startDate || null, duration_days: t.duration || null, end_date: t.endDate || null, indicacao: t.indicacao || '' });
+          out.antibiotics.push({ id: t.id, patient_id: pid, nome: t.name || '', start_date: t.startDate || null, duration_days: t.duration || null, end_date: t.endDate || null, indicacao: t.indicacao || '', ordem: i });
         } else if (t.type === 'culture') {
-          out.cultures.push({ id: t.id, patient_id: pid, tipo: t.name || '', collection_date: t.collectionDate || null, resultado: t.result || '' });
+          out.cultures.push({ id: t.id, patient_id: pid, tipo: t.name || '', collection_date: t.collectionDate || null, resultado: t.result || '', ordem: i });
         } else {
-          out.devices.push({ id: t.id, patient_id: pid, nome: t.name || '', install_date: t.installDate || null, removal_date: t.removalDate || null });
+          out.devices.push({ id: t.id, patient_id: pid, nome: t.name || '', install_date: t.installDate || null, removal_date: t.removalDate || null, ordem: i });
         }
       });
       (b.exams || []).forEach(function (e) {
@@ -228,16 +229,21 @@
         .sort(function (a, b) { return (a.ordem || 0) - (b.ordem || 0); })
         .map(function (r) { return { id: r.id, descricao: r.descricao || '', status: r.status || 'ativo', plano: r.plano || '', ordem: r.ordem || 0 }; });
 
-      bed.trackers = []
+      // Une os três tipos e restaura a ordem manual (coluna "ordem"); linhas antigas
+      // sem ordem vão para o fim mantendo o agrupamento por tipo (comportamento anterior).
+      var mergedTrackers = []
         .concat((atbs[p.id] || []).map(function (r) {
-          return { id: r.id, type: 'atb', name: r.nome || '', startDate: r.start_date || '', duration: r.duration_days || null, endDate: r.end_date || '', indicacao: r.indicacao || '' };
+          return { ord: r.ordem, t: { id: r.id, type: 'atb', name: r.nome || '', startDate: r.start_date || '', duration: r.duration_days || null, endDate: r.end_date || '', indicacao: r.indicacao || '' } };
         }))
         .concat((cultures[p.id] || []).map(function (r) {
-          return { id: r.id, type: 'culture', name: r.tipo || '', collectionDate: r.collection_date || '', result: r.resultado || '' };
+          return { ord: r.ordem, t: { id: r.id, type: 'culture', name: r.tipo || '', collectionDate: r.collection_date || '', result: r.resultado || '' } };
         }))
         .concat((devices[p.id] || []).map(function (r) {
-          return { id: r.id, type: 'device', name: r.nome || '', installDate: r.install_date || '', removalDate: r.removal_date || '' };
+          return { ord: r.ordem, t: { id: r.id, type: 'device', name: r.nome || '', installDate: r.install_date || '', removalDate: r.removal_date || '' } };
         }));
+      mergedTrackers.forEach(function (m, i) { if (m.ord == null) m.ord = 1000000 + i; });
+      mergedTrackers.sort(function (a, b) { return a.ord - b.ord; });
+      bed.trackers = mergedTrackers.map(function (m) { return m.t; });
 
       const labRows = (exams[p.id] || []).filter(function (r) { return r.tipo === 'lab'; });
       const labByDate = {};

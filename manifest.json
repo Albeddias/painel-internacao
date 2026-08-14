@@ -1,0 +1,14 @@
+{
+  "name": "Caderno de Visitas",
+  "short_name": "Caderno",
+  "description": "Painel de internação — visitas médicas diárias, offline-first.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
