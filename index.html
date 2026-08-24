@@ -615,9 +615,10 @@
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
+          <!-- Sugestões inline (substitui o <datalist> nativo, que cobria o teclado no Android) -->
+          <div class="conduta-suggestions flex gap-2 overflow-x-auto mb-2" style="display:none"></div>
           <div class="flex gap-2 w-full mb-3">
-            <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nova conduta">
-            <datalist class="common-condutas-list"></datalist>
+            <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nova conduta" autocomplete="off">
             <button class="add-conduta-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar e Salvar na lista">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M15.75 3a.75.75 0 00-.75.75v3.25H5a.75.75 0 000 1.5h10v3.25a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" clip-rule="evenodd" /><path d="M5.151 3.522A.75.75 0 004 4.25v11.5a.75.75 0 001.5 0V4.25a.75.75 0 00-.349-.649zM6.5 15.75v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM8.5 15.75v-3.5a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0zM10.5 15.75v-5.5a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0zM12.5 15.75v-7.5a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0zM14.5 15.75v-9.5a.75.75 0 00-1.5 0v9.5a.75.75 0 001.5 0z" clip-rule="evenodd" /></svg>
             </button>
@@ -1933,22 +1934,34 @@
         });
 
         const section = listElement.closest('.collapsible-section');
-        const datalist = section.querySelector('.common-condutas-list');
         const newCondInput = section.querySelector('.new-conduta-input');
-        
-        const datalistId = `common-condutas-list-${bedIdx}`;
-        datalist.id = datalistId;
-        newCondInput.setAttribute('list', datalistId);
-        datalist.innerHTML = '';
-        state.commonCondutas.forEach(cText => {
-          const opt = document.createElement('option');
-          opt.value = cText;
-          datalist.appendChild(opt);
-        });
+        const suggestionsBox = section.querySelector('.conduta-suggestions');
+
+        // Sugestões como chips no fluxo da página (nunca flutuam sobre o teclado).
+        // Mostradas só com o campo em foco; toque no chip adiciona a conduta direto.
+        function renderCondutaSuggestions() {
+          const matches = PainelCore.filterSuggestions(state.commonCondutas, newCondInput.value);
+          suggestionsBox.innerHTML = '';
+          matches.forEach(cText => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'flex-shrink-0 inline-flex items-center text-xs bg-sky-100 text-sky-800 rounded-full px-3 py-1';
+            chip.textContent = cText;
+            // preventDefault no pointerdown evita que o campo perca o foco (e o teclado feche) antes do click
+            chip.addEventListener('pointerdown', (e) => e.preventDefault());
+            chip.addEventListener('click', () => addCondutaToPatient(bedIdx, cText));
+            suggestionsBox.appendChild(chip);
+          });
+          const visible = matches.length > 0 && document.activeElement === newCondInput;
+          suggestionsBox.style.display = visible ? 'flex' : 'none';
+        }
 
         const addCondBtn = section.querySelector('.add-conduta-btn');
         if (!addCondBtn.dataset.bound) {
           addCondBtn.dataset.bound = '1';
+          newCondInput.addEventListener('focus', renderCondutaSuggestions);
+          newCondInput.addEventListener('input', renderCondutaSuggestions);
+          newCondInput.addEventListener('blur', () => { suggestionsBox.style.display = 'none'; });
           addCondBtn.addEventListener('click', () => {
             const v = newCondInput.value.trim();
             if (v) { addCondutaToPatient(bedIdx, v); }

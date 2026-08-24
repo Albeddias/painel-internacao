@@ -2,7 +2,7 @@
  * Estratégia: navegação network-first (atualizações chegam rápido, cache é o fallback
  * offline); assets cache-first com atualização em segundo plano (stale-while-revalidate).
  * Ao mudar arquivos do app, subir a versão do cache abaixo força a limpeza dos antigos. */
-const CACHE = 'caderno-v1';
+const CACHE = 'caderno-v2';
 const APP_SHELL = ['./', './index.html', './styles.css', './painel-core.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {

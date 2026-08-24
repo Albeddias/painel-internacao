@@ -35,6 +35,18 @@
     return String(text).split('[NOME]').join(name);
   }
 
+  function normalizeForSearch(s) {
+    return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  // Filtra sugestões (ex.: condutas comuns) por substring, ignorando caixa e acentos.
+  function filterSuggestions(list, query) {
+    const items = (list || []).slice();
+    const q = normalizeForSearch(query).trim();
+    if (!q) return items;
+    return items.filter(function (s) { return normalizeForSearch(s).indexOf(q) !== -1; });
+  }
+
   const GLOBAL_NOTES_TEMPLATE = "S: (Subjetivo)\n\nO: (Objetivo)\n- SSVV:\n- Exame:\n- Labs:\n- Imagem:\n\nA: (Avaliação)\n\nP: (Plano)\n";
 
   function defaultState(todayStr) {
@@ -274,6 +286,7 @@
     uuid: uuid,
     initialsFromName: initialsFromName,
     fillPatientName: fillPatientName,
+    filterSuggestions: filterSuggestions,
     defaultState: defaultState,
     migrateBed: migrateBed,
     migrateState: migrateState,
