@@ -2,12 +2,13 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const PainelCore = require('../painel-core.js');
 
-test('initialsFromName: nome completo vira iniciais com pontos', () => {
-  assert.strictEqual(PainelCore.initialsFromName('Mariana Silva Dias'), 'M.S.D.');
+test('initialsFromName: nome completo vira iniciais sem pontos', () => {
+  assert.strictEqual(PainelCore.initialsFromName('Mariana Silva Dias'), 'MSD');
 });
 
 test('initialsFromName: ignora conectivos (de, da, do, das, dos)', () => {
-  assert.strictEqual(PainelCore.initialsFromName('João de Souza dos Santos'), 'J.S.S.');
+  assert.strictEqual(PainelCore.initialsFromName('João de Souza dos Santos'), 'JSS');
+  assert.strictEqual(PainelCore.initialsFromName('João Figueiredo da Silva'), 'JFS');
 });
 
 test('initialsFromName: vazio/nulo vira string vazia', () => {
@@ -17,7 +18,7 @@ test('initialsFromName: vazio/nulo vira string vazia', () => {
 });
 
 test('initialsFromName: letra E isolada não é tratada como conectivo', () => {
-  assert.strictEqual(PainelCore.initialsFromName('E Souza'), 'E.S.');
+  assert.strictEqual(PainelCore.initialsFromName('E Souza'), 'ES');
 });
 
 test('initialsFromName: somente conectivos vira string vazia', () => {

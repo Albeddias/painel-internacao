@@ -25,7 +25,7 @@ function makeBed() {
 test('buildPushPayload: envia iniciais e nunca o nome completo', () => {
   const state = PainelCore.migrateState({ beds: [makeBed()] }, '2026-06-12');
   const payload = PainelCore.buildPushPayload(state);
-  assert.strictEqual(payload.patients[0].initials, 'M.S.D.');
+  assert.strictEqual(payload.patients[0].initials, 'MSD');
   const json = JSON.stringify(payload);
   assert.ok(!json.includes('Mariana'), 'payload não pode conter o nome');
   assert.ok(!json.includes('patientName'), 'payload não pode ter o campo patientName');

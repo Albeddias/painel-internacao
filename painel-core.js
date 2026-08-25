@@ -25,7 +25,7 @@
       .filter(Boolean)
       .filter(function (w) { return !IGNORED_WORDS.has(w.toLowerCase()); });
     if (words.length === 0) return '';
-    return words.map(function (w) { return w[0].toUpperCase(); }).join('.') + '.';
+    return words.map(function (w) { return w[0].toUpperCase(); }).join('');
   }
 
   function fillPatientName(text, fullName) {
