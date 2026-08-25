@@ -195,9 +195,9 @@
         if (!c || typeof c !== 'object') return null;
         return { id: c.id || uuid(), text: c.text || '', done: !!c.done };
       }).filter(Boolean),
-      trackers: (b.trackers || []).filter(Boolean).slice(),
-      exams: (b.exams || []).filter(Boolean).slice(),
-      rawTexts: (b.rawTexts || []).filter(Boolean).slice(),
+      trackers: (b.trackers || []).filter(Boolean).map(function (t) { return Object.assign({}, t, { id: t.id || uuid() }); }),
+      exams: (b.exams || []).filter(Boolean).map(function (e) { return Object.assign({}, e, { id: e.id || uuid() }); }),
+      rawTexts: (b.rawTexts || []).filter(Boolean).map(function (r) { return Object.assign({}, r, { id: r.id || uuid() }); }),
       generatedDocs: (b.generatedDocs || []).filter(Boolean).slice(),
       externalDoctor: b.externalDoctor || { active: false, name: '' },
       checks: b.checks || { ev: false, p: false, ex: false, tev: false },
@@ -307,6 +307,56 @@
     return out;
   }
 
+  function applyPatientScalars(bed, p, notesTexto) {
+    bed.bedNumber = p.bed_number || bed.bedNumber;
+    bed.age = p.age == null ? '' : p.age;
+    bed.admitDate = p.admit_date || '';
+    bed.hpp = p.hpp || '';
+    bed.anamneseInicial = p.anamnese_inicial || '';
+    bed.dischargeForecast = p.discharge_forecast || '';
+    bed.isArchived = p.status !== 'internado';
+    bed.archiveReason = p.status === 'internado' ? null : p.status;
+    bed.notes = notesTexto || '';
+  }
+
+  function applyRowsToBed(bed, rows) {
+    bed.problems = (rows.problems || []).slice()
+      .sort(function (a, b) { return (a.ordem || 0) - (b.ordem || 0); })
+      .map(function (r) { return { id: r.id, descricao: r.descricao || '', status: r.status || 'ativo', plano: r.plano || '', ordem: r.ordem || 0 }; });
+
+    var mergedTrackers = []
+      .concat((rows.antibiotics || []).map(function (r) {
+        return { ord: r.ordem, t: { id: r.id, type: 'atb', name: r.nome || '', startDate: r.start_date || '', duration: r.duration_days || null, endDate: r.end_date || '', indicacao: r.indicacao || '' } };
+      }))
+      .concat((rows.cultures || []).map(function (r) {
+        return { ord: r.ordem, t: { id: r.id, type: 'culture', name: r.tipo || '', collectionDate: r.collection_date || '', result: r.resultado || '' } };
+      }))
+      .concat((rows.devices || []).map(function (r) {
+        return { ord: r.ordem, t: { id: r.id, type: 'device', name: r.nome || '', installDate: r.install_date || '', removalDate: r.removal_date || '' } };
+      }));
+    mergedTrackers.forEach(function (m, i) { if (m.ord == null) m.ord = 1000000 + i; });
+    mergedTrackers.sort(function (a, b) { return a.ord - b.ord; });
+    bed.trackers = mergedTrackers.map(function (m) { return m.t; });
+
+    const labRows = (rows.exams || []).filter(function (r) { return r.tipo === 'lab'; });
+    const labByDate = {};
+    labRows.forEach(function (r) {
+      const d = r.data || '';
+      (labByDate[d] = labByDate[d] || []).push({ name: r.nome, value: r.resultado });
+    });
+    bed.exams = Object.keys(labByDate).sort().map(function (date) {
+      return { id: uuid(), type: 'lab', date: date, results: labByDate[date] };
+    }).concat((rows.exams || []).filter(function (r) { return r.tipo === 'imagem'; }).map(function (r) {
+      return { id: r.id, type: 'image', date: r.data || '', name: r.nome || '', summary: r.resultado || '' };
+    }));
+
+    bed.condutas = (rows.condutas || []).map(function (r) { return { id: r.id, text: r.texto || '', done: !!r.done }; });
+    bed.rawTexts = (rows.raw_texts || []).map(function (r) { return { id: r.id, tipo: r.tipo, data: r.data || '', texto: r.texto || '' }; });
+    bed.generatedDocs = (rows.generated_docs || []).slice()
+      .sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); })
+      .map(function (r) { return { id: r.id, tipo: r.tipo, conteudo: r.conteudo, createdAt: r.created_at }; });
+  }
+
   function applyPull(state, pulled) {
     function byPatient(rows) {
       const m = {};
@@ -347,53 +397,12 @@
         bed.patientId = p.id;
         state.beds.push(bed);
       }
-      bed.bedNumber = p.bed_number || bed.bedNumber;
-      bed.age = p.age == null ? '' : p.age;
-      bed.admitDate = p.admit_date || '';
-      bed.hpp = p.hpp || '';
-      bed.anamneseInicial = p.anamnese_inicial || '';
-      bed.dischargeForecast = p.discharge_forecast || '';
-      bed.isArchived = p.status !== 'internado';
-      bed.archiveReason = p.status === 'internado' ? null : p.status;
-
-      bed.problems = (problems[p.id] || []).slice()
-        .sort(function (a, b) { return (a.ordem || 0) - (b.ordem || 0); })
-        .map(function (r) { return { id: r.id, descricao: r.descricao || '', status: r.status || 'ativo', plano: r.plano || '', ordem: r.ordem || 0 }; });
-
-      // Une os três tipos e restaura a ordem manual (coluna "ordem"); linhas antigas
-      // sem ordem vão para o fim mantendo o agrupamento por tipo (comportamento anterior).
-      var mergedTrackers = []
-        .concat((atbs[p.id] || []).map(function (r) {
-          return { ord: r.ordem, t: { id: r.id, type: 'atb', name: r.nome || '', startDate: r.start_date || '', duration: r.duration_days || null, endDate: r.end_date || '', indicacao: r.indicacao || '' } };
-        }))
-        .concat((cultures[p.id] || []).map(function (r) {
-          return { ord: r.ordem, t: { id: r.id, type: 'culture', name: r.tipo || '', collectionDate: r.collection_date || '', result: r.resultado || '' } };
-        }))
-        .concat((devices[p.id] || []).map(function (r) {
-          return { ord: r.ordem, t: { id: r.id, type: 'device', name: r.nome || '', installDate: r.install_date || '', removalDate: r.removal_date || '' } };
-        }));
-      mergedTrackers.forEach(function (m, i) { if (m.ord == null) m.ord = 1000000 + i; });
-      mergedTrackers.sort(function (a, b) { return a.ord - b.ord; });
-      bed.trackers = mergedTrackers.map(function (m) { return m.t; });
-
-      const labRows = (exams[p.id] || []).filter(function (r) { return r.tipo === 'lab'; });
-      const labByDate = {};
-      labRows.forEach(function (r) {
-        const d = r.data || '';
-        (labByDate[d] = labByDate[d] || []).push({ name: r.nome, value: r.resultado });
+      applyPatientScalars(bed, p, (notes[p.id] && notes[p.id][0] && notes[p.id][0].texto) || '');
+      applyRowsToBed(bed, {
+        problems: problems[p.id] || [], antibiotics: atbs[p.id] || [], cultures: cultures[p.id] || [],
+        devices: devices[p.id] || [], exams: exams[p.id] || [], condutas: condutas[p.id] || [],
+        raw_texts: rawTexts[p.id] || [], generated_docs: docs[p.id] || [],
       });
-      bed.exams = Object.keys(labByDate).sort().map(function (date) {
-        return { id: uuid(), type: 'lab', date: date, results: labByDate[date] };
-      }).concat((exams[p.id] || []).filter(function (r) { return r.tipo === 'imagem'; }).map(function (r) {
-        return { id: r.id, type: 'image', date: r.data || '', name: r.nome || '', summary: r.resultado || '' };
-      }));
-
-      bed.condutas = (condutas[p.id] || []).map(function (r) { return { id: r.id, text: r.texto || '', done: !!r.done }; });
-      bed.notes = (notes[p.id] && notes[p.id][0] && notes[p.id][0].texto) || '';
-      bed.rawTexts = (rawTexts[p.id] || []).map(function (r) { return { id: r.id, tipo: r.tipo, data: r.data || '', texto: r.texto || '' }; });
-      bed.generatedDocs = (docs[p.id] || []).slice()
-        .sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); })
-        .map(function (r) { return { id: r.id, tipo: r.tipo, conteudo: r.conteudo, createdAt: r.created_at }; });
     });
 
     // Verdade do banco após este pull: usado no próximo pull para detectar deleções remotas.
