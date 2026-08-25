@@ -39,7 +39,7 @@
     return ('0000000' + h.toString(16)).slice(-8);
   }
 
-  const SEP = '';
+  const SEP = '\u0001';
   // Junta campos normalizando null/undefined para '' — local e banco hasheiam igual.
   function j() {
     return Array.prototype.slice.call(arguments)

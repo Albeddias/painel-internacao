@@ -34,7 +34,7 @@ test('buildSyncBase: mapeia linhas por id com hash e labs por chave de conteúdo
   assert.match(b.rows.condutas['c1'], /^[0-9a-f]{8}$/);
   assert.match(b.rows.raw_texts['r1'], /^[0-9a-f]{8}$/);
   assert.match(b.rows.examsImage['i1'], /^[0-9a-f]{8}$/);
-  assert.strictEqual(b.rows.examsLab['2026-08-21Hb10'], '');
+  assert.strictEqual(b.rows.examsLab['2026-08-21\u0001Hb\u000110'], '');
   assert.match(b.scalars, /^[0-9a-f]{8}$/);
 });
 
