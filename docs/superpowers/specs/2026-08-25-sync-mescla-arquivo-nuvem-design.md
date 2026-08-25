@@ -33,7 +33,7 @@ state.syncBase = {
       condutas:    { [id]: hash8 },
       rawTexts:    { [id]: hash8 },
       examsImage:  { [id]: hash8 },
-      examsLab:    { [chave]: true }, // chave de conteúdo: data|nome|valor
+      examsLab:    { [chave]: '' },   // chave de conteúdo: data|nome|valor (hash vazio: a chave É o conteúdo)
     },
     scalars: hash8,  // hash de bed_number, age, admit_date, hpp, anamnese,
                      // discharge_forecast, status e notes (texto da evolução)
@@ -50,8 +50,9 @@ state.syncBase = {
 |---|---|---|
 | Só local, ausente da foto | criada neste aparelho | mantém e envia |
 | Só no banco, ausente da foto | criada lá (outro aparelho/IA) | adota localmente |
-| Na foto, sumiu localmente | deletada neste aparelho | some do banco |
-| Na foto, sumiu do banco | deletada lá | some do aparelho |
+| Na foto (intocada), sumiu localmente | deletada neste aparelho | some do banco |
+| Na foto (intocada), sumiu do banco | deletada lá | some do aparelho |
+| Sumiu de um lado, mas o outro lado editou (hash ≠ foto) | edição × deleção | a edição vence: a linha fica |
 | Nos dois lados, local ≠ foto, banco = foto | editada aqui | local vence |
 | Nos dois lados, local = foto, banco ≠ foto | editada lá | banco vence |
 | Nos dois lados, ambos ≠ foto | conflito real | local vence (quem sincroniza por último vence **aquela linha**) |
@@ -83,18 +84,21 @@ Caveat de transição (único, aceito): deleções feitas **antes** da atualiza�
 
 ## Arquivar na nuvem
 
+**Correção pós-design (encontrada na leitura do schema):** a marca "só na nuvem" não pode ser apenas local — outro aparelho readotaria o paciente no sync seguinte. A marca vive no banco como novo valor de status: `painel_patients.status = 'nuvem'`. Isso exige uma migration mínima (estender o CHECK de status para incluir `'nuvem'`), a única deste projeto.
+
 - Ação **"Guardar só na nuvem"** em paciente arquivado (alta/arquivado).
-- Fluxo: executa uma sincronização completa; **somente se ela concluir com sucesso**, remove o leito do estado local (sem tombstone), adiciona o id a `state.cloudArchivedIds` e grava um registro em `state.cloudArchivedNames[id] = { nome, leito, arquivadoEm }` (o nome completo nunca existe no banco — regra inegociável — então ele sobrevive apenas neste registro local, ~60 bytes/paciente).
-- `applyPull`/mescla: pacientes em `cloudArchivedIds` não são readotados nem contam para ressuscitar leito; `buildPushPayload` não os inclui (já não estão em `beds`), logo o delete+insert por paciente não os toca.
-- Tela **"Arquivados na nuvem"**: consulta o banco sob demanda (fora do sync) listando os pacientes de `cloudArchivedIds` com o nome do registro local (noutro aparelho, iniciais). **"Trazer de volta"** remove o id de `cloudArchivedIds` e dispara uma sincronização — o paciente volta completo; o nome completo é reencaixado do registro local se existir.
-- Paciente deletado do banco enquanto arquivado na nuvem: some da listagem; o registro local de nome é podado.
+- Fluxo: executa uma sincronização completa; **somente se ela concluir com sucesso**, faz `update status='nuvem'` no banco, remove o leito do estado local (sem tombstone) e grava um registro em `state.cloudArchived[id] = { nome, iniciais, leito }` (o nome completo nunca existe no banco — regra inegociável — então ele sobrevive apenas neste registro local, ~60 bytes/paciente).
+- Mescla/pull: paciente com status `'nuvem'` nunca vira leito. Se um aparelho ainda tem o leito dele, o leito é movido para o registro local `cloudArchived` daquele aparelho (preservando o nome completo que ele conhecia) — assim a função é simétrica entre dispositivos. `buildPushPayload` não os inclui (não estão em `beds`), logo o delete+insert por paciente não os toca.
+- Tela **"Na nuvem"** (na aba de arquivados): lista do registro local `cloudArchived` (nome se o aparelho conhecia, senão iniciais + leito) — sem consulta extra ao banco. **"Trazer de volta"**: `update status='arquivado'` no banco + sincronização — a mescla adota o paciente completo e reencaixa o nome do registro local se existir.
+- Paciente deletado do banco enquanto arquivado na nuvem: some da listagem no próximo sync (registro local podado).
+- `resetLocalSync` preserva `cloudArchived` (nomes completos são irrecuperáveis do banco).
 
 ## Mudanças por arquivo
 
-- **`painel-core.js`** (lógica pura, prefix-agnóstica): `hash8()`, `buildSyncBase(state)`, `mergeStates(state, pulled)`, suporte a `cloudArchivedIds`/`cloudArchivedNames` em `migrateState`, `applyPull` e nos pontos de readoção. `buildPushPayload` inalterado.
+- **`painel-core.js`** (lógica pura, prefix-agnóstica): `hash8()`, `buildSyncBase(state)`, `mergeStates(state, pulled)`, suporte a `cloudArchived` em `migrateState`, `applyPull`/mescla e nos pontos de readoção. `buildPushPayload` inalterado.
 - **`index.html`**: botão único **Sincronizar** (substitui Enviar/Receber), fluxo pull→merge→push, tela de arquivados na nuvem, ação "Guardar só na nuvem", "reset local + receber limpo" mantido. `TABLE_PREFIX` e gravação no Supabase inalterados.
 - **`CLAUDE.md`** e memória do projeto: reescrever "Convenções de sync" — morre a regra "edições da IA entre um Enviar e um Receber"; edições da IA no banco são **mescladas** na próxima sincronização (criações e deleções de linhas propagam corretamente). A IA continua sem tocar em `painel_patients.id`.
-- **Sem migration** — o schema do banco não muda.
+- **`supabase/migrations/003_painel_status_nuvem.sql`** — única mudança de schema: estende o CHECK de `painel_patients.status` para incluir `'nuvem'`.
 
 ## Testes (`node --test`, TDD)
 
