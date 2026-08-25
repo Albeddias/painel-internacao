@@ -28,6 +28,122 @@
     return words.map(function (w) { return w[0].toUpperCase(); }).join('');
   }
 
+  // ---- Sync com mescla: hashing e serialização de linhas -----------------
+
+  // Hash curto e determinístico (djb2-xor). Não-criptográfico: serve só para
+  // detectar "mudou desde a última foto sincronizada".
+  function hash8(s) {
+    s = String(s == null ? '' : s);
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
+  const SEP = '';
+  // Junta campos normalizando null/undefined para '' — local e banco hasheiam igual.
+  function j() {
+    return Array.prototype.slice.call(arguments)
+      .map(function (x) { return String(x == null ? '' : x); }).join(SEP);
+  }
+
+  // Linhas do leito no formato do banco (sem patient_id), com hash de conteúdo e
+  // posição original (ord). A identidade dos labs é a própria chave de conteúdo
+  // data|nome|valor: editar um valor = deletar a linha antiga + criar uma nova.
+  function localRowSets(bed) {
+    const out = { problems: [], antibiotics: [], cultures: [], devices: [], condutas: [], raw_texts: [], examsImage: [], examsLab: [] };
+    (bed.problems || []).forEach(function (p, i) {
+      const row = { id: p.id, descricao: p.descricao || '', status: p.status || 'ativo', plano: p.plano || '' };
+      out.problems.push({ key: row.id, hash: hash8(j(row.descricao, row.status, row.plano)), ord: i, row: row });
+    });
+    (bed.trackers || []).forEach(function (t, i) {
+      if (t.type === 'atb') {
+        const row = { id: t.id, nome: t.name || '', start_date: t.startDate || null, duration_days: t.duration || null, end_date: t.endDate || null, indicacao: t.indicacao || '' };
+        out.antibiotics.push({ key: row.id, hash: hash8(j(row.nome, row.start_date, row.duration_days, row.end_date, row.indicacao)), ord: i, row: row });
+      } else if (t.type === 'culture') {
+        const row = { id: t.id, tipo: t.name || '', collection_date: t.collectionDate || null, resultado: t.result || '' };
+        out.cultures.push({ key: row.id, hash: hash8(j(row.tipo, row.collection_date, row.resultado)), ord: i, row: row });
+      } else {
+        const row = { id: t.id, nome: t.name || '', install_date: t.installDate || null, removal_date: t.removalDate || null };
+        out.devices.push({ key: row.id, hash: hash8(j(row.nome, row.install_date, row.removal_date)), ord: i, row: row });
+      }
+    });
+    (bed.exams || []).forEach(function (e, i) {
+      if (e.type === 'lab') {
+        (e.results || []).forEach(function (r) {
+          const row = { tipo: 'lab', nome: r.name || '', data: e.date || null, resultado: String(r.value == null ? '' : r.value) };
+          out.examsLab.push({ key: j(row.data, row.nome, row.resultado), hash: '', ord: i, row: row });
+        });
+      } else {
+        const row = { id: e.id, tipo: 'imagem', nome: e.name || '', data: e.date || null, resultado: e.summary || '' };
+        out.examsImage.push({ key: row.id, hash: hash8(j(row.nome, row.data, row.resultado)), ord: i, row: row });
+      }
+    });
+    (bed.condutas || []).forEach(function (c, i) {
+      const row = { id: c.id, texto: c.text || '', done: !!c.done, data: null };
+      out.condutas.push({ key: row.id, hash: hash8(j(row.texto, row.done)), ord: i, row: row });
+    });
+    (bed.rawTexts || []).forEach(function (r, i) {
+      const row = { id: r.id, tipo: r.tipo || 'evolucao', data: r.data || null, texto: r.texto || '' };
+      out.raw_texts.push({ key: row.id, hash: hash8(j(row.tipo, row.data, row.texto)), ord: i, row: row });
+    });
+    return out;
+  }
+
+  // Mesmos conjuntos, a partir das linhas baixadas do banco de UM paciente.
+  // rows = { problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], raw_texts: [] }
+  function pulledRowSets(rows) {
+    const out = { problems: [], antibiotics: [], cultures: [], devices: [], condutas: [], raw_texts: [], examsImage: [], examsLab: [] };
+    (rows.problems || []).forEach(function (r) {
+      out.problems.push({ key: r.id, hash: hash8(j(r.descricao, r.status, r.plano)), ord: r.ordem, row: r });
+    });
+    (rows.antibiotics || []).forEach(function (r) {
+      out.antibiotics.push({ key: r.id, hash: hash8(j(r.nome, r.start_date, r.duration_days, r.end_date, r.indicacao)), ord: r.ordem, row: r });
+    });
+    (rows.cultures || []).forEach(function (r) {
+      out.cultures.push({ key: r.id, hash: hash8(j(r.tipo, r.collection_date, r.resultado)), ord: r.ordem, row: r });
+    });
+    (rows.devices || []).forEach(function (r) {
+      out.devices.push({ key: r.id, hash: hash8(j(r.nome, r.install_date, r.removal_date)), ord: r.ordem, row: r });
+    });
+    (rows.exams || []).forEach(function (r, i) {
+      if (r.tipo === 'lab') out.examsLab.push({ key: j(r.data, r.nome, r.resultado), hash: '', ord: i, row: r });
+      else out.examsImage.push({ key: r.id, hash: hash8(j(r.nome, r.data, r.resultado)), ord: i, row: r });
+    });
+    (rows.condutas || []).forEach(function (r, i) {
+      out.condutas.push({ key: r.id, hash: hash8(j(r.texto, r.done)), ord: i, row: r });
+    });
+    (rows.raw_texts || []).forEach(function (r, i) {
+      out.raw_texts.push({ key: r.id, hash: hash8(j(r.tipo, r.data, r.texto)), ord: i, row: r });
+    });
+    return out;
+  }
+
+  // Hash dos campos "corridos" do paciente, na mesma normalização do push —
+  // assim o hash local bate com o que uma versão intocada teria após o pull.
+  function localScalarsHash(bed) {
+    const status = bed.isArchived ? (bed.archiveReason === 'alta' ? 'alta' : 'arquivado') : 'internado';
+    const age = (bed.age === '' || bed.age == null) ? '' : String(Number(bed.age));
+    return hash8(j(bed.bedNumber, age, bed.admitDate, bed.hpp, bed.anamneseInicial, bed.dischargeForecast, status, bed.notes));
+  }
+
+  const ROW_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'condutas', 'raw_texts', 'examsImage', 'examsLab'];
+
+  // A "foto" da última sincronização: chaves + hashes de tudo que foi gravado.
+  function buildSyncBase(state) {
+    const base = {};
+    (state.beds || []).forEach(function (bed) {
+      if (!bed.patientId) return;
+      const sets = localRowSets(bed);
+      const rows = {};
+      ROW_TABLES.forEach(function (t) {
+        rows[t] = {};
+        sets[t].forEach(function (e) { rows[t][e.key] = e.hash; });
+      });
+      base[bed.patientId] = { rows: rows, scalars: localScalarsHash(bed) };
+    });
+    return base;
+  }
+
   function fillPatientName(text, fullName) {
     const name = String(fullName || '').trim();
     if (!name) return text;
@@ -108,6 +224,8 @@
     s.lastSyncAt = s.lastSyncAt || null;
     s.deletedPatientIds = s.deletedPatientIds || [];
     s.syncedPatientIds = s.syncedPatientIds || [];
+    s.syncBase = s.syncBase || {};
+    s.cloudArchived = s.cloudArchived || {};
     s.generalTasks = s.generalTasks || [];
     s.generalExams = s.generalExams || [];
     s.pinnedExams = s.pinnedExams || def.pinnedExams;
@@ -136,6 +254,7 @@
     s.deletedPatientIds = [];
     s.syncedPatientIds = [];
     s.lastSyncAt = null;
+    s.syncBase = {};   // cloudArchived é preservado: guarda nomes que só existem no aparelho
     return s;
   }
 
@@ -294,5 +413,7 @@
     applyPull: applyPull,
     markPatientDeleted: markPatientDeleted,
     resetLocalSync: resetLocalSync,
+    hash8: hash8,
+    buildSyncBase: buildSyncBase,
   };
 });
