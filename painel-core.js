@@ -144,6 +144,33 @@
     return base;
   }
 
+  // Mescla uma tabela de UM paciente. local/remote: [{key, hash, ord, row}];
+  // base: {key: hash} da última foto, ou null (sem foto → união, nada deleta).
+  // Regras: linha só de um lado e fora da foto = criada → fica; na foto e
+  // intocada = deletada no outro lado → some; editada (hash ≠ foto) vence
+  // deleção. Linha nos dois lados: local intocado → banco vence; senão local.
+  function mergeRowSets(local, remote, base) {
+    function inBase(key) { return !!base && Object.prototype.hasOwnProperty.call(base, key); }
+    function untouched(entry) { return inBase(entry.key) && entry.hash === base[entry.key]; }
+    const remoteByKey = {};
+    remote.forEach(function (r) { remoteByKey[r.key] = r; });
+    const localKeys = {};
+    local.forEach(function (l) { localKeys[l.key] = true; });
+
+    const result = [];
+    local.forEach(function (l) {
+      const r = remoteByKey[l.key];
+      if (r) result.push(untouched(l) ? r.row : l.row);
+      else if (!untouched(l)) result.push(l.row);
+    });
+    remote.forEach(function (r) {
+      if (localKeys[r.key] || untouched(r)) return;
+      const pos = (r.ord == null) ? result.length : Math.min(r.ord, result.length);
+      result.splice(pos, 0, r.row);
+    });
+    return result.map(function (row, i) { return Object.assign({}, row, { ordem: i }); });
+  }
+
   function fillPatientName(text, fullName) {
     const name = String(fullName || '').trim();
     if (!name) return text;
@@ -424,5 +451,6 @@
     resetLocalSync: resetLocalSync,
     hash8: hash8,
     buildSyncBase: buildSyncBase,
+    mergeRowSets: mergeRowSets,
   };
 });
