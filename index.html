@@ -142,13 +142,10 @@
             <div id="syncStatus" class="text-xs text-slate-500"></div>
           </div>
           <div class="flex gap-2">
-            <!-- Botões de Sync (Nuvem) -->
-            <button id="syncPushBtn" class="relative p-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all print:hidden" title="Enviar para a nuvem">
+            <!-- Botão de Sync (Nuvem): baixa, mescla e envia -->
+            <button id="syncBtn" class="relative p-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all print:hidden" title="Sincronizar com a nuvem">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" /></svg>
-              <span id="syncDirtyDot" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" title="Alterações locais não enviadas"></span>
-            </button>
-            <button id="syncPullBtn" class="p-2.5 bg-indigo-400 text-white font-medium rounded-lg hover:bg-indigo-500 transition-all print:hidden" title="Receber da nuvem">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-2.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" transform="rotate(180 10 11.5)" /></svg>
+              <span id="syncDirtyDot" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" title="Alterações locais não sincronizadas"></span>
             </button>
             <!-- Botão de Reset local + Receber (Âmbar) -->
             <button id="resetLocalBtn" class="p-2.5 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-all print:hidden" title="Resetar dados locais e receber limpo do servidor">
@@ -1132,7 +1129,7 @@
       if (document.visibilityState === 'hidden') flushSave();
     });
 
-    // Pontinho no botão Enviar + aviso quando há edições locais posteriores ao último sync.
+    // Pontinho no botão Sincronizar + aviso quando há edições locais posteriores ao último sync.
     function updateSyncBadge() {
       const dot = document.getElementById('syncDirtyDot');
       if (!dot) return;
@@ -1867,7 +1864,7 @@
     function renderGeneratedDocsList(listElement, bed, bedIdx) {
       listElement.innerHTML = '';
       if (!bed.generatedDocs || bed.generatedDocs.length === 0) {
-        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum documento. Peça à IA para gerar (ex.: sumário de alta) e toque em Receber.</p>`;
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum documento. Peça à IA para gerar (ex.: sumário de alta) e toque em Sincronizar.</p>`;
         return;
       }
       bed.generatedDocs.forEach((doc) => {
@@ -2928,91 +2925,74 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // Na carga: se já há sessão salva, libera o app (mesmo offline); senão, mantém o portão.
     if (hasStoredSession()) hideAuthGate();
 
-    async function pushToSupabase() {
-      const btn = document.getElementById('syncPushBtn');
-      if (btn.disabled) return;
-      btn.disabled = true;
-      setSyncStatus('Enviando...');
-      try {
-        const sb = await getSupabaseClient();
-        const payload = PainelCore.buildPushPayload(state);
-        const delIds = payload.deletePatientIds || [];
-        if (payload.patients.length === 0 && delIds.length === 0) { setSyncStatus('Nada para enviar.'); return; }
-        let res;
+    // Sincronização completa: baixa tudo, mescla (PainelCore.mergeStates) e grava
+    // o resultado com o push de sempre (delete+insert por paciente). Lança em falha.
+    async function doSync() {
+      const sb = await getSupabaseClient();
+      const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs'];
+      const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
+      const pulled = {};
+      tables.forEach((t, i) => {
+        if (results[i].error) throw results[i].error;
+        pulled[t] = results[i].data;
+      });
 
-        // Deleções de pacientes (tombstones): apaga filhos, notes, docs e o próprio paciente.
-        // As tabelas-filhas são independentes entre si — deletes em paralelo.
-        if (delIds.length) {
-          const delResults = await Promise.all([...SYNC_CHILD_TABLES, 'notes', 'generated_docs']
-            .map(t => sb.from(TABLE_PREFIX + t).delete().in('patient_id', delIds)));
-          for (const r of delResults) { if (r.error) throw r.error; }
-          res = await sb.from(TABLE_PREFIX + 'patients').delete().in('id', delIds);
-          if (res.error) throw res.error;
-        }
+      PainelCore.mergeStates(state, pulled);
 
-        if (payload.patients.length) {
-          res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
-          if (res.error) throw res.error;
-          const ids = payload.patients.map(p => p.id);
-          // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
-          // os filhos somem do banco até o próximo push (estado local é a fonte da verdade).
-          // A ordem delete→insert só importa DENTRO de cada tabela; as tabelas rodam em paralelo.
-          await Promise.all([
-            ...SYNC_CHILD_TABLES.map(async (t) => {
-              let r = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
-              if (r.error) throw r.error;
-              if (payload[t].length) {
-                r = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
-                if (r.error) throw r.error;
-              }
-            }),
-            (async () => {
-              const r = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
-              if (r.error) throw r.error;
-            })(),
-          ]);
-        }
-
-        // Atualiza a "verdade do banco": pacientes enviados passam a contar como sincronizados
-        // (permite que um pull futuro detecte se foram deletados em outro aparelho); os deletados saem.
-        const pushedIds = new Set([...(state.syncedPatientIds || []), ...payload.patients.map(p => p.id)]);
-        delIds.forEach(id => pushedIds.delete(id));
-        state.syncedPatientIds = [...pushedIds];
-        state.deletedPatientIds = []; // tombstones aplicados com sucesso
-        state.lastSyncAt = new Date().toISOString();
-        saveData(state, { fromSync: true });
-        flushSave();
-        setSyncStatus('Enviado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-      } catch (e) {
-        setSyncStatus('Falha ao enviar: ' + e.message, true);
-      } finally {
-        btn.disabled = false;
+      const payload = PainelCore.buildPushPayload(state);
+      const delIds = payload.deletePatientIds || [];
+      let res;
+      if (delIds.length) {
+        const delResults = await Promise.all([...SYNC_CHILD_TABLES, 'notes', 'generated_docs']
+          .map(t => sb.from(TABLE_PREFIX + t).delete().in('patient_id', delIds)));
+        for (const r of delResults) { if (r.error) throw r.error; }
+        res = await sb.from(TABLE_PREFIX + 'patients').delete().in('id', delIds);
+        if (res.error) throw res.error;
       }
+      if (payload.patients.length) {
+        res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
+        if (res.error) throw res.error;
+        const ids = payload.patients.map(p => p.id);
+        // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
+        // os filhos somem do banco até o próximo sync (estado local é a fonte da verdade).
+        await Promise.all([
+          ...SYNC_CHILD_TABLES.map(async (t) => {
+            let r = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
+            if (r.error) throw r.error;
+            if (payload[t].length) {
+              r = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
+              if (r.error) throw r.error;
+            }
+          }),
+          (async () => {
+            const r = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
+            if (r.error) throw r.error;
+          })(),
+        ]);
+      }
+
+      // Gravação confirmada: tira a foto e fecha o bookkeeping.
+      state.syncBase = PainelCore.buildSyncBase(state);
+      const pushedIds = new Set([...(state.syncedPatientIds || []), ...payload.patients.map(p => p.id)]);
+      delIds.forEach(id => pushedIds.delete(id));
+      state.syncedPatientIds = [...pushedIds];
+      state.deletedPatientIds = [];
+      state.lastSyncAt = new Date().toISOString();
+      saveData(state, { fromSync: true });
+      flushSave();
     }
 
-    async function pullFromSupabase() {
-      const btn = document.getElementById('syncPullBtn');
+    async function syncWithSupabase() {
+      const btn = document.getElementById('syncBtn');
       if (btn.disabled) return;
       btn.disabled = true;
-      setSyncStatus('Recebendo...');
+      setSyncStatus('Sincronizando...');
       try {
-        const sb = await getSupabaseClient();
-        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs'];
-        // Selects independentes — em paralelo o pull cai de ~10 roundtrips para 1.
-        const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
-        const pulled = {};
-        tables.forEach((t, i) => {
-          if (results[i].error) throw results[i].error;
-          pulled[t] = results[i].data;
-        });
-        PainelCore.applyPull(state, pulled);
-        state.lastSyncAt = new Date().toISOString();
-        saveData(state, { fromSync: true });
-        flushSave();
+        await doSync();
         renderScreenA();
-        setSyncStatus('Recebido ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+        setSyncStatus('Sincronizado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
       } catch (e) {
-        setSyncStatus('Falha ao receber: ' + e.message, true);
+        setSyncStatus('Falha ao sincronizar: ' + e.message, true);
       } finally {
         btn.disabled = false;
       }
@@ -3039,6 +3019,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         });
         PainelCore.resetLocalSync(state);   // limpa leitos + bookkeeping, mantém preferências locais
         PainelCore.applyPull(state, pulled);
+        state.syncBase = PainelCore.buildSyncBase(state);
         state.lastSyncAt = new Date().toISOString();
         saveData(state, { fromSync: true });
         flushSave();
@@ -3051,18 +3032,17 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       }
     }
 
-    document.getElementById('syncPushBtn').addEventListener('click', pushToSupabase);
-    document.getElementById('syncPullBtn').addEventListener('click', pullFromSupabase);
+    document.getElementById('syncBtn').addEventListener('click', syncWithSupabase);
     document.getElementById('resetLocalBtn').addEventListener('click', () => {
       showConfirm(
         'Isso vai APAGAR todos os leitos deste dispositivo e baixar tudo de novo do servidor. ' +
         'Use quando este aparelho estiver com dados desatualizados. ' +
-        'Se houver mudanças locais que você ainda não enviou (↑), envie antes — elas serão perdidas. ' +
+        'Se houver mudanças locais que você ainda não sincronizou, sincronize antes — elas serão perdidas. ' +
         'Suas preferências (templates, exames fixados, condutas comuns) são mantidas. Continuar?',
         resetLocalAndPull, 'Resetar e receber do servidor', 'bg-amber-500', 'Resetar e receber');
     });
     if (state.lastModifiedAt && (!state.lastSyncAt || state.lastModifiedAt > state.lastSyncAt)) {
-      setSyncStatus('Alterações locais não enviadas');
+      setSyncStatus('Alterações locais não sincronizadas');
     } else if (state.lastSyncAt) {
       setSyncStatus('Último sync: ' + new Date(state.lastSyncAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
     }
