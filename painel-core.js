@@ -171,6 +171,105 @@
     return result.map(function (row, i) { return Object.assign({}, row, { ordem: i }); });
   }
 
+  // Mescla three-way do estado inteiro com o que veio do banco.
+  // Muta e retorna state, pronto para buildPushPayload. Ver spec 2026-08-25.
+  function mergeStates(state, pulled) {
+    function byPatient(rows) {
+      const m = {};
+      (rows || []).forEach(function (r) { (m[r.patient_id] = m[r.patient_id] || []).push(r); });
+      return m;
+    }
+    const problems = byPatient(pulled.problems), atbs = byPatient(pulled.antibiotics),
+      cultures = byPatient(pulled.cultures), devices = byPatient(pulled.devices),
+      exams = byPatient(pulled.exams), condutas = byPatient(pulled.condutas),
+      notes = byPatient(pulled.notes), rawTexts = byPatient(pulled.raw_texts),
+      docs = byPatient(pulled.generated_docs);
+
+    state.syncBase = state.syncBase || {};
+    state.cloudArchived = state.cloudArchived || {};
+
+    const deletedPending = {};
+    (state.deletedPatientIds || []).forEach(function (id) { deletedPending[id] = true; });
+    const pulledIds = {};
+    (pulled.patients || []).forEach(function (p) { pulledIds[p.id] = true; });
+
+    // Deleção remota de paciente: mesma regra do applyPull.
+    const previouslySynced = {};
+    (state.syncedPatientIds || []).forEach(function (id) { previouslySynced[id] = true; });
+    state.beds = (state.beds || []).filter(function (b) {
+      if (!b.patientId) return true;
+      if (!previouslySynced[b.patientId]) return true;
+      if (deletedPending[b.patientId]) return true;
+      return !!pulledIds[b.patientId];
+    });
+
+    (pulled.patients || []).forEach(function (p) {
+      if (deletedPending[p.id]) return;
+      let bed = (state.beds || []).find(function (b) { return b.patientId === p.id; });
+
+      // Paciente guardado só na nuvem: nunca vira leito; se este aparelho ainda
+      // tinha o leito, move-o para o registro local preservando o nome completo.
+      if (p.status === 'nuvem') {
+        if (bed) {
+          state.cloudArchived[p.id] = { nome: bed.patientName || '', iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '' };
+          state.beds = state.beds.filter(function (b) { return b.patientId !== p.id; });
+        } else if (!state.cloudArchived[p.id]) {
+          state.cloudArchived[p.id] = { nome: '', iniciais: p.initials || '', leito: p.bed_number || '' };
+        }
+        return;
+      }
+
+      const remoteRows = {
+        problems: problems[p.id] || [], antibiotics: atbs[p.id] || [], cultures: cultures[p.id] || [],
+        devices: devices[p.id] || [], exams: exams[p.id] || [], condutas: condutas[p.id] || [],
+        raw_texts: rawTexts[p.id] || [], generated_docs: docs[p.id] || [],
+      };
+      const remoteNote = (notes[p.id] && notes[p.id][0] && notes[p.id][0].texto) || '';
+
+      if (!bed) {
+        // Novo aqui (criado no banco, ou restaurado da nuvem): adoção integral.
+        const reg = state.cloudArchived[p.id];
+        bed = migrateBed({ patientName: (reg && reg.nome) || p.initials || '?', bedNumber: p.bed_number || '' });
+        bed.patientId = p.id;
+        state.beds.push(bed);
+        delete state.cloudArchived[p.id];
+        applyPatientScalars(bed, p, remoteNote);
+        applyRowsToBed(bed, remoteRows);
+        return;
+      }
+
+      const base = state.syncBase[p.id] || null;
+      const local = localRowSets(bed);
+      const remote = pulledRowSets(remoteRows);
+      function baseRows(t) { return base ? (base.rows[t] || {}) : null; }
+
+      // Scalars antes das linhas: usa o leito ainda intocado para o hash local.
+      if (base && base.scalars === localScalarsHash(bed)) {
+        applyPatientScalars(bed, p, remoteNote);
+      }
+
+      applyRowsToBed(bed, {
+        problems: mergeRowSets(local.problems, remote.problems, baseRows('problems')),
+        antibiotics: mergeRowSets(local.antibiotics, remote.antibiotics, baseRows('antibiotics')),
+        cultures: mergeRowSets(local.cultures, remote.cultures, baseRows('cultures')),
+        devices: mergeRowSets(local.devices, remote.devices, baseRows('devices')),
+        condutas: mergeRowSets(local.condutas, remote.condutas, baseRows('condutas')),
+        raw_texts: mergeRowSets(local.raw_texts, remote.raw_texts, baseRows('raw_texts')),
+        exams: mergeRowSets(local.examsLab, remote.examsLab, baseRows('examsLab'))
+          .concat(mergeRowSets(local.examsImage, remote.examsImage, baseRows('examsImage'))),
+        generated_docs: remoteRows.generated_docs,
+      });
+    });
+
+    // Registro da nuvem: poda pacientes que sumiram do banco.
+    Object.keys(state.cloudArchived).forEach(function (id) {
+      if (!pulledIds[id]) delete state.cloudArchived[id];
+    });
+
+    state.syncedPatientIds = Object.keys(pulledIds);
+    return state;
+  }
+
   function fillPatientName(text, fullName) {
     const name = String(fullName || '').trim();
     if (!name) return text;
@@ -452,5 +551,6 @@
     hash8: hash8,
     buildSyncBase: buildSyncBase,
     mergeRowSets: mergeRowSets,
+    mergeStates: mergeStates,
   };
 });
