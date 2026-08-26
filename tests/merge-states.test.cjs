@@ -85,8 +85,10 @@ test('sem foto: união — nada é deletado de lado nenhum', () => {
   const { state, pulled } = syncedFixture();
   state.syncBase = {};
   pulled.problems = []; // sumiu do banco, mas sem foto não dá pra saber se foi deleção
+  pulled.raw_texts.push({ id: 'rt-uniao', patient_id: 'p1015', tipo: 'evolucao', data: '2026-08-25', texto: 'Remota.' });
   PainelCore.mergeStates(state, pulled);
   assert.strictEqual(state.beds[0].problems.length, 1, 'linha local preservada');
+  assert.ok(state.beds[0].rawTexts.find(r => r.id === 'rt-uniao'), 'linha remota adotada');
 });
 
 test('tombstone de paciente continua valendo na mescla', () => {
@@ -143,4 +145,73 @@ test('privacidade: payload pós-mescla não contém nome completo', () => {
   PainelCore.mergeStates(state, pulled);
   const json = JSON.stringify(PainelCore.buildPushPayload(state));
   assert.ok(!json.includes('Ana Braga') && !json.includes('Bruno Costa'));
+});
+
+function trackerFixture() {
+  const state = PainelCore.migrateState({ beds: [
+    PainelCore.migrateBed({
+      patientId: 'pT', bedNumber: '1020-A', patientName: 'Carla Dias',
+      trackers: [
+        { id: 'a1', type: 'atb', name: 'Cefepime', startDate: '2026-08-20', duration: 7 },
+        { id: 'd1', type: 'device', name: 'CVC', installDate: '2026-08-20' },
+        { id: 'a2', type: 'atb', name: 'Vancomicina', startDate: '2026-08-21', duration: 10 },
+      ],
+      condutas: [{ id: 'c1', text: 'Manter ATB', done: false }],
+    }),
+  ] }, '2026-08-25');
+  state.syncedPatientIds = ['pT'];
+  state.syncBase = PainelCore.buildSyncBase(state);
+  const pulled = {
+    patients: [{ id: 'pT', bed_number: '1020-A', initials: 'CD', age: null, admit_date: null, hpp: '', anamnese_inicial: '', discharge_forecast: null, status: 'internado' }],
+    problems: [],
+    antibiotics: [
+      { id: 'a1', patient_id: 'pT', nome: 'Cefepime', start_date: '2026-08-20', duration_days: 7, end_date: null, indicacao: '', ordem: 0 },
+      { id: 'a2', patient_id: 'pT', nome: 'Vancomicina', start_date: '2026-08-21', duration_days: 10, end_date: null, indicacao: '', ordem: 2 },
+    ],
+    cultures: [],
+    devices: [{ id: 'd1', patient_id: 'pT', nome: 'CVC', install_date: '2026-08-20', removal_date: null, ordem: 1 }],
+    exams: [], condutas: [{ id: 'c1', patient_id: 'pT', texto: 'Manter ATB', done: false, data: null }],
+    notes: [{ patient_id: 'pT', texto: '' }], raw_texts: [], generated_docs: [],
+  };
+  return { state, pulled };
+}
+
+test('trackers: ordem entrelaçada entre tipos sobrevive a sync sem mudanças', () => {
+  const { state, pulled } = trackerFixture();
+  PainelCore.mergeStates(state, pulled);
+  assert.deepStrictEqual(state.beds[0].trackers.map(t => t.id), ['a1', 'd1', 'a2']);
+});
+
+test('trackers: edição local de um ATB vence sem embaralhar os demais tipos', () => {
+  const { state, pulled } = trackerFixture();
+  state.beds[0].trackers[0].duration = 14;
+  PainelCore.mergeStates(state, pulled);
+  const t = state.beds[0].trackers;
+  assert.deepStrictEqual(t.map(x => x.id), ['a1', 'd1', 'a2']);
+  assert.strictEqual(t[0].duration, 14);
+});
+
+test('condutas: adição local + adição remota viram união', () => {
+  const { state, pulled } = trackerFixture();
+  state.beds[0].condutas.push({ id: 'c2', text: 'Nova local', done: false });
+  pulled.condutas.push({ id: 'c3', patient_id: 'pT', texto: 'Nova remota', done: true, data: null });
+  PainelCore.mergeStates(state, pulled);
+  assert.deepStrictEqual(state.beds[0].condutas.map(c => c.id).sort(), ['c1', 'c2', 'c3']);
+});
+
+test('notes: evolução editada localmente vence; intocada adota o banco', () => {
+  const { state, pulled } = syncedFixture();
+  state.beds[0].notes = 'Editada aqui.';
+  pulled.notes = [{ patient_id: 'p1015', texto: 'Editada lá.' }, { patient_id: 'p2001', texto: 'Nova do banco.' }];
+  PainelCore.mergeStates(state, pulled);
+  assert.strictEqual(state.beds[0].notes, 'Editada aqui.');
+  assert.strictEqual(state.beds[1].notes, 'Nova do banco.');
+});
+
+test('registro da nuvem não é podado por um pull vazio', () => {
+  const { state, pulled } = syncedFixture();
+  pulled.patients[1].status = 'nuvem';
+  PainelCore.mergeStates(state, pulled);
+  PainelCore.mergeStates(state, { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [] });
+  assert.ok(state.cloudArchived['p2001'], 'nome preservado mesmo com pull vazio');
 });

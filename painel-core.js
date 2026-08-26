@@ -149,7 +149,7 @@
   // Regras: linha só de um lado e fora da foto = criada → fica; na foto e
   // intocada = deletada no outro lado → some; editada (hash ≠ foto) vence
   // deleção. Linha nos dois lados: local intocado → banco vence; senão local.
-  function mergeRowSets(local, remote, base) {
+  function mergeRowSets(local, remote, base, keepOrd) {
     function inBase(key) { return !!base && Object.prototype.hasOwnProperty.call(base, key); }
     function untouched(entry) { return inBase(entry.key) && entry.hash === base[entry.key]; }
     const remoteByKey = {};
@@ -160,15 +160,19 @@
     const result = [];
     local.forEach(function (l) {
       const r = remoteByKey[l.key];
-      if (r) result.push(untouched(l) ? r.row : l.row);
-      else if (!untouched(l)) result.push(l.row);
+      if (r) result.push(untouched(l) ? r : l);
+      else if (!untouched(l)) result.push(l);
     });
     remote.forEach(function (r) {
       if (localKeys[r.key] || untouched(r)) return;
       const pos = (r.ord == null) ? result.length : Math.min(r.ord, result.length);
-      result.splice(pos, 0, r.row);
+      result.splice(pos, 0, r);
     });
-    return result.map(function (row, i) { return Object.assign({}, row, { ordem: i }); });
+    // keepOrd: preserva o ord original do vencedor (ordem unificada dos trackers,
+    // que atravessa três tabelas); sem keepOrd: renumera pela posição final.
+    return result.map(function (e, i) {
+      return Object.assign({}, e.row, { ordem: keepOrd ? (e.ord == null ? i : e.ord) : i });
+    });
   }
 
   // Mescla three-way do estado inteiro com o que veio do banco.
@@ -250,9 +254,9 @@
 
       applyRowsToBed(bed, {
         problems: mergeRowSets(local.problems, remote.problems, baseRows('problems')),
-        antibiotics: mergeRowSets(local.antibiotics, remote.antibiotics, baseRows('antibiotics')),
-        cultures: mergeRowSets(local.cultures, remote.cultures, baseRows('cultures')),
-        devices: mergeRowSets(local.devices, remote.devices, baseRows('devices')),
+        antibiotics: mergeRowSets(local.antibiotics, remote.antibiotics, baseRows('antibiotics'), true),
+        cultures: mergeRowSets(local.cultures, remote.cultures, baseRows('cultures'), true),
+        devices: mergeRowSets(local.devices, remote.devices, baseRows('devices'), true),
         condutas: mergeRowSets(local.condutas, remote.condutas, baseRows('condutas')),
         raw_texts: mergeRowSets(local.raw_texts, remote.raw_texts, baseRows('raw_texts')),
         exams: mergeRowSets(local.examsLab, remote.examsLab, baseRows('examsLab'))
@@ -261,10 +265,13 @@
       });
     });
 
-    // Registro da nuvem: poda pacientes que sumiram do banco.
-    Object.keys(state.cloudArchived).forEach(function (id) {
-      if (!pulledIds[id]) delete state.cloudArchived[id];
-    });
+    // Poda só com pull não-vazio: um pull vazio anômalo não pode apagar os nomes,
+    // que não existem em nenhum outro lugar.
+    if ((pulled.patients || []).length) {
+      Object.keys(state.cloudArchived).forEach(function (id) {
+        if (!pulledIds[id]) delete state.cloudArchived[id];
+      });
+    }
 
     state.syncedPatientIds = Object.keys(pulledIds);
     return state;
