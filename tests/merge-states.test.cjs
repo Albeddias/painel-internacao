@@ -215,3 +215,10 @@ test('registro da nuvem não é podado por um pull vazio', () => {
   PainelCore.mergeStates(state, { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [] });
   assert.ok(state.cloudArchived['p2001'], 'nome preservado mesmo com pull vazio');
 });
+
+test('pull vazio não remove leitos sincronizados nem zera syncedPatientIds', () => {
+  const { state } = syncedFixture();
+  PainelCore.mergeStates(state, { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [] });
+  assert.strictEqual(state.beds.length, 2, 'leitos preservados');
+  assert.deepStrictEqual(state.syncedPatientIds.slice().sort(), ['p1015', 'p2001']);
+});

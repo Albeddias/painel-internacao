@@ -147,7 +147,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" /></svg>
               <span id="syncDirtyDot" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" title="Alterações locais não sincronizadas"></span>
             </button>
-            <!-- Botão de Reset local + Receber (Âmbar) -->
+            <!-- Botão de Reset local: apaga leitos locais e baixa limpo do servidor (Âmbar) -->
             <button id="resetLocalBtn" class="p-2.5 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-all print:hidden" title="Resetar dados locais e receber limpo do servidor">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd" /></svg>
             </button>
@@ -2966,59 +2966,81 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
 
     // Sincronização completa: baixa tudo, mescla (PainelCore.mergeStates) e grava
     // o resultado com o push de sempre (delete+insert por paciente). Lança em falha.
+    let syncInFlight = false;
     async function doSync() {
-      const sb = await getSupabaseClient();
-      const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs'];
-      const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
-      const pulled = {};
-      tables.forEach((t, i) => {
-        if (results[i].error) throw results[i].error;
-        pulled[t] = results[i].data;
-      });
+      if (syncInFlight) throw new Error('Sincronização já em andamento.');
+      syncInFlight = true;
+      let merged = false;
+      try {
+        const sb = await getSupabaseClient();
+        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs'];
+        const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
+        const pulled = {};
+        tables.forEach((t, i) => {
+          if (results[i].error) throw results[i].error;
+          pulled[t] = results[i].data;
+        });
 
-      PainelCore.mergeStates(state, pulled);
+        PainelCore.mergeStates(state, pulled);
+        // Foto capturada AGORA (síncrono): edições feitas durante os awaits do push
+        // não entram na foto e sobrevivem à próxima mescla.
+        const newBase = PainelCore.buildSyncBase(state);
+        merged = true;
 
-      const payload = PainelCore.buildPushPayload(state);
-      const delIds = payload.deletePatientIds || [];
-      let res;
-      if (delIds.length) {
-        const delResults = await Promise.all([...SYNC_CHILD_TABLES, 'notes', 'generated_docs']
-          .map(t => sb.from(TABLE_PREFIX + t).delete().in('patient_id', delIds)));
-        for (const r of delResults) { if (r.error) throw r.error; }
-        res = await sb.from(TABLE_PREFIX + 'patients').delete().in('id', delIds);
-        if (res.error) throw res.error;
-      }
-      if (payload.patients.length) {
-        res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
-        if (res.error) throw res.error;
-        const ids = payload.patients.map(p => p.id);
-        // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
-        // os filhos somem do banco até o próximo sync (estado local é a fonte da verdade).
-        await Promise.all([
-          ...SYNC_CHILD_TABLES.map(async (t) => {
-            let r = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
-            if (r.error) throw r.error;
-            if (payload[t].length) {
-              r = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
+        const payload = PainelCore.buildPushPayload(state);
+        const delIds = payload.deletePatientIds || [];
+        let res;
+        if (delIds.length) {
+          const delResults = await Promise.all([...SYNC_CHILD_TABLES, 'notes', 'generated_docs']
+            .map(t => sb.from(TABLE_PREFIX + t).delete().in('patient_id', delIds)));
+          for (const r of delResults) { if (r.error) throw r.error; }
+          res = await sb.from(TABLE_PREFIX + 'patients').delete().in('id', delIds);
+          if (res.error) throw res.error;
+        }
+        if (payload.patients.length) {
+          res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
+          if (res.error) throw res.error;
+          const ids = payload.patients.map(p => p.id);
+          // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
+          // os filhos somem do banco até o próximo sync (estado local é a fonte da verdade).
+          // Mitigação: em falha pós-mescla a foto é zerada e o próximo sync degrada para união.
+          await Promise.all([
+            ...SYNC_CHILD_TABLES.map(async (t) => {
+              let r = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
               if (r.error) throw r.error;
-            }
-          }),
-          (async () => {
-            const r = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
-            if (r.error) throw r.error;
-          })(),
-        ]);
-      }
+              if (payload[t].length) {
+                r = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
+                if (r.error) throw r.error;
+              }
+            }),
+            (async () => {
+              const r = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
+              if (r.error) throw r.error;
+            })(),
+          ]);
+        }
 
-      // Gravação confirmada: tira a foto e fecha o bookkeeping.
-      state.syncBase = PainelCore.buildSyncBase(state);
-      const pushedIds = new Set([...(state.syncedPatientIds || []), ...payload.patients.map(p => p.id)]);
-      delIds.forEach(id => pushedIds.delete(id));
-      state.syncedPatientIds = [...pushedIds];
-      state.deletedPatientIds = [];
-      state.lastSyncAt = new Date().toISOString();
-      saveData(state, { fromSync: true });
-      flushSave();
+        // Gravação confirmada: tira a foto e fecha o bookkeeping.
+        state.syncBase = newBase;
+        const pushedIds = new Set([...(state.syncedPatientIds || []), ...payload.patients.map(p => p.id)]);
+        delIds.forEach(id => pushedIds.delete(id));
+        state.syncedPatientIds = [...pushedIds];
+        state.deletedPatientIds = [];
+        state.lastSyncAt = new Date().toISOString();
+        saveData(state, { fromSync: true });
+        flushSave();
+      } catch (e) {
+        if (merged) {
+          // Push pode ter ficado pela metade: sem foto, a próxima sincronização
+          // faz união (nada é deletado) em vez de ler o buraco como deleção remota.
+          state.syncBase = {};
+          saveData(state, { fromSync: true });
+          flushSave();
+        }
+        throw e;
+      } finally {
+        syncInFlight = false;
+      }
     }
 
     async function syncWithSupabase() {
@@ -3028,11 +3050,11 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       setSyncStatus('Sincronizando...');
       try {
         await doSync();
-        renderScreenA();
         setSyncStatus('Sincronizado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
       } catch (e) {
         setSyncStatus('Falha ao sincronizar: ' + e.message, true);
       } finally {
+        renderScreenA();
         btn.disabled = false;
       }
     }
@@ -3040,6 +3062,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // Guardar só na nuvem: sincroniza (garante o banco completo), marca status='nuvem'
     // no banco, remove o leito do aparelho e guarda o nome completo só localmente.
     async function archiveBedToCloud(bed) {
+      if (!bed.patientId) bed.patientId = PainelCore.uuid(); // leito nomeado nesta sessão: ganha id antes do sync
       setSyncStatus('Sincronizando...');
       await doSync();
       const sb = await getSupabaseClient();
@@ -3050,8 +3073,8 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         iniciais: PainelCore.initialsFromName(bed.patientName),
         leito: bed.bedNumber || '',
       };
-      state.beds = state.beds.filter(b => b.patientId !== bed.patientId);
-      state.syncBase = PainelCore.buildSyncBase(state);
+      state.beds = state.beds.filter(b => b !== bed);
+      delete state.syncBase[bed.patientId];
       saveData(state, { fromSync: true });
       flushSave();
       renderScreenA();

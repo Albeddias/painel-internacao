@@ -32,6 +32,7 @@
 
   // Hash curto e determinístico (djb2-xor). Não-criptográfico: serve só para
   // detectar "mudou desde a última foto sincronizada".
+  // 32 bits: risco de colisão de conteúdo é desprezível para uso pessoal e aceito.
   function hash8(s) {
     s = String(s == null ? '' : s);
     let h = 5381;
@@ -197,15 +198,20 @@
     const pulledIds = {};
     (pulled.patients || []).forEach(function (p) { pulledIds[p.id] = true; });
 
+    // Pull vazio é anômalo (sessão errada, RLS): nunca interpretar como "banco esvaziado".
+    const emptyPull = (pulled.patients || []).length === 0;
+
     // Deleção remota de paciente: mesma regra do applyPull.
     const previouslySynced = {};
     (state.syncedPatientIds || []).forEach(function (id) { previouslySynced[id] = true; });
-    state.beds = (state.beds || []).filter(function (b) {
-      if (!b.patientId) return true;
-      if (!previouslySynced[b.patientId]) return true;
-      if (deletedPending[b.patientId]) return true;
-      return !!pulledIds[b.patientId];
-    });
+    if (!emptyPull) {
+      state.beds = (state.beds || []).filter(function (b) {
+        if (!b.patientId) return true;
+        if (!previouslySynced[b.patientId]) return true;
+        if (deletedPending[b.patientId]) return true;
+        return !!pulledIds[b.patientId];
+      });
+    }
 
     (pulled.patients || []).forEach(function (p) {
       if (deletedPending[p.id]) return;
@@ -267,13 +273,13 @@
 
     // Poda só com pull não-vazio: um pull vazio anômalo não pode apagar os nomes,
     // que não existem em nenhum outro lugar.
-    if ((pulled.patients || []).length) {
+    if (!emptyPull) {
       Object.keys(state.cloudArchived).forEach(function (id) {
         if (!pulledIds[id]) delete state.cloudArchived[id];
       });
     }
 
-    state.syncedPatientIds = Object.keys(pulledIds);
+    if (!emptyPull) state.syncedPatientIds = Object.keys(pulledIds);
     return state;
   }
 
