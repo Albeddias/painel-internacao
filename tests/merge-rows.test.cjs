@@ -50,7 +50,7 @@ test('mergeRowSets: sem foto (base null) → união, nada é deletado', () => {
 });
 
 test('mergeRowSets: labs por chave de conteúdo (hash vazio) — deleção remota funciona', () => {
-  const out = PainelCore.mergeRowSets([e('2026-08-21\\u0001Hb\\u000110', '', 0)], [], { '2026-08-21\\u0001Hb\\u000110': '' });
+  const out = PainelCore.mergeRowSets([e('2026-08-21\u0001Hb\u000110', '', 0)], [], { '2026-08-21\u0001Hb\u000110': '' });
   assert.deepStrictEqual(out, []);
 });
 
