@@ -74,6 +74,13 @@
       .map(function (x) { return String(x == null ? '' : x); }).join(SEP);
   }
 
+  // Hash de dispositivo: o kind só entra quando é 'procedimento', para que linhas
+  // antigas (sem kind / kind 'device') mantenham o hash de antes da coluna existir.
+  function deviceHash(nome, installDate, removalDate, kind) {
+    const base = j(nome, installDate, removalDate);
+    return hash8(kind === 'procedimento' ? base + SEP + 'procedimento' : base);
+  }
+
   // Linhas do leito no formato do banco (sem patient_id), com hash de conteúdo e
   // posição original (ord). A identidade dos labs é a própria chave de conteúdo
   // data|nome|valor: editar um valor = deletar a linha antiga + criar uma nova.
@@ -91,8 +98,8 @@
         const row = { id: t.id, tipo: t.name || '', collection_date: t.collectionDate || null, resultado: t.result || '' };
         out.cultures.push({ key: row.id, hash: hash8(j(row.tipo, row.collection_date, row.resultado)), ord: i, row: row });
       } else {
-        const row = { id: t.id, nome: t.name || '', install_date: t.installDate || null, removal_date: t.removalDate || null };
-        out.devices.push({ key: row.id, hash: hash8(j(row.nome, row.install_date, row.removal_date)), ord: i, row: row });
+        const row = { id: t.id, nome: t.name || '', install_date: t.installDate || null, removal_date: t.removalDate || null, kind: t.kind === 'procedimento' ? 'procedimento' : 'device' };
+        out.devices.push({ key: row.id, hash: deviceHash(row.nome, row.install_date, row.removal_date, row.kind), ord: i, row: row });
       }
     });
     (bed.exams || []).forEach(function (e, i) {
@@ -131,7 +138,7 @@
       out.cultures.push({ key: r.id, hash: hash8(j(r.tipo, r.collection_date, r.resultado)), ord: r.ordem, row: r });
     });
     (rows.devices || []).forEach(function (r) {
-      out.devices.push({ key: r.id, hash: hash8(j(r.nome, r.install_date, r.removal_date)), ord: r.ordem, row: r });
+      out.devices.push({ key: r.id, hash: deviceHash(r.nome, r.install_date, r.removal_date, r.kind), ord: r.ordem, row: r });
     });
     (rows.exams || []).forEach(function (r, i) {
       if (r.tipo === 'lab') out.examsLab.push({ key: j(r.data, r.nome, r.resultado), hash: '', ord: i, row: r });
@@ -450,7 +457,7 @@
         } else if (t.type === 'culture') {
           out.cultures.push({ id: t.id, patient_id: pid, tipo: t.name || '', collection_date: t.collectionDate || null, resultado: t.result || '', ordem: i });
         } else {
-          out.devices.push({ id: t.id, patient_id: pid, nome: t.name || '', install_date: t.installDate || null, removal_date: t.removalDate || null, ordem: i });
+          out.devices.push({ id: t.id, patient_id: pid, nome: t.name || '', install_date: t.installDate || null, removal_date: t.removalDate || null, kind: t.kind === 'procedimento' ? 'procedimento' : 'device', ordem: i });
         }
       });
       (b.exams || []).forEach(function (e) {
@@ -498,7 +505,7 @@
         return { ord: r.ordem, t: { id: r.id, type: 'culture', name: r.tipo || '', collectionDate: r.collection_date || '', result: r.resultado || '' } };
       }))
       .concat((rows.devices || []).map(function (r) {
-        return { ord: r.ordem, t: { id: r.id, type: 'device', name: r.nome || '', installDate: r.install_date || '', removalDate: r.removal_date || '' } };
+        return { ord: r.ordem, t: { id: r.id, type: 'device', kind: r.kind === 'procedimento' ? 'procedimento' : 'device', name: r.nome || '', installDate: r.install_date || '', removalDate: r.removal_date || '' } };
       }));
     mergedTrackers.forEach(function (m, i) { if (m.ord == null) m.ord = 1000000 + i; });
     mergedTrackers.sort(function (a, b) { return a.ord - b.ord; });

@@ -341,7 +341,8 @@
         <div class="grid grid-cols-1 gap-3 mt-4">
           <button data-type="atb" class="tracker-type-btn w-full text-left bg-sky-50 hover:bg-sky-100 text-sky-800 font-medium rounded-lg p-4 transition-all">Antibiótico</button>
           <button data-type="culture" class="tracker-type-btn w-full text-left bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium rounded-lg p-4 transition-all">Cultura</button>
-          <button data-type="device" class="tracker-type-btn w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-800 font-medium rounded-lg p-4 transition-all">Dispositivo / Procedimento</button>
+          <button data-type="device" class="tracker-type-btn w-full text-left bg-slate-50 hover:bg-slate-100 text-slate-800 font-medium rounded-lg p-4 transition-all">Dispositivo Invasivo</button>
+          <button data-type="proc" class="tracker-type-btn w-full text-left bg-violet-50 hover:bg-violet-100 text-violet-800 font-medium rounded-lg p-4 transition-all">Cirurgia / Procedimento</button>
         </div>
       </div>
 
@@ -364,6 +365,13 @@
               <input id="tracker-atb-duration" type="number" placeholder="Ex: 7" min="1" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
             </div>
           </div>
+          <div>
+            <label class="text-sm font-medium text-slate-700">Fim / Suspenso em (opcional)</label>
+            <div class="flex gap-2 mt-1">
+              <input id="tracker-atb-end" type="date" class="flex-1 border border-slate-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <button id="tracker-atb-end-today" type="button" class="flex-shrink-0 text-sm bg-slate-100 text-slate-700 font-medium rounded-lg px-3 hover:bg-slate-200 transition-all">Hoje</button>
+            </div>
+          </div>
         </div>
         
         <div id="tracker-form-culture" class="tracker-form space-y-3 mt-4">
@@ -378,6 +386,12 @@
           <div>
             <label class="text-sm font-medium text-slate-700">Resultado</label>
             <input id="tracker-culture-result" type="text" placeholder="Ex: Aguardando" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              <button type="button" class="culture-result-chip text-xs bg-slate-100 text-slate-700 rounded-full px-2.5 py-1 hover:bg-slate-200 transition-all" data-result="Aguardando">Aguardando</button>
+              <button type="button" class="culture-result-chip text-xs bg-slate-100 text-slate-700 rounded-full px-2.5 py-1 hover:bg-slate-200 transition-all" data-result="Negativa parcial">Negativa parcial</button>
+              <button type="button" class="culture-result-chip text-xs bg-slate-100 text-slate-700 rounded-full px-2.5 py-1 hover:bg-slate-200 transition-all" data-result="Negativa final">Negativa final</button>
+              <button type="button" class="culture-result-chip text-xs bg-slate-100 text-slate-700 rounded-full px-2.5 py-1 hover:bg-slate-200 transition-all" data-result="Positiva: ">Positiva…</button>
+            </div>
           </div>
         </div>
         
@@ -386,10 +400,28 @@
             <label class="text-sm font-medium text-slate-700">Nome do Dispositivo</label>
             <input id="tracker-device-name" type="text" placeholder="Ex: CVC Subclávia D" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
           </div>
-          <div>
-            <label class="text-sm font-medium text-slate-700">Data da Instalação</label>
-            <input id="tracker-device-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm font-medium text-slate-700">Instalação</label>
+              <input id="tracker-device-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="text-sm font-medium text-slate-700">Retirada (opcional)</label>
+              <input id="tracker-device-removal" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
           </div>
+        </div>
+
+        <div id="tracker-form-proc" class="tracker-form space-y-3 mt-4">
+          <div>
+            <label class="text-sm font-medium text-slate-700">Nome do Procedimento</label>
+            <input id="tracker-proc-name" type="text" placeholder="Ex: Laparotomia exploradora" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div>
+            <label class="text-sm font-medium text-slate-700">Data do Procedimento</label>
+            <input id="tracker-proc-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <p class="text-xs text-slate-500">Conta o pós-operatório ("PO D5") e não gera alerta de tempo prolongado.</p>
         </div>
         
         <div class="flex gap-3 mt-5">
@@ -898,15 +930,22 @@
                 document.getElementById('tracker-atb-name').value = tracker.name || '';
                 document.getElementById('tracker-atb-start').value = tracker.startDate || '';
                 document.getElementById('tracker-atb-duration').value = tracker.duration || '';
+                document.getElementById('tracker-atb-end').value = tracker.endDate || '';
             } else if (currentTrackerType === 'culture') {
                 formId = 'tracker-form-culture'; title = 'Editar Cultura';
                 document.getElementById('tracker-culture-name').value = tracker.name || '';
                 document.getElementById('tracker-culture-date').value = tracker.collectionDate || '';
                 document.getElementById('tracker-culture-result').value = tracker.result || '';
+            } else if (tracker.kind === 'procedimento') {
+                currentTrackerType = 'proc';
+                formId = 'tracker-form-proc'; title = 'Editar Procedimento';
+                document.getElementById('tracker-proc-name').value = tracker.name || '';
+                document.getElementById('tracker-proc-date').value = tracker.installDate || '';
             } else {
                 formId = 'tracker-form-device'; title = 'Editar Dispositivo';
                 document.getElementById('tracker-device-name').value = tracker.name || '';
                 document.getElementById('tracker-device-date').value = tracker.installDate || '';
+                document.getElementById('tracker-device-removal').value = tracker.removalDate || '';
             }
             trackerFormTitle.textContent = title;
             document.getElementById(formId).classList.add('active');
@@ -936,6 +975,18 @@
         hideModal('trackerModal');
         resetTrackerModal();
     });
+
+    document.getElementById('tracker-atb-end-today').addEventListener('click', () => {
+        document.getElementById('tracker-atb-end').value = todayISO();
+    });
+
+    document.querySelectorAll('.culture-result-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const input = document.getElementById('tracker-culture-result');
+            input.value = chip.dataset.result;
+            if (chip.dataset.result.endsWith(': ')) input.focus();
+        });
+    });
     
     document.getElementById('trackerBackBtn').addEventListener('click', () => {
         trackerStep2.classList.remove('active');
@@ -958,6 +1009,9 @@
                 formId = 'tracker-form-culture'; title = 'Nova Cultura';
                 document.getElementById('tracker-culture-date').value = today;
                 document.getElementById('tracker-culture-result').value = 'Aguardando';
+            } else if (currentTrackerType === 'proc') {
+                formId = 'tracker-form-proc'; title = 'Novo Procedimento';
+                document.getElementById('tracker-proc-date').value = today;
             } else {
                 formId = 'tracker-form-device'; title = 'Novo Dispositivo';
                 document.getElementById('tracker-device-date').value = today;
@@ -981,34 +1035,50 @@
                     tracker.name = document.getElementById('tracker-atb-name').value.trim() || 'Antibiótico';
                     tracker.startDate = document.getElementById('tracker-atb-start').value;
                     tracker.duration = parseInt(document.getElementById('tracker-atb-duration').value, 10) || null;
+                    tracker.endDate = document.getElementById('tracker-atb-end').value || '';
                     if (!tracker.startDate) throw new Error("Data D1 é obrigatória.");
                 } else if (tracker.type === 'culture') {
                     tracker.name = document.getElementById('tracker-culture-name').value.trim() || 'Cultura';
                     tracker.collectionDate = document.getElementById('tracker-culture-date').value;
                     tracker.result = document.getElementById('tracker-culture-result').value.trim() || 'Aguardando';
                     if (!tracker.collectionDate) throw new Error("Data da coleta é obrigatória.");
+                } else if (currentTrackerType === 'proc') {
+                    tracker.name = document.getElementById('tracker-proc-name').value.trim() || 'Procedimento';
+                    tracker.installDate = document.getElementById('tracker-proc-date').value;
+                    if (!tracker.installDate) throw new Error("Data do procedimento é obrigatória.");
                 } else { // device
                     tracker.name = document.getElementById('tracker-device-name').value.trim() || 'Dispositivo';
                     tracker.installDate = document.getElementById('tracker-device-date').value;
+                    tracker.removalDate = document.getElementById('tracker-device-removal').value || '';
                     if (!tracker.installDate) throw new Error("Data de instalação é obrigatória.");
+                    if (tracker.removalDate && tracker.removalDate < tracker.installDate) throw new Error("A retirada não pode ser antes da instalação.");
                 }
             } else {
                 // Adição
-                const newTracker = { id: crypto.randomUUID(), type: currentTrackerType };
+                // "proc" é um dispositivo com kind 'procedimento' (mesma tabela no banco)
+                const newTracker = { id: crypto.randomUUID(), type: currentTrackerType === 'proc' ? 'device' : currentTrackerType };
                 if (currentTrackerType === 'atb') {
                     newTracker.name = document.getElementById('tracker-atb-name').value.trim() || 'Antibiótico';
                     newTracker.startDate = document.getElementById('tracker-atb-start').value;
                     newTracker.duration = parseInt(document.getElementById('tracker-atb-duration').value, 10) || null;
+                    newTracker.endDate = document.getElementById('tracker-atb-end').value || '';
                     if (!newTracker.startDate) throw new Error("Data D1 é obrigatória.");
                 } else if (currentTrackerType === 'culture') {
                     newTracker.name = document.getElementById('tracker-culture-name').value.trim() || 'Cultura';
                     newTracker.collectionDate = document.getElementById('tracker-culture-date').value;
                     newTracker.result = document.getElementById('tracker-culture-result').value.trim() || 'Aguardando';
                     if (!newTracker.collectionDate) throw new Error("Data da coleta é obrigatória.");
+                } else if (currentTrackerType === 'proc') {
+                    newTracker.kind = 'procedimento';
+                    newTracker.name = document.getElementById('tracker-proc-name').value.trim() || 'Procedimento';
+                    newTracker.installDate = document.getElementById('tracker-proc-date').value;
+                    if (!newTracker.installDate) throw new Error("Data do procedimento é obrigatória.");
                 } else { // device
                     newTracker.name = document.getElementById('tracker-device-name').value.trim() || 'Dispositivo';
                     newTracker.installDate = document.getElementById('tracker-device-date').value;
+                    newTracker.removalDate = document.getElementById('tracker-device-removal').value || '';
                     if (!newTracker.installDate) throw new Error("Data de instalação é obrigatória.");
+                    if (newTracker.removalDate && newTracker.removalDate < newTracker.installDate) throw new Error("A retirada não pode ser antes da instalação.");
                 }
                 bed.trackers.push(newTracker);
             }
@@ -1662,11 +1732,18 @@
             if (t.type === 'atb') {
                 const dayNum = getDayNumber(t.startDate);
                 const d1Date = formatDate(t.startDate);
+                const ended = t.endDate && t.endDate <= todayISO();
                 let dayDisplay = dayNum === null ? 'D-' : `D${dayNum}`;
                 let badgeClass = 'bg-sky-100 text-sky-800';
                 let extra = '';
 
-                if (dayNum === 0) {
+                if (ended) {
+                    // Suspenso/finalizado em data conhecida: contagem congela e o item fica discreto.
+                    const usedDays = daysBetween(t.startDate, t.endDate);
+                    dayDisplay = usedDays === null ? 'Suspenso' : `Suspenso D${usedDays + 1}`;
+                    badgeClass = 'bg-slate-100 text-slate-500';
+                    extra = `<span class="text-xs text-slate-500 ml-1">(fim ${formatDate(t.endDate)})</span>`;
+                } else if (dayNum === 0) {
                     dayDisplay = 'Agendado';
                     badgeClass = 'bg-slate-100 text-slate-600';
                 } else if (dayNum !== null && t.duration) {
@@ -1683,8 +1760,11 @@
                     badgeClass = 'bg-amber-100 text-amber-800';
                     extra = `<span class="text-xs font-medium text-amber-700 ml-1">• ATB longo, reavaliar</span>`;
                 }
+                if (!ended && t.endDate) {
+                    extra += `<span class="text-xs text-slate-500 ml-1">(fim previsto ${formatDate(t.endDate)})</span>`;
+                }
 
-                html = `<div class="flex-1 min-w-0">
+                html = `<div class="flex-1 min-w-0 ${ended ? 'opacity-60' : ''}">
                             <span class="font-medium text-sky-700">ATB:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
                             <span class="text-xs font-semibold ${badgeClass} px-1.5 py-0.5 rounded-full ml-1">${dayDisplay}</span>
                             <span class="text-xs text-slate-500 ml-1">(D1: ${d1Date})</span>${extra}
@@ -1700,16 +1780,39 @@
                             <span class="text-xs ${alertCulture ? 'text-amber-700 font-semibold' : 'text-slate-500'} ml-1">- ${escapeHtml(resultText || 'Aguardando')}${alertCulture ? ' • resultado pendente' : ''}</span>
                             <span class="text-xs text-slate-500 ml-1">(Coleta: ${d1Date})</span>
                         </div>`;
-            } else { // device
+            } else if (t.kind === 'procedimento') {
+                // Cirurgia/procedimento: conta pós-operatório, nunca alerta.
                 const d1Date = formatDate(t.installDate);
                 const dDays = getDayNumber(t.installDate);
-                const alertDevice = dDays !== null && dDays >= 7;
-                const devBadge = alertDevice ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800';
+                const poDisplay = dDays === null ? 'PO D-' : (dDays === 0 ? 'Agendado' : `PO D${dDays}`);
                 html = `<div class="flex-1 min-w-0">
-                            <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
-                            <span class="text-xs font-semibold ${devBadge} px-1.5 py-0.5 rounded-full ml-1">${calculateDaysSince(t.installDate)}</span>${alertDevice ? '<span class="text-xs font-medium text-amber-700 ml-1">• tempo prolongado</span>' : ''}
-                            <span class="text-xs text-slate-500 ml-1">(Início: ${d1Date})</span>
+                            <span class="font-medium text-violet-700">Proc:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
+                            <span class="text-xs font-semibold bg-violet-100 text-violet-800 px-1.5 py-0.5 rounded-full ml-1">${poDisplay}</span>
+                            <span class="text-xs text-slate-500 ml-1">(Data: ${d1Date})</span>
                         </div>`;
+            } else { // device
+                const d1Date = formatDate(t.installDate);
+                const removed = !!t.removalDate;
+                if (removed) {
+                    // Retirado: contagem congelada no total de dias de uso, sem alerta.
+                    const usedDays = daysBetween(t.installDate, t.removalDate);
+                    const usedDisplay = usedDays === null ? 'D-' : `D${usedDays + 1}`;
+                    html = `<div class="flex-1 min-w-0 opacity-60">
+                                <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
+                                <span class="text-xs font-semibold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full ml-1">${usedDisplay}</span>
+                                <span class="text-xs text-slate-500 ml-1">• removido ${formatDate(t.removalDate)}</span>
+                                <span class="text-xs text-slate-500 ml-1">(Início: ${d1Date})</span>
+                            </div>`;
+                } else {
+                    const dDays = getDayNumber(t.installDate);
+                    const alertDevice = dDays !== null && dDays >= 7;
+                    const devBadge = alertDevice ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800';
+                    html = `<div class="flex-1 min-w-0">
+                                <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
+                                <span class="text-xs font-semibold ${devBadge} px-1.5 py-0.5 rounded-full ml-1">${calculateDaysSince(t.installDate)}</span>${alertDevice ? '<span class="text-xs font-medium text-amber-700 ml-1">• tempo prolongado</span>' : ''}
+                                <span class="text-xs text-slate-500 ml-1">(Início: ${d1Date})</span>
+                            </div>`;
+                }
             }
             
             html += `<div class="flex-shrink-0">
