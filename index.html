@@ -500,19 +500,19 @@
       
       <!-- Cabeçalho (Nome, Idade, Admissão) -->
       <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
-        <!-- Em tela estreita os botões descem para uma linha própria; o nome fica com a largura toda -->
+        <!-- Em tela estreita os botões ficam numa linha própria ACIMA do leito/nome; em tela larga, à direita -->
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <input class="inline-bed font-bold text-2xl text-slate-900 p-1 -ml-1 rounded-md w-32 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Leito">
-            <input class="inline-name font-medium text-lg text-slate-800 p-1 rounded-md w-full border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Nome completo">
-          </div>
-          <div class="flex-shrink-0 flex flex-wrap justify-end gap-2">
+          <div class="flex-shrink-0 flex flex-wrap justify-end gap-2 sm:order-2">
               <button class="reminder-btn text-slate-400 hover:text-blue-500 rounded-lg p-2" title="Definir lembrete">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 0013.484 0 .75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zM8.05 16.09A.75.75 0 018.8 15h2.4a.75.75 0 01.75.75 1.5 1.5 0 01-3 0z" clip-rule="evenodd" /></svg>
               </button>
             <button class="discharge-card text-sm bg-amber-100 text-amber-800 font-medium rounded-lg py-2 px-3 hover:bg-amber-200 transition-all">Dar Alta</button>
             <button class="archive-bed-btn text-sm bg-slate-100 text-slate-800 font-medium rounded-lg py-2 px-3 hover:bg-slate-200 transition-all">Arquivar</button>
             <button class="delete-patient-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
+          </div>
+          <div class="flex-1 min-w-0">
+            <input class="inline-bed font-bold text-2xl text-slate-900 p-1 -ml-1 rounded-md w-32 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Leito">
+            <input class="inline-name font-medium text-lg text-slate-800 p-1 rounded-md w-full border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Nome completo">
           </div>
         </div>
         
