@@ -635,7 +635,9 @@
      <!-- Seção: Exames (Laboratoriais e Imagem) -->
       <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900">Exames (Labs e Imagem)</span>
+          <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Exames (Labs e Imagem)
+            <span class="labs-last-line hidden block text-xs font-normal text-slate-500 mt-0.5"></span>
+          </span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <!-- O conteúdo desta seção é renderizado pelo JS (renderExamsSection) -->
@@ -1151,13 +1153,6 @@
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
-    // Extrai o primeiro número de um resultado de lab ("9.5", "120k", "<1,0") para comparar tendência.
-    // Retorna null se não houver número (ex.: "Aguardando", "negativo").
-    function parseLabNumber(v) {
-      const m = String(v == null ? '' : v).replace(',', '.').match(/-?\d+(\.\d+)?/);
-      return m ? parseFloat(m[0]) : null;
     }
 
     function getDoctorColorClasses(name) {
@@ -1679,6 +1674,7 @@
       setupCollapsibleSection(art, '.input-anamnese-inline', 'isAnamneseMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.tracker-list', 'isTrackerMinimized', b, (el) => renderTrackerList(el, b, idx)); 
       setupCollapsibleSection(art, '.exams-content-wrapper', 'isExamsMinimized', b, (el) => renderExamsSection(el, b, idx));
+      updateLabsLastLine(art, b);
       setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.conduta-list', 'isCondutaMinimized', b, (el) => renderCondutaList(el, b, idx));
       setupCollapsibleSection(art, '.rawtext-list', 'isRawTextsMinimized', b, (el) => renderRawTextList(el, b, idx));
@@ -2288,6 +2284,15 @@
 
 let currentImageExamEditingId = null;
 
+// Linha compacta da última coleta no cabeçalho da seção Exames (visível mesmo colapsada)
+function updateLabsLastLine(rootEl, bed) {
+    const el = rootEl.querySelector('.labs-last-line');
+    if (!el) return;
+    const line = PainelCore.buildLabsLine(bed, state.pinnedExams);
+    el.textContent = line;
+    el.classList.toggle('hidden', !line);
+}
+
 /**
  * Função principal que renderiza o conteúdo da seção "Exames" (abas, etc.)
  */
@@ -2389,6 +2394,13 @@ function renderLabTab(contentEl, bed, bedIdx) {
             </div>
         </div>
 
+        <button id="toggle-lab-ranges-btn" class="text-xs text-slate-500 hover:text-sky-600 mb-3 transition-all">Faixas de referência ▸</button>
+        <div id="lab-ranges-form" class="hidden space-y-2 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <label class="text-xs font-medium text-slate-600">Uma por linha, no formato "Nome: min-max". Valores fora da faixa aparecem coloridos na tabela (alto em vermelho, baixo em azul).</label>
+            <textarea id="lab-ranges-textarea" rows="6" class="w-full text-sm p-3 rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+            <button id="save-lab-ranges-btn" class="w-full bg-sky-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-sky-700 transition-all">Salvar faixas</button>
+        </div>
+
         <div id="exam-flowsheet-container" class="w-full overflow-x-auto">
             </div>
     `;
@@ -2406,7 +2418,25 @@ function renderLabTab(contentEl, bed, bedIdx) {
             end: filterEndInput.value
         };
         renderLabFlowsheet(flowsheetContainer, bed, filters);
+        updateLabsLastLine(document, bed);
     };
+
+    // Editor de faixas de referência (preferência local, como pinnedExams)
+    const rangesForm = contentEl.querySelector('#lab-ranges-form');
+    const rangesTextarea = contentEl.querySelector('#lab-ranges-textarea');
+    contentEl.querySelector('#toggle-lab-ranges-btn').addEventListener('click', (e) => {
+        rangesForm.classList.toggle('hidden');
+        const open = !rangesForm.classList.contains('hidden');
+        if (open) rangesTextarea.value = state.labRangesText || PainelCore.DEFAULT_LAB_RANGES_TEXT;
+        e.currentTarget.textContent = open ? 'Faixas de referência ▾' : 'Faixas de referência ▸';
+    });
+    contentEl.querySelector('#save-lab-ranges-btn').addEventListener('click', () => {
+        state.labRangesText = rangesTextarea.value;
+        saveData(state);
+        rangesForm.classList.add('hidden');
+        contentEl.querySelector('#toggle-lab-ranges-btn').textContent = 'Faixas de referência ▸';
+        rerenderFlowsheet();
+    });
 
     // Listeners dos Filtros
     filterNameInput.addEventListener('input', rerenderFlowsheet);
@@ -2559,10 +2589,25 @@ function parseAndSaveLabs(text, date, bed) {
     return { saved: newResults.length, ignored };
 }
 
+// Mini-gráfico de tendência (polyline) com os valores numéricos do período filtrado.
+function sparklineSvg(nums) {
+    const vals = nums.filter(v => v !== null);
+    if (vals.length < 2) return '';
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const w = 44, h = 14, pad = 2;
+    const pts = vals.map((v, i) => {
+        const x = pad + (i * (w - 2 * pad)) / (vals.length - 1);
+        const y = max === min ? h / 2 : pad + (h - 2 * pad) * (1 - (v - min) / (max - min));
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="flex-shrink-0 text-slate-400" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
 /**
  * Renderiza a Tabela Evolutiva (Flowsheet)
  */
 function renderLabFlowsheet(container, bed, filters) {
+    const labRanges = PainelCore.parseLabRanges(state.labRangesText || PainelCore.DEFAULT_LAB_RANGES_TEXT);
     const labEntries = bed.exams.filter(e => e.type === 'lab');
     if (labEntries.length === 0) {
         container.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum exame laboratorial adicionado.</p>`;
@@ -2648,8 +2693,12 @@ function renderLabFlowsheet(container, bed, filters) {
     tableHtml += '<tbody class="divide-y divide-slate-100 bg-white">';
     filteredExamNames.forEach(examName => {
         const isPinned = state.pinnedExams.includes(examName);
+        const examNameLower = examName.toLowerCase();
+        const rawValues = filteredDates.map(date => dateMap.get(date)?.get(examNameLower));
+        const nums = rawValues.map(v => PainelCore.labNumber(v == null ? '' : v));
+
         tableHtml += '<tr>';
-        // Adiciona ícone de "pin"
+        // Ícone de "pin" + sparkline (só nos fixados) ao lado do nome
         tableHtml += `
             <td class="sticky left-0 bg-white px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
                 <div class="flex items-center gap-1.5">
@@ -2657,17 +2706,17 @@ function renderLabFlowsheet(container, bed, filters) {
                         <path fill-rule="evenodd" d="M10.868 2.884c-.521-.26-1.115-.26-1.636 0l-7 3.5A.75.75 0 002 7.22v4.574c0 .89.223 1.756.65 2.553l.004.008.018.038.004.008.058.115.008.013.012.02l.033.055.004.005.01.016.03.045.015.021.042.056.022.028.02.023.01.01a.75.75 0 001.072 0l.01-.01.02-.023.022-.028.042-.056.015-.021.03-.045.01-.016.004-.005.033-.055.012-.02.008-.013.058-.115.004-.008.018-.038.004-.008A5.965 5.965 0 0018 11.794V7.22a.75.75 0 00-.368-.656l-7-3.5zM10 5.113L16.22 8.5 10 11.887 3.78 8.5 10 5.113zM15.5 10.165v1.629a4.465 4.465 0 01-1.123 2.98l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5A4.465 4.465 0 014.5 11.794v-1.629L10 13.18l5.5-3.015z" clip-rule="evenodd" />
                     </svg>
                     <span>${escapeHtml(examName)}</span>
+                    ${isPinned ? sparklineSvg(nums) : ''}
                 </div>
             </td>
         `;
 
-        const examNameLower = examName.toLowerCase();
         let prevNum = null;
-        filteredDates.forEach(date => {
-            const raw = dateMap.get(date)?.get(examNameLower);
+        filteredDates.forEach((date, di) => {
+            const raw = rawValues[di];
             const value = (raw == null || raw === '') ? '—' : raw;
             // Tendência: compara o valor numérico com a coleta anterior (seta ↑/↓ colorida).
-            const num = parseLabNumber(value);
+            const num = nums[di];
             let trend = '';
             if (num !== null && prevNum !== null && num !== prevNum) {
                 trend = num > prevNum
@@ -2675,7 +2724,10 @@ function renderLabFlowsheet(container, bed, filters) {
                   : ' <span class="text-sky-500" title="caiu">▼</span>';
             }
             if (num !== null) prevNum = num;
-            tableHtml += `<td class="px-3 py-2 text-center text-slate-600 whitespace-nowrap">${escapeHtml(value)}${trend}</td>`;
+            // Fora da faixa de referência: alto em vermelho, baixo em azul.
+            const cls = PainelCore.classifyLab(examName, value, labRanges);
+            const valueClass = cls === 'high' ? 'text-red-600 font-semibold' : cls === 'low' ? 'text-sky-600 font-semibold' : 'text-slate-600';
+            tableHtml += `<td class="px-3 py-2 text-center ${valueClass} whitespace-nowrap">${escapeHtml(value)}${trend}</td>`;
         });
         tableHtml += '</tr>';
     });

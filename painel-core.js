@@ -402,6 +402,40 @@
     return 'Labs ' + formatDateBR(last.date) + ': ' + parts.join(' | ');
   }
 
+  // ---- Faixas de referência: destaque de valores alterados no flowsheet ------
+  // Preferência local (como pinnedExams): texto "Nome: min-max", uma linha por exame.
+
+  const DEFAULT_LAB_RANGES_TEXT = [
+    'Hb: 12-17', 'Ht: 36-50', 'Leucócitos: 4.000-11.000', 'Plaquetas: 150.000-450.000',
+    'Cr: 0,6-1,3', 'Ur: 15-45', 'Na: 135-145', 'K: 3,5-5,0', 'PCR: 0-5', 'Glicemia: 70-140',
+  ].join('\n');
+
+  function parseLabRanges(text) {
+    const out = {};
+    String(text == null ? '' : text).split(/\r?\n/).forEach(function (line) {
+      const idx = line.indexOf(':');
+      if (idx === -1) return;
+      const name = line.slice(0, idx).trim();
+      const sides = line.slice(idx + 1).split(/[-–]/);
+      if (!name || sides.length !== 2) return;
+      const min = labNumber(sides[0]), max = labNumber(sides[1]);
+      if (min === null || max === null) return;
+      out[name.toLowerCase()] = { min: min, max: max };
+    });
+    return out;
+  }
+
+  // 'high' | 'low' | null (normal, sem faixa cadastrada ou resultado não numérico)
+  function classifyLab(name, value, ranges) {
+    const r = (ranges || {})[String(name == null ? '' : name).toLowerCase()];
+    if (!r) return null;
+    const n = labNumber(value);
+    if (n === null) return null;
+    if (n > r.max) return 'high';
+    if (n < r.min) return 'low';
+    return null;
+  }
+
   // ---- Resumo do dia: texto pronto para colar na evolução --------------------
   // Roda só no aparelho: pode usar o nome completo (nunca vai ao banco).
   function buildDailySummary(bed, opts) {
@@ -506,7 +540,8 @@
       notesTemplate: GLOBAL_NOTES_TEMPLATE,
       generalTasks: [],
       generalExams: [],
-      pinnedExams: ['Hb', 'Ht', 'Leucócitos', 'Plaquetas', 'Cr', 'Ur', 'Na', 'K', 'PCR', 'Glicemia']
+      pinnedExams: ['Hb', 'Ht', 'Leucócitos', 'Plaquetas', 'Cr', 'Ur', 'Na', 'K', 'PCR', 'Glicemia'],
+      labRangesText: DEFAULT_LAB_RANGES_TEXT
     };
   }
 
@@ -562,6 +597,7 @@
     s.generalTasks = s.generalTasks || [];
     s.generalExams = s.generalExams || [];
     s.pinnedExams = s.pinnedExams || def.pinnedExams;
+    s.labRangesText = s.labRangesText || def.labRangesText;
     return s;
   }
 
@@ -756,6 +792,9 @@
     labNumber: labNumber,
     buildLabsLine: buildLabsLine,
     buildDailySummary: buildDailySummary,
+    DEFAULT_LAB_RANGES_TEXT: DEFAULT_LAB_RANGES_TEXT,
+    parseLabRanges: parseLabRanges,
+    classifyLab: classifyLab,
     defaultState: defaultState,
     migrateBed: migrateBed,
     migrateState: migrateState,
