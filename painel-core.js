@@ -336,6 +336,70 @@
     return items.filter(function (s) { return normalizeForSearch(s).indexOf(q) !== -1; });
   }
 
+  // ---- Datas e contagem de dias (puras: recebem "hoje" como string) ---------
+
+  function parseISODate(s) {
+    const d = new Date(String(s || '') + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // Nº do dia corrido ("D1" no próprio dia). null sem data válida; 0 se futura.
+  function dayNumber(startDate, todayStr) {
+    if (!startDate) return null;
+    const start = parseISODate(startDate), today = parseISODate(todayStr);
+    if (!start || !today) return null;
+    const diff = Math.round((today.getTime() - start.getTime()) / 86400000);
+    return diff < 0 ? 0 : diff + 1;
+  }
+
+  function formatDateBR(iso) {
+    const parts = String(iso || '').split('-');
+    return parts.length === 3 ? parts[2] + '/' + parts[1] : '';
+  }
+
+  // ---- Pendências do dia: tudo que pede ação, varrendo os leitos ativos -----
+  // Retorna [{bedIndex, bedNumber, patientName, tipo, label}] na ordem dos leitos.
+  // tipo: 'atb' | 'cultura' | 'dispositivo' | 'alta' | 'lembrete'
+  function buildPendencias(state, todayStr) {
+    const out = [];
+    (state.beds || []).forEach(function (bed, bedIndex) {
+      if (bed.isArchived) return;
+      if (!bed.patientName || !String(bed.patientName).trim()) return;
+      if (bed.externalDoctor && bed.externalDoctor.active) return;
+
+      function add(tipo, label) {
+        out.push({ bedIndex: bedIndex, bedNumber: bed.bedNumber || '', patientName: bed.patientName || '', tipo: tipo, label: label });
+      }
+
+      (bed.trackers || []).forEach(function (t) {
+        if (!t) return;
+        if (t.type === 'atb') {
+          const ended = t.endDate && t.endDate <= todayStr;
+          const n = dayNumber(t.startDate, todayStr);
+          if (ended || !t.duration || n === null || n === 0) return;
+          if (n === t.duration) add('atb', 'ATB ' + t.name + ': último dia (D' + n + '/' + t.duration + ')');
+          else if (n > t.duration) add('atb', 'ATB ' + t.name + ': prazo vencido (D' + n + '/' + t.duration + ')');
+        } else if (t.type === 'culture') {
+          const resultText = String(t.result || '').trim();
+          const pending = resultText === '' || /aguard/i.test(resultText);
+          const n = dayNumber(t.collectionDate, todayStr);
+          if (pending && n !== null && n >= 3) add('cultura', 'Cultura ' + t.name + ': sem resultado (D' + n + ')');
+        } else {
+          if (t.kind === 'procedimento' || t.removalDate) return;
+          const n = dayNumber(t.installDate, todayStr);
+          if (n !== null && n >= 7) add('dispositivo', t.name + ': D' + n + ', avaliar retirada');
+        }
+      });
+
+      if (bed.dischargeForecast) {
+        if (bed.dischargeForecast === todayStr) add('alta', 'Alta prevista hoje');
+        else if (bed.dischargeForecast < todayStr) add('alta', 'Alta prevista atrasada (' + formatDateBR(bed.dischargeForecast) + ')');
+      }
+      if (bed.reminderDate && bed.reminderDate <= todayStr) add('lembrete', 'Lembrete para hoje');
+    });
+    return out;
+  }
+
   const GLOBAL_NOTES_TEMPLATE = "S: (Subjetivo)\n\nO: (Objetivo)\n- SSVV:\n- Exame:\n- Labs:\n- Imagem:\n\nA: (Avaliação)\n\nP: (Plano)\n";
 
   function defaultState(todayStr) {
@@ -590,6 +654,9 @@
     joinHpp: joinHpp,
     fillPatientName: fillPatientName,
     filterSuggestions: filterSuggestions,
+    dayNumber: dayNumber,
+    formatDateBR: formatDateBR,
+    buildPendencias: buildPendencias,
     defaultState: defaultState,
     migrateBed: migrateBed,
     migrateState: migrateState,

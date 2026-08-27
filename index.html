@@ -1250,6 +1250,43 @@
     }
 
     // --- Funções de Renderização (TELA A) ---
+
+    // Painel "Pendências do dia": agregado do que pede ação hoje (calculado na hora, nada sincroniza).
+    const PENDENCIA_COLORS = { atb: 'bg-sky-500', cultura: 'bg-amber-500', dispositivo: 'bg-slate-500', alta: 'bg-green-500', lembrete: 'bg-blue-500' };
+    function renderPendenciasPanel() {
+      const pend = PainelCore.buildPendencias(state, todayISO());
+      if (pend.length === 0) return;
+      const open = !state.isPendenciasMinimized;
+      const wrap = document.createElement('div');
+      wrap.className = 'bg-white rounded-xl shadow-lg border border-amber-300/60';
+      wrap.innerHTML = `
+        <button class="pendencias-toggle w-full flex justify-between items-center p-3 text-left">
+          <span class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-amber-500"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /></svg>
+            Pendências do dia <span class="text-amber-600">(${pend.length})</span>
+          </span>
+          <svg class="toggle-icon w-5 h-5 transition-transform ${open ? 'rotate-90' : ''}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="pendencias-list ${open ? '' : 'hidden'} px-3 pb-3 space-y-0.5">
+          ${pend.map(p => `
+            <button class="pendencia-item w-full flex items-center gap-2 text-left text-sm p-2 rounded-md hover:bg-slate-50" data-bed-index="${p.bedIndex}">
+              <span class="w-2 h-2 rounded-full flex-shrink-0 ${PENDENCIA_COLORS[p.tipo] || 'bg-slate-400'}"></span>
+              <span class="font-semibold text-slate-800 flex-shrink-0">${escapeHtml(p.bedNumber || '—')}</span>
+              <span class="text-slate-600 truncate">${escapeHtml(p.label)}</span>
+            </button>`).join('')}
+        </div>`;
+      wrap.querySelector('.pendencias-toggle').addEventListener('click', () => {
+        state.isPendenciasMinimized = !state.isPendenciasMinimized;
+        saveData(state);
+        wrap.querySelector('.pendencias-list').classList.toggle('hidden');
+        wrap.querySelector('.pendencias-toggle .toggle-icon').classList.toggle('rotate-90');
+      });
+      wrap.querySelectorAll('.pendencia-item').forEach(btn => {
+        btn.addEventListener('click', () => openPatientDetails(parseInt(btn.dataset.bedIndex, 10)));
+      });
+      bedsListArea.appendChild(wrap);
+    }
+
     function renderScreenA() {
       const searchTerm = searchInput.value.toLowerCase();
       bedsListArea.innerHTML = '';
@@ -1268,6 +1305,7 @@
 
       // Renderiza Leitos ATIVOS
       if (!isViewingArchived) {
+          renderPendenciasPanel();
           const activeBeds = state.beds.filter(b => !b.isArchived);
           
           const totalBeds = activeBeds.length;
@@ -1310,7 +1348,11 @@
           });
           
           if (bedsToRender.length === 0) {
-            bedsListArea.innerHTML = `<p class="text-sm text-slate-500 text-center py-4">Nenhum leito${state.beds.length > 0 ? ' visível' : ' adicionado'}.</p>`;
+            // appendChild (e não innerHTML=) para não apagar o painel de pendências já renderizado
+            const p = document.createElement('p');
+            p.className = 'text-sm text-slate-500 text-center py-4';
+            p.textContent = `Nenhum leito${state.beds.length > 0 ? ' visível' : ' adicionado'}.`;
+            bedsListArea.appendChild(p);
             return;
           }
 
