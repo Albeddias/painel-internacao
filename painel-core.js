@@ -28,6 +28,33 @@
     return words.map(function (w) { return w[0].toUpperCase(); }).join('');
   }
 
+  // ---- HPP: lista de comorbidades sobre um campo de texto ----------------
+  // O banco guarda hpp como texto ("HAS, DM2"); a UI mostra como lista.
+  // Vírgula dentro de parênteses não separa ("DM2 (NPH, metformina)").
+  function parseHpp(text) {
+    const s = String(text == null ? '' : text);
+    const items = [];
+    let buf = '', depth = 0;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === '(') depth++;
+      else if (c === ')' && depth > 0) depth--;
+      if ((c === ',' || c === ';' || c === '\n') && depth === 0) {
+        items.push(buf); buf = '';
+      } else {
+        buf += c;
+      }
+    }
+    items.push(buf);
+    return items.map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+
+  function joinHpp(items) {
+    return (items || [])
+      .map(function (x) { return String(x == null ? '' : x).trim(); })
+      .filter(Boolean).join(', ');
+  }
+
   // ---- Sync com mescla: hashing e serialização de linhas -----------------
 
   // Hash curto e determinístico (djb2-xor). Não-criptográfico: serve só para
@@ -552,6 +579,8 @@
   return {
     uuid: uuid,
     initialsFromName: initialsFromName,
+    parseHpp: parseHpp,
+    joinHpp: joinHpp,
     fillPatientName: fillPatientName,
     filterSuggestions: filterSuggestions,
     defaultState: defaultState,

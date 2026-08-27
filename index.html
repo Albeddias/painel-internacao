@@ -81,15 +81,17 @@
       -moz-appearance: textfield;
     }
     
-    /* Alça de arrasto dos trackers: touch-action none impede o scroll da página
-       durante o arrasto (só na alça — o resto do item continua rolando normal). */
+    /* Alça de arrasto das listas reordenáveis: touch-action none impede o scroll
+       da página durante o arrasto (só na alça — o resto do item continua rolando normal). */
     .drag-handle {
       touch-action: none;
       cursor: grab;
       user-select: none;
       -webkit-user-select: none;
     }
-    .tracker-item.dragging {
+    .tracker-item.dragging,
+    .problem-item.dragging,
+    .hpp-item.dragging {
       opacity: 0.75;
       background-color: #e0f2fe; /* sky-100 */
       box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
@@ -508,6 +510,7 @@
               </button>
             <button class="discharge-card text-sm bg-amber-100 text-amber-800 font-medium rounded-lg py-2 px-3 hover:bg-amber-200 transition-all">Dar Alta</button>
             <button class="archive-bed-btn text-sm bg-slate-100 text-slate-800 font-medium rounded-lg py-2 px-3 hover:bg-slate-200 transition-all">Arquivar</button>
+            <button class="delete-patient-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
           </div>
         </div>
         
@@ -528,10 +531,6 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div>
-            <label class="section-title text-sm font-semibold text-slate-900 mb-1 block">HPP</label>
-            <input class="inline-hpp w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="HAS, DM2...">
-          </div>
-          <div>
             <label class="section-title text-sm font-semibold text-slate-900 mb-1 block">Médico Externo</label>
             <div class="flex gap-2 w-full">
               <input class="inline-ext-name text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nome do médico">
@@ -540,6 +539,21 @@
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M15.75 3a.75.75 0 00-.75.75v3.25H5a.75.75 0 000 1.5h10v3.25a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" clip-rule="evenodd" /><path d="M5.151 3.522A.75.75 0 004 4.25v11.5a.75.75 0 001.5 0V4.25a.75.75 0 00-.349-.649zM6.5 15.75v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM8.5 15.75v-3.5a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0zM10.5 15.75v-5.5a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0zM12.5 15.75v-7.5a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0zM14.5 15.75v-9.5a.75.75 0 00-1.5 0v9.5a.75.75 0 001.5 0z" clip-rule="evenodd" /></svg>
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção: HPP / Comorbidades (lista sobre o campo de texto bed.hpp) -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">HPP <span class="hpp-count text-sm font-medium text-slate-400"></span></span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="hpp-list space-y-1"></div>
+          <div class="flex gap-2 w-full mt-3">
+            <input class="new-hpp-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo diagnóstico (HAS, DM2...)">
+            <button class="add-hpp-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
           </div>
         </div>
       </div>
@@ -1440,9 +1454,6 @@
       art.querySelector('.inline-age').addEventListener('input', (e) => { b.age = e.target.value; saveData(state); });
       art.querySelector('.inline-admit').value = b.admitDate || '';
       art.querySelector('.inline-admit').addEventListener('input', (e) => { b.admitDate = e.target.value; saveData(state); });
-      art.querySelector('.inline-hpp').value = b.hpp || '';
-      art.querySelector('.inline-hpp').addEventListener('input', (e) => { b.hpp = e.target.value; saveData(state); });
-      
       const extNameInput = art.querySelector('.inline-ext-name');
       const extDatalist = art.querySelector('.common-ext-docs-list');
       const extDatalistId = `common-ext-docs-list-${idx}`;
@@ -1495,6 +1506,16 @@
           closePatientDetails();
         }, "Arquivar Leito", 'bg-slate-600', 'Arquivar');
       });
+
+      art.querySelector('.delete-patient-btn').addEventListener('click', () => {
+        showConfirm(`Deletar PERMANENTEMENTE o leito ${b.bedNumber}? Todos os dados serão perdidos (deste aparelho e do banco na próxima sincronização).`, () => {
+          PainelCore.markPatientDeleted(state, b.patientId);
+          const i = state.beds.indexOf(b);
+          if (i !== -1) state.beds.splice(i, 1);
+          saveData(state);
+          closePatientDetails();
+        }, 'Deletar paciente', 'bg-red-600', 'Deletar');
+      });
       
       const reminderBtn = art.querySelector('.reminder-btn');
       if (b.reminderDate && b.reminderDate <= today) {
@@ -1529,6 +1550,8 @@
       });
 
       // Seções Colapsáveis
+      setupCollapsibleSection(art, '.hpp-list', 'isHppMinimized', b, (el) => renderHppList(el, b, idx));
+      updateHppCount(art, b);
       setupCollapsibleSection(art, '.problem-list', 'isProblemsMinimized', b, (el) => renderProblemList(el, b, idx));
       setupCollapsibleSection(art, '.input-anamnese-inline', 'isAnamneseMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.tracker-list', 'isTrackerMinimized', b, (el) => renderTrackerList(el, b, idx)); 
@@ -1606,6 +1629,13 @@
     }
 
     // --- Renderização de Sub-listas (Tela B) ---
+
+    // Alça de arrasto (reordenação manual; nos trackers e problemas a ordem
+    // sincroniza via coluna "ordem"; no HPP é a ordem do próprio texto)
+    const dragHandleHtml = `<span class="drag-handle flex-shrink-0 text-slate-300 p-1 -ml-1 mr-1" title="Arraste para reordenar">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><circle cx="7" cy="4" r="1.6"/><circle cx="7" cy="10" r="1.6"/><circle cx="7" cy="16" r="1.6"/><circle cx="13" cy="4" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="13" cy="16" r="1.6"/></svg>
+        </span>`;
+
     function renderTrackerList(listElement, bed, bedIdx) {
         listElement.innerHTML = ''; 
         if (!bed.trackers || bed.trackers.length === 0) {
@@ -1613,11 +1643,6 @@
             return;
         }
         
-        // Alça de arrasto (reordenação manual; a ordem sincroniza via coluna "ordem")
-        const dragHandleHtml = `<span class="drag-handle flex-shrink-0 text-slate-300 p-1 -ml-1 mr-1" title="Arraste para reordenar">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><circle cx="7" cy="4" r="1.6"/><circle cx="7" cy="10" r="1.6"/><circle cx="7" cy="16" r="1.6"/><circle cx="13" cy="4" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="13" cy="16" r="1.6"/></svg>
-            </span>`;
-
         bed.trackers.forEach(t => {
             const item = document.createElement('div');
             item.className = 'tracker-item flex justify-between items-center group text-sm p-2 rounded-md hover:bg-slate-50';
@@ -1698,7 +1723,15 @@
             listElement.appendChild(item);
         });
 
-        enableTrackerDrag(listElement, bed);
+        enableListDrag(listElement, '.tracker-item', (els) => {
+            const byId = {};
+            bed.trackers.forEach(t => { byId[t.id] = t; });
+            const reordered = els.map(el => byId[el.dataset.trackerId]).filter(Boolean);
+            if (reordered.length === bed.trackers.length) {
+                bed.trackers = reordered;
+                saveData(state);
+            }
+        });
 
         listElement.querySelectorAll('.edit-tracker-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1723,20 +1756,20 @@
         });
     }
 
-    // Arrastar para reordenar os trackers (pointer events: funciona com dedo e mouse).
-    // O arrasto começa só pela alça; a lista reflete a nova ordem em bed.trackers.
-    function enableTrackerDrag(listElement, bed) {
+    // Arrastar para reordenar itens de lista (pointer events: funciona com dedo e mouse).
+    // O arrasto começa só pela alça; ao soltar, onReorder recebe os elementos na nova ordem.
+    function enableListDrag(listElement, itemSelector, onReorder) {
         let dragEl = null;
         listElement.querySelectorAll('.drag-handle').forEach(handle => {
             handle.addEventListener('pointerdown', (e) => {
-                dragEl = handle.closest('.tracker-item');
+                dragEl = handle.closest(itemSelector);
                 dragEl.classList.add('dragging');
                 handle.setPointerCapture(e.pointerId);
                 e.preventDefault();
             });
             handle.addEventListener('pointermove', (e) => {
                 if (!dragEl) return;
-                const siblings = [...listElement.querySelectorAll('.tracker-item:not(.dragging)')];
+                const siblings = [...listElement.querySelectorAll(itemSelector + ':not(.dragging)')];
                 const next = siblings.find(s => {
                     const r = s.getBoundingClientRect();
                     return e.clientY < r.top + r.height / 2;
@@ -1748,18 +1781,79 @@
                 if (!dragEl) return;
                 dragEl.classList.remove('dragging');
                 dragEl = null;
-                const ids = [...listElement.querySelectorAll('.tracker-item')].map(el => el.dataset.trackerId);
-                const byId = {};
-                bed.trackers.forEach(t => { byId[t.id] = t; });
-                const reordered = ids.map(id => byId[id]).filter(Boolean);
-                if (reordered.length === bed.trackers.length) {
-                    bed.trackers = reordered;
-                    saveData(state);
-                }
+                onReorder([...listElement.querySelectorAll(itemSelector)]);
             };
             handle.addEventListener('pointerup', endDrag);
             handle.addEventListener('pointercancel', endDrag);
         });
+    }
+
+    // HPP: lista de diagnósticos por cima do campo de texto bed.hpp (banco continua texto)
+    function updateHppCount(article, bed) {
+      const el = article.querySelector('.hpp-count');
+      if (!el) return;
+      const n = PainelCore.parseHpp(bed.hpp).length;
+      el.textContent = n > 0 ? `(${n})` : '';
+    }
+
+    function renderHppList(listElement, bed, bedIdx) {
+      listElement.innerHTML = '';
+      const items = PainelCore.parseHpp(bed.hpp);
+      if (items.length === 0) {
+        listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum diagnóstico adicionado.</p>`;
+      }
+      const commit = () => { bed.hpp = PainelCore.joinHpp(items); saveData(state); };
+      items.forEach((txt, i) => {
+        const it = document.createElement('div');
+        it.className = 'hpp-item flex gap-2 items-center group py-0.5 border-b border-slate-100 last:border-b-0';
+        it.dataset.hppIndex = i;
+        it.innerHTML = `
+          ${dragHandleHtml}
+          <input type="text" class="hpp-desc flex-1 min-w-0 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Diagnóstico">
+          <button class="remove-hpp flex-shrink-0 text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
+          </button>
+        `;
+        it.querySelector('.hpp-desc').value = txt;
+        it.querySelector('.hpp-desc').addEventListener('input', (e) => { items[i] = e.target.value; commit(); });
+        it.querySelector('.remove-hpp').addEventListener('click', () => {
+          const name = (items[i] || '').trim() || 'este diagnóstico';
+          showConfirm(`Remover "${name}"?`, () => {
+            items.splice(i, 1);
+            commit();
+            renderScreenB();
+          }, 'Remover diagnóstico', 'bg-red-600', 'Remover');
+        });
+        listElement.appendChild(it);
+      });
+
+      enableListDrag(listElement, '.hpp-item', (els) => {
+        // itens não têm id: a nova ordem vem do índice com que foram renderizados
+        const reordered = els.map(el => items[Number(el.dataset.hppIndex)]).filter(x => x != null);
+        if (reordered.length === items.length) {
+          bed.hpp = PainelCore.joinHpp(reordered);
+          saveData(state);
+          renderScreenB(); // re-renderiza para os índices dos handlers baterem de novo
+        }
+      });
+
+      const section = listElement.closest('.collapsible-section');
+      const addBtn = section.querySelector('.add-hpp-btn');
+      const input = section.querySelector('.new-hpp-input');
+      if (!addBtn.dataset.bound) {
+        addBtn.dataset.bound = '1';
+        const addHpp = () => {
+          const v = input.value.trim();
+          if (!v) return;
+          // parseHpp no valor digitado: colar "HAS, DM2" adiciona dois itens
+          bed.hpp = PainelCore.joinHpp(PainelCore.parseHpp(bed.hpp).concat(PainelCore.parseHpp(v)));
+          input.value = '';
+          saveData(state);
+          renderScreenB();
+        };
+        addBtn.addEventListener('click', addHpp);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addHpp(); });
+      }
     }
 
     const PROBLEM_STATUS_NEXT = { ativo: 'resolvido', resolvido: 'cronico', cronico: 'ativo' };
@@ -1778,8 +1872,10 @@
       (bed.problems || []).forEach((p, pi) => {
         const it = document.createElement('div');
         it.className = 'problem-item group py-1 border-b border-slate-100 last:border-b-0';
+        it.dataset.problemId = p.id;
         it.innerHTML = `
           <div class="flex gap-2 items-center">
+            ${dragHandleHtml}
             <button class="problem-status-chip flex-shrink-0 text-xs font-medium rounded-full px-2 py-1 ${PROBLEM_STATUS_STYLE[p.status] || PROBLEM_STATUS_STYLE.ativo}">${PROBLEM_STATUS_LABEL[p.status] || 'Ativo'}</button>
             <input type="text" class="problem-desc flex-1 min-w-0 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${p.status === 'resolvido' ? 'line-through text-slate-500' : ''}" placeholder="Descreva o problema">
             <button class="remove-problem flex-shrink-0 text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
@@ -1800,12 +1896,24 @@
         it.querySelector('.remove-problem').addEventListener('click', () => {
           const pName = (p.descricao || '').trim() || 'este problema';
           showConfirm(`Remover "${pName}"?`, () => {
-            bed.problems.splice(pi, 1);
+            const i = bed.problems.indexOf(p);
+            if (i !== -1) bed.problems.splice(i, 1);
             saveData(state);
             renderScreenB();
           }, 'Remover problema', 'bg-red-600', 'Remover');
         });
         listElement.appendChild(it);
+      });
+
+      enableListDrag(listElement, '.problem-item', (els) => {
+        const byId = {};
+        (bed.problems || []).forEach(p => { byId[p.id] = p; });
+        const reordered = els.map(el => byId[el.dataset.problemId]).filter(Boolean);
+        if (reordered.length === bed.problems.length) {
+          bed.problems = reordered;
+          bed.problems.forEach((p, i) => { p.ordem = i; });
+          saveData(state);
+        }
       });
 
       const section = listElement.closest('.collapsible-section');
