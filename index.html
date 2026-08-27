@@ -538,6 +538,7 @@
               <button class="reminder-btn text-slate-400 hover:text-blue-500 rounded-lg p-2" title="Definir lembrete">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 0013.484 0 .75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zM8.05 16.09A.75.75 0 018.8 15h2.4a.75.75 0 01.75.75 1.5 1.5 0 01-3 0z" clip-rule="evenodd" /></svg>
               </button>
+            <button class="copy-summary-btn text-sm bg-sky-100 text-sky-800 font-medium rounded-lg py-2 px-3 hover:bg-sky-200 transition-all" title="Copiar resumo do dia para a evolução">Copiar resumo</button>
             <button class="discharge-card text-sm bg-amber-100 text-amber-800 font-medium rounded-lg py-2 px-3 hover:bg-amber-200 transition-all">Dar Alta</button>
             <button class="archive-bed-btn text-sm bg-slate-100 text-slate-800 font-medium rounded-lg py-2 px-3 hover:bg-slate-200 transition-all">Arquivar</button>
             <button class="delete-patient-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
@@ -1599,6 +1600,14 @@
       });
 
       // Botões de Ação do Card
+      const copySummaryBtn = art.querySelector('.copy-summary-btn');
+      copySummaryBtn.addEventListener('click', async () => {
+        const text = PainelCore.buildDailySummary(b, { todayStr: todayISO(), pinnedExams: state.pinnedExams });
+        const ok = await copyTextToClipboard(text);
+        copySummaryBtn.textContent = ok ? 'Copiado ✓' : 'Falhou :(';
+        setTimeout(() => { copySummaryBtn.textContent = 'Copiar resumo'; }, 2000);
+      });
+
       art.querySelector('.discharge-card').addEventListener('click', () => {
         showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? O registro completo será guardado em Arquivados e o leito ficará livre.`, () => {
           const snapshot = JSON.parse(JSON.stringify(b));

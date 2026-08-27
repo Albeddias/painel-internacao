@@ -357,6 +357,102 @@
     return parts.length === 3 ? parts[2] + '/' + parts[1] : '';
   }
 
+  // ---- Labs: número do resultado e linha da última coleta -------------------
+
+  // Extrai o valor numérico de um resultado ("9,5", "12.300", "120k", "<1,0").
+  // Heurística: ponto seguido de exatamente 3 dígitos é milhar brasileiro
+  // (12.300 = 12300); sufixo k multiplica por mil. null se não houver número.
+  function labNumber(v) {
+    const s = String(v == null ? '' : v);
+    const mil = s.match(/-?\d{1,3}(?:\.\d{3})+(?!\d)/);
+    if (mil) return parseFloat(mil[0].replace(/\./g, ''));
+    const norm = s.replace(',', '.');
+    const m = norm.match(/-?\d+(?:\.\d+)?/);
+    if (!m) return null;
+    let n = parseFloat(m[0]);
+    if (/^[kK]/.test(norm.slice(norm.indexOf(m[0]) + m[0].length))) n *= 1000;
+    return n;
+  }
+
+  // Linha compacta da última coleta: "Labs 26/08: Hb 9,5 ▼ | Cr 1,1 | ...".
+  // Fixados primeiro (na ordem de pinnedExams); setas comparam com a coleta anterior.
+  function buildLabsLine(bed, pinnedExams) {
+    const entries = ((bed && bed.exams) || [])
+      .filter(function (e) { return e && e.type === 'lab' && e.date; })
+      .slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    if (entries.length === 0) return '';
+    const last = entries[entries.length - 1];
+    const prevByName = {};
+    if (entries.length > 1) {
+      (entries[entries.length - 2].results || []).forEach(function (r) {
+        prevByName[String(r.name).toLowerCase()] = r.value;
+      });
+    }
+    const pinned = (pinnedExams || []).map(function (n) { return String(n).toLowerCase(); });
+    const results = (last.results || []).slice().sort(function (a, b) {
+      const ia = pinned.indexOf(String(a.name).toLowerCase()), ib = pinned.indexOf(String(b.name).toLowerCase());
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      return (ia !== -1) ? -1 : (ib !== -1) ? 1 : 0;
+    });
+    const parts = results.map(function (r) {
+      const num = labNumber(r.value), prevNum = labNumber(prevByName[String(r.name).toLowerCase()]);
+      const trend = (num !== null && prevNum !== null && num !== prevNum) ? (num > prevNum ? ' ▲' : ' ▼') : '';
+      return r.name + ' ' + r.value + trend;
+    });
+    return 'Labs ' + formatDateBR(last.date) + ': ' + parts.join(' | ');
+  }
+
+  // ---- Resumo do dia: texto pronto para colar na evolução --------------------
+  // Roda só no aparelho: pode usar o nome completo (nunca vai ao banco).
+  function buildDailySummary(bed, opts) {
+    opts = opts || {};
+    const todayStr = opts.todayStr;
+    const lines = [];
+
+    let header = 'Leito ' + (bed.bedNumber || '—') + ' — ' + (bed.patientName || '?');
+    if (bed.age !== '' && bed.age != null) header += ', ' + bed.age + 'a';
+    const dih = dayNumber(bed.admitDate, todayStr);
+    if (dih) header += ', DIH D' + dih;
+    lines.push(header);
+
+    const ativos = (bed.problems || []).filter(function (p) { return p && (p.status || 'ativo') === 'ativo'; });
+    if (ativos.length) {
+      lines.push('Problemas: ' + ativos.map(function (p, i) {
+        return (i + 1) + '. ' + p.descricao + (p.plano ? ' — ' + p.plano : '');
+      }).join('; '));
+    }
+
+    const atbs = [], disps = [], cults = [];
+    (bed.trackers || []).forEach(function (t) {
+      if (!t) return;
+      if (t.type === 'atb') {
+        if (t.endDate && todayStr && t.endDate <= todayStr) {
+          const used = dayNumber(t.startDate, t.endDate);
+          atbs.push(t.name + ' suspenso ' + formatDateBR(t.endDate) + (used ? ' (D' + used + ')' : ''));
+        } else {
+          const n = dayNumber(t.startDate, todayStr);
+          if (n === 0) atbs.push(t.name + ' agendado (D1 ' + formatDateBR(t.startDate) + ')');
+          else atbs.push(t.name + ' D' + (n == null ? '-' : n) + (t.duration ? '/' + t.duration : '') + ' (D1 ' + formatDateBR(t.startDate) + ')');
+        }
+      } else if (t.type === 'culture') {
+        cults.push(t.name + ' ' + formatDateBR(t.collectionDate) + ' — ' + (String(t.result || '').trim() || 'aguardando'));
+      } else if (t.kind === 'procedimento') {
+        const n = dayNumber(t.installDate, todayStr);
+        disps.push(t.name + ' — PO D' + (n == null ? '-' : n));
+      } else if (!t.removalDate) {
+        const n = dayNumber(t.installDate, todayStr);
+        disps.push(t.name + ' — D' + (n == null ? '-' : n));
+      }
+    });
+    if (atbs.length) lines.push('ATB: ' + atbs.join('; '));
+    if (disps.length) lines.push('Disp: ' + disps.join('; '));
+    if (cults.length) lines.push('Culturas: ' + cults.join('; '));
+
+    const labs = buildLabsLine(bed, opts.pinnedExams);
+    if (labs) lines.push(labs);
+    return lines.join('\n');
+  }
+
   // ---- Pendências do dia: tudo que pede ação, varrendo os leitos ativos -----
   // Retorna [{bedIndex, bedNumber, patientName, tipo, label}] na ordem dos leitos.
   // tipo: 'atb' | 'cultura' | 'dispositivo' | 'alta' | 'lembrete'
@@ -657,6 +753,9 @@
     dayNumber: dayNumber,
     formatDateBR: formatDateBR,
     buildPendencias: buildPendencias,
+    labNumber: labNumber,
+    buildLabsLine: buildLabsLine,
+    buildDailySummary: buildDailySummary,
     defaultState: defaultState,
     migrateBed: migrateBed,
     migrateState: migrateState,
