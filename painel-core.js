@@ -164,6 +164,8 @@
   const ROW_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'condutas', 'raw_texts', 'examsImage', 'examsLab'];
 
   // A "foto" da última sincronização: chaves + hashes de tudo que foi gravado.
+  // A chave reservada '#prefs' (nunca colide com uuid de paciente) fotografa as
+  // preferências globais sincronizadas (painel_prefs).
   function buildSyncBase(state) {
     const base = {};
     (state.beds || []).forEach(function (bed) {
@@ -176,6 +178,7 @@
       });
       base[bed.patientId] = { rows: rows, scalars: localScalarsHash(bed) };
     });
+    base['#prefs'] = { lab_ranges: hash8(state.labRangesText == null ? '' : state.labRangesText) };
     return base;
   }
 
@@ -226,6 +229,19 @@
 
     state.syncBase = state.syncBase || {};
     state.cloudArchived = state.cloudArchived || {};
+
+    // Preferência global (faixas de referência): três-vias como os scalars — local
+    // intocado desde a foto adota o banco; editado vence (o push regrava). Sem foto
+    // (primeira sync após a atualização), só o padrão de fábrica adota o banco.
+    const remotePref = (pulled.prefs || []).find(function (r) { return r.key === 'lab_ranges'; });
+    if (remotePref) {
+      const localText = state.labRangesText == null ? '' : state.labRangesText;
+      const basePrefs = state.syncBase['#prefs'];
+      const untouched = basePrefs
+        ? hash8(localText) === basePrefs.lab_ranges
+        : (state.labRangesText == null || state.labRangesText === DEFAULT_LAB_RANGES_TEXT);
+      if (untouched) state.labRangesText = remotePref.value;
+    }
 
     const deletedPending = {};
     (state.deletedPatientIds || []).forEach(function (id) { deletedPending[id] = true; });
@@ -629,6 +645,7 @@
 
   function buildPushPayload(state) {
     const out = { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], deletePatientIds: (state.deletedPatientIds || []).slice() };
+    out.prefs = [{ key: 'lab_ranges', value: state.labRangesText == null ? '' : state.labRangesText }];
     (state.beds || []).forEach(function (b) {
       if (!b.patientId) return;
       const pid = b.patientId;
@@ -737,6 +754,10 @@
       exams = byPatient(pulled.exams), condutas = byPatient(pulled.condutas),
       notes = byPatient(pulled.notes), rawTexts = byPatient(pulled.raw_texts),
       docs = byPatient(pulled.generated_docs);
+
+    // Pull limpo: o banco é a verdade também para as preferências globais.
+    const pulledPref = (pulled.prefs || []).find(function (r) { return r.key === 'lab_ranges'; });
+    if (pulledPref) state.labRangesText = pulledPref.value;
 
     const deletedPending = {};
     (state.deletedPatientIds || []).forEach(function (id) { deletedPending[id] = true; });

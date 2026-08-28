@@ -13,7 +13,7 @@ App pessoal de um médico internista: `index.html` (offline-first, localStorage)
 - Projeto: **Gestão Médica** (`kuhymtikommkoupynhkj`, região sa-east-1). As tabelas do Painel convivem com outro app no mesmo projeto, por isso usam o **prefixo `painel_`**.
 - Acesso restrito por RLS ao usuário dono do painel (o e-mail real está configurado nas policies do banco; o projeto tem outros usuários, mas só o dono enxerga as tabelas `painel_*`).
 
-Tabelas: `painel_patients` (status: internado/alta/arquivado/nuvem), `painel_problems` (status: ativo/resolvido/cronico, com `plano` e `ordem`), `painel_antibiotics`, `painel_cultures`, `painel_devices`, `painel_exams` (tipo: lab/imagem), `painel_condutas`, `painel_notes` (1 linha por paciente, PK = patient_id), `painel_raw_texts` (tipo: evolucao/prescricao/admissao — textos crus colados do prontuário), `painel_doc_templates`, `painel_generated_docs`.
+Tabelas: `painel_patients` (status: internado/alta/arquivado/nuvem), `painel_problems` (status: ativo/resolvido/cronico, com `plano` e `ordem`), `painel_antibiotics`, `painel_cultures`, `painel_devices` (`kind`: device/procedimento — cirurgias contam "PO Dn" e não alertam), `painel_exams` (tipo: lab/imagem), `painel_condutas`, `painel_notes` (1 linha por paciente, PK = patient_id), `painel_raw_texts` (tipo: evolucao/prescricao/admissao — textos crus colados do prontuário), `painel_doc_templates`, `painel_generated_docs`, `painel_prefs` (preferências globais do app, PK = key; hoje só `lab_ranges` — upsert por chave no push, três-vias na mescla).
 
 Identifique pacientes por `bed_number` + `initials` (ex.: "leito 1012-A"). Em ambiguidade, pergunte.
 

@@ -3289,7 +3289,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       let merged = false;
       try {
         const sb = await getSupabaseClient();
-        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs'];
+        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs', 'prefs'];
         const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
         const pulled = {};
         tables.forEach((t, i) => {
@@ -3335,6 +3335,10 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             })(),
           ]);
         }
+
+        // Preferências globais (faixas de referência): upsert por chave, mesmo sem pacientes.
+        res = await sb.from(TABLE_PREFIX + 'prefs').upsert(payload.prefs);
+        if (res.error) throw res.error;
 
         // Gravação confirmada: tira a foto e fecha o bookkeeping.
         state.syncBase = newBase;
@@ -3419,7 +3423,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         const sb = await getSupabaseClient();
         // Baixa TUDO primeiro (selects em paralelo); só zeramos o local depois que o servidor
         // respondeu com sucesso, para nunca deixar o app vazio se estiver offline / a conexão cair.
-        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs'];
+        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs', 'prefs'];
         const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
         const pulled = {};
         tables.forEach((t, i) => {
