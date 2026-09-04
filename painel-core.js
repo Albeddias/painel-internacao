@@ -213,9 +213,21 @@
     });
   }
 
+  // Toda linha filha precisa de id ANTES da mescla/foto/push: sem id, a chave da
+  // linha vira "undefined" na foto, o push sorteia um uuid que não volta ao
+  // aparelho e a próxima sincronização vê duas linhas distintas (duplicata).
+  function ensureRowIds(state) {
+    (state.beds || []).forEach(function (bed) {
+      ['problems', 'condutas', 'trackers', 'exams', 'rawTexts'].forEach(function (k) {
+        (bed[k] || []).forEach(function (r) { if (r && !r.id) r.id = uuid(); });
+      });
+    });
+  }
+
   // Mescla three-way do estado inteiro com o que veio do banco.
   // Muta e retorna state, pronto para buildPushPayload. Ver spec 2026-08-25.
   function mergeStates(state, pulled) {
+    ensureRowIds(state);
     function byPatient(rows) {
       const m = {};
       (rows || []).forEach(function (r) { (m[r.patient_id] = m[r.patient_id] || []).push(r); });

@@ -2936,7 +2936,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       const b = state.beds[bIdx];
       if (!b) return;
       b.condutas = b.condutas || [];
-      b.condutas.push({ text, done: false });
+      b.condutas.push({ id: PainelCore.uuid(), text, done: false });
       b.isCondutaMinimized = false; 
       saveData(state);
       renderScreenB(); 
