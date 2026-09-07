@@ -2444,16 +2444,32 @@ function renderLabTab(contentEl, bed, bedIdx) {
     filterEndInput.addEventListener('input', rerenderFlowsheet);
 
     // Listeners do Formulário de Entrada
+    // Modo edição: o formulário guarda a data original da coleta sendo editada (data-edit-date).
+    // Nesse modo, salvar substitui a lista inteira (linha apagada some); fora dele, mescla.
+    const setLabEditMode = (editDate) => {
+        const form = contentEl.querySelector('#lab-entry-form');
+        if (editDate) form.dataset.editDate = editDate; else delete form.dataset.editDate;
+        contentEl.querySelector('#save-lab-entry-btn').textContent = editDate ? 'Salvar Alterações' : 'Salvar Coleta';
+    };
+
     contentEl.querySelector('#toggle-lab-entry-btn').addEventListener('click', (e) => {
         const form = contentEl.querySelector('#lab-entry-form');
+        const wasEditing = !!form.dataset.editDate;
         form.classList.toggle('hidden');
         e.currentTarget.textContent = form.classList.contains('hidden') ? '+ Adicionar Nova Coleta' : 'Fechar Formulário';
+        if (wasEditing) {
+            // Sai da edição: limpa o texto para não relançar a coleta antiga como "nova".
+            setLabEditMode(null);
+            contentEl.querySelector('#lab-entry-textarea').value = '';
+            contentEl.querySelector('#lab-entry-date').value = todayISO();
+        }
     });
 
     contentEl.querySelector('#save-lab-entry-btn').addEventListener('click', () => {
         const date = contentEl.querySelector('#lab-entry-date').value;
         const text = contentEl.querySelector('#lab-entry-textarea').value;
-        const result = parseAndSaveLabs(text, date, bed);
+        const editDate = contentEl.querySelector('#lab-entry-form').dataset.editDate || null;
+        const result = parseAndSaveLabs(text, date, bed, editDate);
         if (result.saved === 0) {
             // Nada reconhecido: preserva o texto digitado e explica o formato esperado.
             const motivo = !date ? 'Escolha a data da coleta.'
@@ -2474,6 +2490,7 @@ function renderLabTab(contentEl, bed, bedIdx) {
         const editBtn = e.target.closest('.edit-collection-btn');
         const deleteBtn = e.target.closest('.delete-collection-btn');
         const pinBtn = e.target.closest('.pin-exam-btn');
+        const moveBtn = e.target.closest('.pin-move-btn');
         const labEntryForm = contentEl.querySelector('#lab-entry-form');
         const labEntryTextarea = contentEl.querySelector('#lab-entry-textarea');
         const labEntryDate = contentEl.querySelector('#lab-entry-date');
@@ -2485,6 +2502,7 @@ function renderLabTab(contentEl, bed, bedIdx) {
             if (entry) {
                 // Preenche o formulário com os dados da coleta
                 labEntryDate.value = entry.date;
+                setLabEditMode(entry.date);
                 labEntryTextarea.value = entry.results.map(r => `${r.name}: ${r.value}`).join('\n');
                 
                 // Abre o formulário
@@ -2506,6 +2524,15 @@ function renderLabTab(contentEl, bed, bedIdx) {
                     rerenderFlowsheet(); // Apenas re-renderiza a tabela
                 });
             }
+        }
+
+        // Reordenar fixados (setas): o passo é relativo às linhas fixadas visíveis na tabela
+        if (moveBtn) {
+            const visible = [...flowsheetContainer.querySelectorAll('.pin-exam-btn')].map(el => el.dataset.examName);
+            state.pinnedExams = PainelCore.movePinnedExam(state.pinnedExams, moveBtn.dataset.examName, Number(moveBtn.dataset.dir), visible);
+            saveData(state);
+            rerenderFlowsheet();
+            return;
         }
 
         // Fixar Exame
@@ -2530,63 +2557,19 @@ function renderLabTab(contentEl, bed, bedIdx) {
     rerenderFlowsheet();
 }
 /**
- * Converte o texto da textarea em dados e salva no state
+ * Converte o texto da textarea em dados e salva no state.
+ * editDate = data original da coleta em edição: a lista vira exatamente o texto digitado
+ * (linha apagada some). Sem editDate (adicionar), mescla por nome na coleta da data.
  */
-function parseAndSaveLabs(text, date, bed) {
+function parseAndSaveLabs(text, date, bed, editDate) {
     if (!text || !date) return { saved: 0, ignored: [] };
-
-    const lines = text.trim().split('\n');
-    const newResults = [];
-    const ignored = [];
-    lines.forEach(line => {
-        const raw = line.trim();
-        if (!raw) return;
-        let name = '', value = '';
-        // Aceita "Nome: valor", "Nome = valor" e também "Nome valor" (ex.: "Hb 9.5").
-        const sep = raw.match(/^([^:=]+?)\s*[:=]\s*(.+)$/);
-        if (sep) {
-            name = sep[1].trim();
-            value = sep[2].trim();
-        } else {
-            const sp = raw.match(/^(\D.*?)\s+([<>]?=?\s*[\d.,].*)$/);
-            if (sp) { name = sp[1].trim(); value = sp[2].trim(); }
-        }
-        if (name && value) {
-            newResults.push({ name, value });
-        } else {
-            ignored.push(raw);
-        }
-    });
-
-    if (newResults.length === 0) return { saved: 0, ignored };
+    const parsed = PainelCore.parseLabText(text);
+    if (parsed.results.length === 0) return { saved: 0, ignored: parsed.ignored };
 
     bed.exams = bed.exams || [];
-
-    // Verifica se já existe uma coleta para esta data
-    let existingEntry = bed.exams.find(e => e.type === 'lab' && e.date === date);
-
-    if (existingEntry) {
-        // Atualiza a coleta existente
-        newResults.forEach(newRes => {
-            const existingRes = existingEntry.results.find(r => r.name.toLowerCase() === newRes.name.toLowerCase());
-            if (existingRes) {
-                existingRes.value = newRes.value; // Sobrescreve
-            } else {
-                existingEntry.results.push(newRes); // Adiciona novo
-            }
-        });
-    } else {
-        // Cria uma nova entrada de coleta
-        bed.exams.push({
-            id: crypto.randomUUID(),
-            type: 'lab',
-            date: date,
-            results: newResults
-        });
-    }
-
+    PainelCore.applyLabEntry(bed.exams, date, parsed.results, editDate ? { editDate } : undefined);
     saveData(state);
-    return { saved: newResults.length, ignored };
+    return { saved: parsed.results.length, ignored: parsed.ignored };
 }
 
 // Mini-gráfico de tendência (polyline) com os valores numéricos do período filtrado.
@@ -2650,6 +2633,16 @@ function renderLabFlowsheet(container, bed, filters) {
         }).sort();
     }
 
+    // Só entram exames com algum resultado nas datas exibidas (evita linhas só de "—")
+    // e só entram datas em que algum dos exames exibidos tem resultado (na busca por nome,
+    // um TSH colhido duas vezes mostra duas colunas, não todas as coletas do período).
+    const hasValue = (date, name) => {
+        const v = dateMap.get(date)?.get(name.toLowerCase());
+        return v != null && String(v).trim() !== '';
+    };
+    filteredExamNames = filteredExamNames.filter(name => filteredDates.some(date => hasValue(date, name)));
+    filteredDates = filteredDates.filter(date => filteredExamNames.some(name => hasValue(date, name)));
+
     if (filteredDates.length === 0 || filteredExamNames.length === 0) {
          container.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum resultado encontrado para os filtros aplicados.</p>`;
         return;
@@ -2690,9 +2683,16 @@ function renderLabFlowsheet(container, bed, filters) {
         return a.localeCompare(b);
     });
 
+    const visiblePinned = filteredExamNames.filter(n => state.pinnedExams.includes(n));
+    const arrowBtn = (name, dir, enabled) => `<button type="button" class="pin-move-btn text-xs leading-none px-1 py-0.5 rounded ${enabled ? 'text-slate-400 hover:text-sky-600 hover:bg-sky-50' : 'invisible'}" data-exam-name="${escapeHtml(name)}" data-dir="${dir}" title="${dir < 0 ? 'Subir' : 'Descer'}" aria-label="${dir < 0 ? 'Subir' : 'Descer'} ${escapeHtml(name)}">${dir < 0 ? '▲' : '▼'}</button>`;
+
     tableHtml += '<tbody class="divide-y divide-slate-100 bg-white">';
     filteredExamNames.forEach(examName => {
         const isPinned = state.pinnedExams.includes(examName);
+        const pinPos = visiblePinned.indexOf(examName);
+        const arrows = isPinned && visiblePinned.length > 1
+          ? `<span class="flex flex-col ml-auto">${arrowBtn(examName, -1, pinPos > 0)}${arrowBtn(examName, 1, pinPos < visiblePinned.length - 1)}</span>`
+          : '';
         const examNameLower = examName.toLowerCase();
         const rawValues = filteredDates.map(date => dateMap.get(date)?.get(examNameLower));
         const nums = rawValues.map(v => PainelCore.labNumber(v == null ? '' : v));
@@ -2707,6 +2707,7 @@ function renderLabFlowsheet(container, bed, filters) {
                     </svg>
                     <span>${escapeHtml(examName)}</span>
                     ${isPinned ? sparklineSvg(nums) : ''}
+                    ${arrows}
                 </div>
             </td>
         `;

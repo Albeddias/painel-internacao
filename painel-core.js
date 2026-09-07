@@ -464,6 +464,97 @@
     return null;
   }
 
+  // ---- Lançamento de coleta laboratorial ------------------------------------
+  // Texto da textarea -> { results: [{name, value}], ignored: [linha crua] }.
+  // Aceita "Nome: valor", "Nome = valor" e "Nome valor" (ex.: "Hb 9.5").
+  function parseLabText(text) {
+    const results = [], ignored = [];
+    String(text == null ? '' : text).split(/\r?\n/).forEach(function (line) {
+      const raw = line.trim();
+      if (!raw) return;
+      let name = '', value = '';
+      const sep = raw.match(/^([^:=]+?)\s*[:=]\s*(.+)$/);
+      if (sep) { name = sep[1].trim(); value = sep[2].trim(); }
+      else {
+        const sp = raw.match(/^(\D.*?)\s+([<>]?=?\s*[\d.,].*)$/);
+        if (sp) { name = sp[1].trim(); value = sp[2].trim(); }
+      }
+      if (name && value) results.push({ name: name, value: value });
+      else ignored.push(raw);
+    });
+    return { results: results, ignored: ignored };
+  }
+
+  // Sobrescreve por nome (case-insensitive) e acrescenta os que não existiam, preservando a ordem.
+  function mergeLabResults(into, results) {
+    results.forEach(function (r) {
+      const hit = into.find(function (x) { return String(x.name).toLowerCase() === String(r.name).toLowerCase(); });
+      if (hit) hit.value = r.value; else into.push({ name: r.name, value: r.value });
+    });
+    return into;
+  }
+
+  // Aplica uma coleta em `exams` (mutação in-place). Devolve a coleta afetada, ou null.
+  // Sem opts.editDate = ADICIONAR: na mesma data mescla por nome (nunca remove).
+  // Com opts.editDate = EDITAR a coleta daquela data: a lista passa a ser exatamente
+  // `results` (linha apagada some; lista vazia apaga a coleta). Mudar a data move a
+  // coleta; se a nova data já tiver coleta, os resultados são fundidos nela.
+  function applyLabEntry(exams, date, results, opts) {
+    opts = opts || {};
+    results = (results || []).map(function (r) { return { name: r.name, value: r.value }; });
+    const isLab = function (e) { return e && e.type === 'lab'; };
+    const findByDate = function (d) { return exams.find(function (e) { return isLab(e) && e.date === d; }); };
+
+    if (opts.editDate) {
+      const edited = findByDate(opts.editDate);
+      if (edited) {
+        if (results.length === 0) {
+          exams.splice(exams.indexOf(edited), 1);
+          return null;
+        }
+        const target = date === opts.editDate ? null : findByDate(date);
+        if (target) {
+          exams.splice(exams.indexOf(edited), 1);
+          mergeLabResults(target.results, results);
+          return target;
+        }
+        edited.date = date;
+        edited.results = results;
+        return edited;
+      }
+    }
+
+    if (results.length === 0) return null;
+    const existing = findByDate(date);
+    if (existing) {
+      mergeLabResults(existing.results, results);
+      return existing;
+    }
+    const entry = { id: uuid(), type: 'lab', date: date, results: results };
+    exams.push(entry);
+    return entry;
+  }
+
+  // ---- Ordem dos exames fixados --------------------------------------------
+  // Move `name` um passo (dir -1 = sobe, +1 = desce) dentro de `pinned`. Se `visible`
+  // (nomes das linhas na tela) vier, o passo é relativo ao vizinho fixado VISÍVEL,
+  // para que uma seta corresponda a uma linha da tabela. Devolve uma lista nova.
+  function movePinnedExam(pinned, name, dir, visible) {
+    const out = (pinned || []).slice();
+    const lc = function (s) { return String(s == null ? '' : s).toLowerCase(); };
+    const idx = out.findIndex(function (p) { return lc(p) === lc(name); });
+    if (idx === -1) return out;
+    const vis = visible ? visible.map(lc) : null;
+    const shown = out.filter(function (p) { return !vis || vis.indexOf(lc(p)) !== -1; });
+    const sIdx = shown.findIndex(function (p) { return lc(p) === lc(name); });
+    const neighbor = shown[sIdx + (dir < 0 ? -1 : 1)];
+    if (sIdx === -1 || neighbor === undefined) return out;
+    const item = out.splice(idx, 1)[0];
+    const nIdx = out.indexOf(neighbor);
+    out.splice(dir < 0 ? nIdx : nIdx + 1, 0, item);
+    return out;
+  }
+
   // ---- Resumo do dia: texto pronto para colar na evolução --------------------
   // Roda só no aparelho: pode usar o nome completo (nunca vai ao banco).
   function buildDailySummary(bed, opts) {
@@ -828,6 +919,9 @@
     DEFAULT_LAB_RANGES_TEXT: DEFAULT_LAB_RANGES_TEXT,
     parseLabRanges: parseLabRanges,
     classifyLab: classifyLab,
+    parseLabText: parseLabText,
+    applyLabEntry: applyLabEntry,
+    movePinnedExam: movePinnedExam,
     defaultState: defaultState,
     migrateBed: migrateBed,
     migrateState: migrateState,
