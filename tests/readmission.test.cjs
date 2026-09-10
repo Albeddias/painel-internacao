@@ -203,3 +203,69 @@ test('buildReadmission: mantém personId existente e não muta o registro anteri
   newBed.exams[0].results[0].value = '7'; // cópia profunda
   assert.strictEqual(prev.exams[0].results[0].value, '9.5');
 });
+
+// ---- Task 5: agrupamento ----------------------------------------------------
+
+function mkBed(over) {
+  return PainelCore.migrateBed(Object.assign({ patientName: 'Fulano', problems: [], trackers: [], exams: [] }, over));
+}
+
+test('personAdmissions: mais recente primeiro; desempate por alta e depois posição', () => {
+  const beds = [
+    mkBed({ patientId: 'a', personId: 'P', admitDate: '2026-01-01', isArchived: true, archiveReason: 'alta', dischargedAt: '2026-01-10' }),
+    mkBed({ patientId: 'x', personId: 'Q', admitDate: '2026-05-01' }),
+    mkBed({ patientId: 'b', personId: 'P', admitDate: '2026-03-01', isArchived: true, archiveReason: 'alta', dischargedAt: '2026-03-05' }),
+    mkBed({ patientId: 'c', personId: 'P', admitDate: '2026-03-01', isArchived: true, archiveReason: 'alta', dischargedAt: '2026-03-09' }),
+    mkBed({ patientId: 'd', personId: 'P', admitDate: '2026-09-10' }),
+  ];
+  assert.deepStrictEqual(PainelCore.personAdmissions(beds, 'P').map(x => x.bed.patientId), ['d', 'c', 'b', 'a']);
+  assert.deepStrictEqual(PainelCore.personAdmissions(beds, 'P').map(x => x.index), [4, 3, 2, 0]);
+  assert.deepStrictEqual(PainelCore.personAdmissions(beds, null), []);
+  assert.deepStrictEqual(PainelCore.previousAdmissions(beds, beds[4]).map(x => x.bed.patientId), ['c', 'b', 'a']);
+  assert.deepStrictEqual(PainelCore.previousAdmissions(beds, beds[1]), []);
+});
+
+test('groupArchived: uma linha por pessoa (mais recente arquivada), sem personId individual, ordinal correto', () => {
+  const beds = [
+    mkBed({ patientId: 'a', personId: 'P', admitDate: '2026-01-01', isArchived: true, archiveReason: 'alta', dischargedAt: '2026-01-10' }),
+    mkBed({ patientId: 's', admitDate: '2026-02-01', isArchived: true, archiveReason: 'arquivado' }),
+    mkBed({ patientId: 'b', personId: 'P', admitDate: '2026-03-01', isArchived: true, archiveReason: 'alta', dischargedAt: '2026-03-09' }),
+    mkBed({ patientId: 'd', personId: 'P', admitDate: '2026-09-10' }), // internado agora: não entra em Arquivados
+    mkBed({ patientId: 't', admitDate: '2026-04-01' }),
+  ];
+  const g = PainelCore.groupArchived(beds);
+  assert.strictEqual(g.length, 2);
+  assert.strictEqual(g[0].latest.patientId, 'b');
+  assert.strictEqual(g[0].latestIndex, 2);
+  assert.strictEqual(g[0].count, 2, 'só as arquivadas');
+  assert.strictEqual(g[0].ordinal, 2, 'b é a 2ª internação da pessoa (d é a 3ª, ativa)');
+  assert.deepStrictEqual(g[0].members.map(m => m.bed.patientId), ['b', 'a']);
+  assert.strictEqual(g[1].latest.patientId, 's');
+  assert.strictEqual(g[1].count, 1);
+  assert.strictEqual(g[1].ordinal, 1);
+});
+
+test('groupArchived: filtro bate em qualquer internação do grupo', () => {
+  const beds = [
+    mkBed({ patientId: 'a', personId: 'P', bedNumber: '1001', admitDate: '2026-01-01', isArchived: true, archiveReason: 'alta' }),
+    mkBed({ patientId: 'b', personId: 'P', bedNumber: '2002', admitDate: '2026-03-01', isArchived: true, archiveReason: 'alta' }),
+    mkBed({ patientId: 's', bedNumber: '3003', admitDate: '2026-02-01', isArchived: true, archiveReason: 'arquivado' }),
+  ];
+  const g = PainelCore.groupArchived(beds, b => (b.bedNumber || '').includes('1001'));
+  assert.strictEqual(g.length, 1);
+  assert.strictEqual(g[0].latest.patientId, 'b');
+  assert.strictEqual(PainelCore.groupArchived(beds, () => false).length, 0);
+});
+
+test('groupCloudArchived: agrupa por personId e prefere o registro com nome', () => {
+  const g = PainelCore.groupCloudArchived({
+    'c1': { nome: '', iniciais: 'MSD', leito: '1001', personId: 'P' },
+    'c2': { nome: 'Mariana Silva Dias', iniciais: 'MSD', leito: '2002', personId: 'P' },
+    'c3': { nome: 'Outro', iniciais: 'O', leito: '3003' },
+  });
+  assert.strictEqual(g.length, 2);
+  assert.deepStrictEqual(g[0].ids, ['c1', 'c2']);
+  assert.strictEqual(g[0].reg.nome, 'Mariana Silva Dias');
+  assert.strictEqual(g[0].count, 2);
+  assert.deepStrictEqual(g[1], { ids: ['c3'], reg: { nome: 'Outro', iniciais: 'O', leito: '3003' }, count: 1 });
+});

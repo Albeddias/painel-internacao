@@ -744,6 +744,67 @@
     return { newBed: newBed, previousPatch: { personId: personId } };
   }
 
+  // ---- Internações da mesma pessoa -------------------------------------------
+  // Ordem cronológica: admitDate, depois dischargedAt, depois posição em state.beds.
+  function compareAdmissions(a, b) {
+    const c1 = String(a.bed.admitDate || '').localeCompare(String(b.bed.admitDate || ''));
+    if (c1) return c1;
+    const c2 = String(a.bed.dischargedAt || '').localeCompare(String(b.bed.dischargedAt || ''));
+    if (c2) return c2;
+    return a.index - b.index;
+  }
+
+  // Todas as internações (leitos) de uma pessoa, mais recente primeiro.
+  function personAdmissions(beds, personId) {
+    if (!personId) return [];
+    return (beds || []).map(function (bed, index) { return { bed: bed, index: index }; })
+      .filter(function (x) { return x.bed && x.bed.personId === personId; })
+      .sort(compareAdmissions).reverse();
+  }
+
+  function previousAdmissions(beds, bed) {
+    return personAdmissions(beds, bed && bed.personId).filter(function (x) { return x.bed !== bed; });
+  }
+
+  // Lista Arquivados agrupada: uma entrada por pessoa (a arquivada mais recente),
+  // registros sem personId ficam individuais. matches(bed) opcional: mantém o grupo
+  // se qualquer internação dele bater (busca por nome/leito antigo).
+  function groupArchived(beds, matches) {
+    const seen = {};
+    const out = [];
+    (beds || []).forEach(function (bed, index) {
+      if (!bed || !bed.isArchived) return;
+      if (!bed.personId) {
+        out.push({ latest: bed, latestIndex: index, members: [{ bed: bed, index: index }], count: 1, ordinal: 1 });
+        return;
+      }
+      if (seen[bed.personId]) return;
+      seen[bed.personId] = true;
+      const all = personAdmissions(beds, bed.personId);
+      const members = all.filter(function (x) { return x.bed.isArchived; });
+      const latest = members[0];
+      const ordinal = all.length - all.indexOf(latest); // posição cronológica (1 = primeira internação)
+      out.push({ latest: latest.bed, latestIndex: latest.index, members: members, count: members.length, ordinal: ordinal });
+    });
+    return matches ? out.filter(function (g) { return g.members.some(function (m) { return matches(m.bed); }); }) : out;
+  }
+
+  // Registro "Na nuvem" (state.cloudArchived) agrupado por personId.
+  function groupCloudArchived(cloudArchived) {
+    const byKey = {};
+    const out = [];
+    Object.keys(cloudArchived || {}).forEach(function (id) {
+      const reg = cloudArchived[id];
+      const key = (reg && reg.personId) ? 'person:' + reg.personId : 'id:' + id;
+      if (!byKey[key]) { byKey[key] = { ids: [], reg: reg, count: 0 }; out.push(byKey[key]); }
+      const g = byKey[key];
+      g.ids.push(id);
+      g.count++;
+      if (!(g.reg && g.reg.nome) && reg && reg.nome) g.reg = reg;
+    });
+    return out;
+  }
+
   function migrateState(parsed, todayStr) {
     const def = defaultState(todayStr);
     const s = Object.assign({}, def, parsed || {});
@@ -969,6 +1030,10 @@
     defaultState: defaultState,
     migrateBed: migrateBed,
     buildReadmission: buildReadmission,
+    personAdmissions: personAdmissions,
+    previousAdmissions: previousAdmissions,
+    groupArchived: groupArchived,
+    groupCloudArchived: groupCloudArchived,
     migrateState: migrateState,
     buildPushPayload: buildPushPayload,
     applyPull: applyPull,
