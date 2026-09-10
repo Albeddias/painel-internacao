@@ -158,7 +158,8 @@
   function localScalarsHash(bed) {
     const status = bed.isArchived ? (bed.archiveReason === 'alta' ? 'alta' : 'arquivado') : 'internado';
     const age = (bed.age === '' || bed.age == null) ? '' : String(Number(bed.age));
-    return hash8(j(bed.bedNumber, age, bed.admitDate, bed.hpp, bed.anamneseInicial, bed.dischargeForecast, status, bed.notes));
+    return hash8(j(bed.bedNumber, age, bed.admitDate, bed.hpp, bed.anamneseInicial, bed.dischargeForecast, status, bed.notes,
+      bed.personId, bed.dischargedAt));
   }
 
   const ROW_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'condutas', 'raw_texts', 'examsImage', 'examsLab'];
@@ -669,6 +670,7 @@
     const hasPatient = !!(b.patientName && String(b.patientName).trim());
     return {
       patientId: b.patientId || (hasPatient ? uuid() : null),
+      personId: b.personId || null,
       bedNumber: b.bedNumber || '', patientName: b.patientName || '',
       age: b.age === 0 ? 0 : (b.age || ''), admitDate: b.admitDate || '',
       hpp: b.hpp || '', anamneseInicial: b.anamneseInicial || '',
@@ -762,6 +764,8 @@
         anamnese_inicial: b.anamneseInicial || '',
         discharge_forecast: b.dischargeForecast || null,
         status: b.isArchived ? (b.archiveReason === 'alta' ? 'alta' : 'arquivado') : 'internado',
+        person_id: b.personId || null,
+        discharge_date: b.dischargedAt || null,
       });
       (b.problems || []).forEach(function (p, i) {
         out.problems.push({ id: p.id, patient_id: pid, descricao: p.descricao || '', status: p.status || 'ativo', plano: p.plano || '', ordem: i });
@@ -805,6 +809,8 @@
     bed.dischargeForecast = p.discharge_forecast || '';
     bed.isArchived = p.status !== 'internado';
     bed.archiveReason = p.status === 'internado' ? null : p.status;
+    bed.personId = p.person_id || null;
+    bed.dischargedAt = p.discharge_date || '';
     bed.notes = notesTexto || '';
   }
 
