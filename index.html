@@ -1477,29 +1477,26 @@
           });
       } else {
           // Renderiza Leitos ARQUIVADOS
-          const bedsToRender = state.beds
-            .map((bed, index) => ({ bed, originalIndex: index }))
-            .filter(({ bed }) => {
-              if (!bed.isArchived) return false; 
-              if (!searchTerm) return true;
-              const name = (bed.patientName || '').toLowerCase();
-              const num = (bed.bedNumber || '').toLowerCase();
-              return name.includes(searchTerm) || num.includes(searchTerm);
-            });
-            
-          const cloudIds = Object.keys(state.cloudArchived || {});
+          // Uma linha por pessoa (internação arquivada mais recente); busca bate em qualquer internação dela
+          const groups = PainelCore.groupArchived(state.beds, searchTerm ? (bed) => {
+            const name = (bed.patientName || '').toLowerCase();
+            const num = (bed.bedNumber || '').toLowerCase();
+            return name.includes(searchTerm) || num.includes(searchTerm);
+          } : null);
+          const bedsToRender = groups.map(g => ({ bed: g.latest, originalIndex: g.latestIndex, group: g }));
 
           if (bedsToRender.length === 0) {
             bedsListArea.innerHTML = `<p class="text-sm text-slate-500 text-center py-4">Nenhum leito arquivado.</p>`;
           }
 
-          bedsToRender.forEach(({ bed: b, originalIndex: idx }) => {
+          bedsToRender.forEach(({ bed: b, originalIndex: idx, group: g }) => {
             const tpl = document.getElementById('archivedBedTpl');
             const node = tpl.content.cloneNode(true);
             const card = node.querySelector('.list-card');
             node.querySelector('.bed-id').textContent = b.bedNumber || '—';
             const altaInfo = b.archiveReason === 'alta' && b.dischargedAt ? ` · Alta em ${formatDate(b.dischargedAt)}` : '';
-            node.querySelector('.bed-name').textContent = (b.patientName || 'Vazio') + altaInfo;
+            const ordinalInfo = g.count > 1 ? ` · ${g.ordinal}ª internação` : '';
+            node.querySelector('.bed-name').textContent = (b.patientName || 'Vazio') + altaInfo + ordinalInfo;
 
             card.addEventListener('click', () => {
                 openPatientDetails(idx);
@@ -1521,18 +1518,22 @@
 
             node.querySelector('.cloud-archive-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
-                showConfirm(
-                  `Guardar ${b.patientName || b.bedNumber} só na nuvem? O paciente sai deste aparelho ` +
-                  `(o nome completo fica guardado aqui para quando voltar) e permanece no banco.`,
-                  async () => {
-                    try { await archiveBedToCloud(b); }
+                const beds = g.members.map(m => m.bed);
+                const msg = beds.length > 1
+                  ? `Guardar as ${beds.length} internações de ${b.patientName || b.bedNumber} só na nuvem? Elas saem deste aparelho ` +
+                    `(o nome completo fica guardado aqui para quando voltar) e permanecem no banco.`
+                  : `Guardar ${b.patientName || b.bedNumber} só na nuvem? O paciente sai deste aparelho ` +
+                    `(o nome completo fica guardado aqui para quando voltar) e permanece no banco.`;
+                showConfirm(msg, async () => {
+                    try { await archiveBedsToCloud(beds); }
                     catch (err) { setSyncStatus('Falha ao guardar na nuvem: ' + err.message, true); }
                   }, 'Guardar só na nuvem', 'bg-indigo-600', 'Guardar');
             });
 
             node.querySelector('.delete-bed-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
-                showConfirm(`Deletar PERMANENTEMENTE o leito ${b.bedNumber}? Todos os dados serão perdidos.`, () => {
+                const extra = g.count > 1 ? ` As ${g.count - 1} internação(ões) anterior(es) continuam em Arquivados.` : '';
+                showConfirm(`Deletar PERMANENTEMENTE o leito ${b.bedNumber}? Todos os dados desta internação serão perdidos.${extra}`, () => {
                     PainelCore.markPatientDeleted(state, b.patientId);
                     state.beds.splice(idx, 1);
                     saveData(state);
@@ -1543,24 +1544,25 @@
             bedsListArea.appendChild(node);
           });
 
-          if (cloudIds.length) {
+          const cloudGroups = PainelCore.groupCloudArchived(state.cloudArchived || {});
+          if (cloudGroups.length) {
             const header = document.createElement('p');
             header.className = 'text-xs font-semibold text-slate-400 uppercase mt-4 mb-2 px-1';
             header.textContent = 'Na nuvem (fora deste aparelho)';
             bedsListArea.appendChild(header);
-            cloudIds.forEach(pid => {
-              const reg = state.cloudArchived[pid];
+            cloudGroups.forEach(cg => {
+              const reg = cg.reg || {};
               const row = document.createElement('div');
               row.className = 'list-card flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-2';
               const label = document.createElement('span');
               label.className = 'text-sm text-slate-600';
-              label.textContent = `${reg.leito || '—'} · ${reg.nome || reg.iniciais || '?'}`;
+              label.textContent = `${reg.leito || '—'} · ${reg.nome || reg.iniciais || '?'}` + (cg.count > 1 ? ` · ${cg.count} internações` : '');
               const btn = document.createElement('button');
               btn.className = 'text-sm font-medium text-indigo-600 hover:underline';
               btn.textContent = 'Trazer de volta';
               btn.addEventListener('click', async () => {
                 btn.disabled = true;
-                try { await restoreBedFromCloud(pid); }
+                try { await restoreBedsFromCloud(cg.ids); }
                 catch (err) { setSyncStatus('Falha ao trazer da nuvem: ' + err.message, true); btn.disabled = false; }
               });
               row.appendChild(label);
@@ -3516,33 +3518,38 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     }
 
     // Guardar só na nuvem: sincroniza (garante o banco completo), marca status='nuvem'
-    // no banco, remove o leito do aparelho e guarda o nome completo só localmente.
-    async function archiveBedToCloud(bed) {
-      if (!bed.patientId) bed.patientId = PainelCore.uuid(); // leito nomeado nesta sessão: ganha id antes do sync
+    // no banco, remove os leitos do aparelho e guarda o nome completo só localmente.
+    // Recebe TODAS as internações da pessoa para o histórico não ficar partido.
+    async function archiveBedsToCloud(beds) {
+      beds.forEach(bed => { if (!bed.patientId) bed.patientId = PainelCore.uuid(); });
       setSyncStatus('Sincronizando...');
       await doSync();
       const sb = await getSupabaseClient();
-      const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'nuvem' }).eq('id', bed.patientId);
+      const ids = beds.map(b => b.patientId);
+      const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'nuvem' }).in('id', ids);
       if (r.error) throw r.error;
-      state.cloudArchived[bed.patientId] = {
-        nome: bed.patientName || '',
-        iniciais: PainelCore.initialsFromName(bed.patientName),
-        leito: bed.bedNumber || '',
-      };
-      state.beds = state.beds.filter(b => b !== bed);
-      delete state.syncBase[bed.patientId];
+      beds.forEach(bed => {
+        state.cloudArchived[bed.patientId] = {
+          nome: bed.patientName || '',
+          iniciais: PainelCore.initialsFromName(bed.patientName),
+          leito: bed.bedNumber || '',
+          personId: bed.personId || null,
+        };
+        delete state.syncBase[bed.patientId];
+      });
+      state.beds = state.beds.filter(b => !ids.includes(b.patientId));
       saveData(state, { fromSync: true });
       flushSave();
       renderScreenA();
       setSyncStatus('Guardado na nuvem ✓');
     }
 
-    async function restoreBedFromCloud(patientId) {
+    async function restoreBedsFromCloud(ids) {
       setSyncStatus('Trazendo da nuvem...');
       const sb = await getSupabaseClient();
-      const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'arquivado' }).eq('id', patientId);
+      const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'arquivado' }).in('id', ids);
       if (r.error) throw r.error;
-      await doSync(); // a mescla adota o paciente e reencaixa o nome do registro local
+      await doSync(); // a mescla adota os pacientes e reencaixa os nomes do registro local
       renderScreenA();
       setSyncStatus('Trazido da nuvem ✓');
     }
