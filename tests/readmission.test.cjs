@@ -118,7 +118,7 @@ test('mergeStates: foto na fórmula antiga (sem personId/dischargedAt) não perd
   const state = PainelCore.migrateState({ beds: [bed] }, '2026-09-10');
   state.syncedPatientIds = ['p-old'];
   // Simula foto gravada pela versão anterior do app: hash sem os campos novos.
-  const old = PainelCore.hash8(['1012-A', '32', '2026-06-07', 'HAS, DM2', 'Admitida com dispneia.', '', 'alta', 'Evolução estável.'].join('')); // mesmo separador interno de j()
+  const old = PainelCore.hash8(['1012-A', '32', '2026-06-07', 'HAS, DM2', 'Admitida com dispneia.', '', 'alta', 'Evolução estável.'].join('\u0001')); // mesmo separador interno de j()
   state.syncBase = { 'p-old': { rows: { problems: {}, antibiotics: {}, cultures: {}, devices: {}, condutas: {}, raw_texts: {}, examsImage: {}, examsLab: {} }, scalars: old } };
   PainelCore.mergeStates(state, pulledFor(bed, { discharge_date: null })); // banco ainda sem discharge_date
   assert.strictEqual(state.beds[0].hpp, 'HAS, DM2');
