@@ -78,3 +78,60 @@ test('syncBase: hash de escalares muda quando personId ou dischargedAt mudam', (
   assert.notStrictEqual(h(mk({ dischargedAt: '2026-06-13' })), base);
   assert.strictEqual(h(mk({})), base, 'determinístico');
 });
+
+// ---- Task 3: mescla ---------------------------------------------------------
+
+function pulledFor(bed, over) {
+  return {
+    patients: [Object.assign({ id: bed.patientId, bed_number: bed.bedNumber, initials: 'MSD', age: bed.age,
+      admit_date: bed.admitDate, hpp: bed.hpp, anamnese_inicial: bed.anamneseInicial, discharge_forecast: null,
+      status: 'alta', person_id: null, discharge_date: bed.dischargedAt || null }, over || {})],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [],
+    notes: [{ patient_id: bed.patientId, texto: bed.notes }], raw_texts: [], generated_docs: [], prefs: [],
+  };
+}
+
+test('mergeStates: adota person_id do banco quando local é null, mesmo com scalars locais alterados', () => {
+  const bed = altaBed({ problems: [], trackers: [], exams: [], rawTexts: [], condutas: [], generatedDocs: [] });
+  const state = PainelCore.migrateState({ beds: [bed] }, '2026-09-10');
+  state.syncedPatientIds = ['p-old'];
+  state.syncBase = PainelCore.buildSyncBase(state);
+  state.beds[0].hpp = 'HAS, DM2, DPOC'; // edição local → scalars "tocados"
+  PainelCore.mergeStates(state, pulledFor(bed, { person_id: 'per-1' }));
+  assert.strictEqual(state.beds[0].personId, 'per-1');
+  assert.strictEqual(state.beds[0].hpp, 'HAS, DM2, DPOC', 'edição local preservada');
+});
+
+test('mergeStates: personId recém-criado pelo Reinternar (local tocado) vence o null do banco', () => {
+  const bed = altaBed({ problems: [], trackers: [], exams: [], rawTexts: [], condutas: [], generatedDocs: [] });
+  const state = PainelCore.migrateState({ beds: [bed] }, '2026-09-10');
+  state.syncedPatientIds = ['p-old'];
+  state.syncBase = PainelCore.buildSyncBase(state);
+  state.beds[0].personId = 'per-1'; // Reinternar aplicou previousPatch depois da última foto
+  PainelCore.mergeStates(state, pulledFor(bed, { person_id: null }));
+  assert.strictEqual(state.beds[0].personId, 'per-1');
+  assert.strictEqual(PainelCore.buildPushPayload(state).patients[0].person_id, 'per-1');
+});
+
+test('mergeStates: foto na fórmula antiga (sem personId/dischargedAt) não perde nada quando local = banco', () => {
+  const bed = altaBed({ problems: [], trackers: [], exams: [], rawTexts: [], condutas: [], generatedDocs: [] });
+  const state = PainelCore.migrateState({ beds: [bed] }, '2026-09-10');
+  state.syncedPatientIds = ['p-old'];
+  // Simula foto gravada pela versão anterior do app: hash sem os campos novos.
+  const old = PainelCore.hash8(['1012-A', '32', '2026-06-07', 'HAS, DM2', 'Admitida com dispneia.', '', 'alta', 'Evolução estável.'].join('')); // mesmo separador interno de j()
+  state.syncBase = { 'p-old': { rows: { problems: {}, antibiotics: {}, cultures: {}, devices: {}, condutas: {}, raw_texts: {}, examsImage: {}, examsLab: {} }, scalars: old } };
+  PainelCore.mergeStates(state, pulledFor(bed, { discharge_date: null })); // banco ainda sem discharge_date
+  assert.strictEqual(state.beds[0].hpp, 'HAS, DM2');
+  assert.strictEqual(state.beds[0].dischargedAt, '2026-06-12', 'data de alta local sobrevive e vai subir');
+  assert.strictEqual(PainelCore.buildPushPayload(state).patients[0].discharge_date, '2026-06-12');
+});
+
+test('mergeStates: paciente nuvem registra personId em cloudArchived', () => {
+  const state = PainelCore.migrateState({ beds: [] }, '2026-09-10');
+  state.cloudArchived = {};
+  PainelCore.mergeStates(state, {
+    patients: [{ id: 'p-cloud', bed_number: '1012-A', initials: 'MSD', status: 'nuvem', person_id: 'per-1' }],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [], prefs: [],
+  });
+  assert.strictEqual(state.cloudArchived['p-cloud'].personId, 'per-1');
+});

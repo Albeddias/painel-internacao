@@ -284,10 +284,12 @@
       // tinha o leito, move-o para o registro local preservando o nome completo.
       if (p.status === 'nuvem') {
         if (bed) {
-          state.cloudArchived[p.id] = { nome: bed.patientName || '', iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '' };
+          state.cloudArchived[p.id] = { nome: bed.patientName || '', iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '', personId: p.person_id || null };
           state.beds = state.beds.filter(function (b) { return b.patientId !== p.id; });
         } else if (!state.cloudArchived[p.id]) {
-          state.cloudArchived[p.id] = { nome: '', iniciais: p.initials || '', leito: p.bed_number || '' };
+          state.cloudArchived[p.id] = { nome: '', iniciais: p.initials || '', leito: p.bed_number || '', personId: p.person_id || null };
+        } else {
+          state.cloudArchived[p.id].personId = p.person_id || state.cloudArchived[p.id].personId || null;
         }
         return;
       }
@@ -320,6 +322,10 @@
       if (base && base.scalars === localScalarsHash(bed)) {
         applyPatientScalars(bed, p, remoteNote);
       }
+
+      // person_id só nasce pelo botão Reinternar e nunca é editado à mão: se o banco
+      // tem e o aparelho não, adota sempre (senão o push apagaria o vínculo com null).
+      if (!bed.personId && p.person_id) bed.personId = p.person_id;
 
       applyRowsToBed(bed, {
         problems: mergeRowSets(local.problems, remote.problems, baseRows('problems')),
