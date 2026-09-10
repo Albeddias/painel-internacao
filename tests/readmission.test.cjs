@@ -135,3 +135,71 @@ test('mergeStates: paciente nuvem registra personId em cloudArchived', () => {
   });
   assert.strictEqual(state.cloudArchived['p-cloud'].personId, 'per-1');
 });
+
+// ---- Task 4: buildReadmission ----------------------------------------------
+
+test('buildReadmission: copia identidade, HPP, exames, trackers e só problemas crônicos', () => {
+  const prev = altaBed();
+  const { newBed, previousPatch } = PainelCore.buildReadmission(prev, '2004-B', '2026-09-10');
+  assert.ok(newBed.patientId && newBed.patientId !== prev.patientId);
+  assert.strictEqual(previousPatch.personId, 'p-old', 'anterior sem personId ganha o próprio id');
+  assert.strictEqual(newBed.personId, 'p-old');
+  assert.strictEqual(newBed.bedNumber, '2004-B');
+  assert.strictEqual(newBed.patientName, 'Mariana Silva Dias');
+  assert.strictEqual(newBed.age, 32);
+  assert.strictEqual(newBed.hpp, 'HAS, DM2');
+  assert.strictEqual(newBed.admitDate, '2026-09-10');
+  assert.deepStrictEqual(newBed.problems.map(p => [p.descricao, p.status, p.plano, p.ordem]), [['DRC 3b', 'cronico', 'Nefro ambulatorial', 0]]);
+  assert.notStrictEqual(newBed.problems[0].id, 'pr2', 'id novo');
+  assert.strictEqual(newBed.exams.length, 2);
+  assert.ok(newBed.exams.every(e => e.id !== 'l1' && e.id !== 'i1'), 'exames com ids novos');
+  assert.deepStrictEqual(newBed.exams[0].results, [{ name: 'Hb', value: '9.5' }]);
+  assert.strictEqual(newBed.trackers.length, 5);
+  assert.ok(newBed.trackers.every(t => !['a1', 'a2', 'c1', 'd1', 'd2'].includes(t.id)), 'trackers com ids novos');
+});
+
+test('buildReadmission: fecha ATB e dispositivos abertos com a data da alta anterior; cultura intacta', () => {
+  const { newBed } = PainelCore.buildReadmission(altaBed(), '2004-B', '2026-09-10');
+  const byName = Object.fromEntries(newBed.trackers.map(t => [t.name, t]));
+  assert.strictEqual(byName['Ceftriaxona'].endDate, '2026-06-12');
+  assert.strictEqual(byName['Azitromicina'].endDate, '2026-06-11', 'já fechado não muda');
+  assert.strictEqual(byName['CVC'].removalDate, '2026-06-12');
+  assert.strictEqual(byName['Colecistectomia'].removalDate, '2026-06-12');
+  assert.strictEqual(byName['Colecistectomia'].kind, 'procedimento');
+  assert.strictEqual(byName['Hemocultura'].result, 'KPC');
+  assert.strictEqual(byName['Hemocultura'].removalDate, undefined);
+});
+
+test('buildReadmission: sem data de alta anterior, fecha com todayStr', () => {
+  const { newBed } = PainelCore.buildReadmission(altaBed({ dischargedAt: '', archiveReason: 'arquivado' }), '2004-B', '2026-09-10');
+  assert.strictEqual(newBed.trackers.find(t => t.name === 'CVC').removalDate, '2026-09-10');
+});
+
+test('buildReadmission: zera o que é da internação (HDA, condutas, notas, textos, docs, flags)', () => {
+  const { newBed } = PainelCore.buildReadmission(altaBed(), '2004-B', '2026-09-10');
+  assert.strictEqual(newBed.anamneseInicial, '');
+  assert.strictEqual(newBed.dischargeForecast, '');
+  assert.deepStrictEqual(newBed.condutas, []);
+  assert.strictEqual(newBed.notes, '');
+  assert.deepStrictEqual(newBed.rawTexts, []);
+  assert.deepStrictEqual(newBed.generatedDocs, []);
+  assert.strictEqual(newBed.isArchived, false);
+  assert.strictEqual(newBed.archiveReason, null);
+  assert.strictEqual(newBed.dischargedAt, '');
+  assert.strictEqual(newBed.isVisited, false);
+  assert.strictEqual(newBed.reminderDate, '');
+  assert.deepStrictEqual(newBed.externalDoctor, { active: false, name: '' });
+  assert.deepStrictEqual(newBed.checks, { ev: false, p: false, ex: false, tev: false });
+  assert.strictEqual(newBed.isAnamneseMinimized, false, 'HDA aberta para preencher');
+});
+
+test('buildReadmission: mantém personId existente e não muta o registro anterior', () => {
+  const prev = altaBed({ personId: 'per-1' });
+  const snapshot = JSON.stringify(prev);
+  const { newBed, previousPatch } = PainelCore.buildReadmission(prev, '2004-B', '2026-09-10');
+  assert.strictEqual(previousPatch.personId, 'per-1');
+  assert.strictEqual(newBed.personId, 'per-1');
+  assert.strictEqual(JSON.stringify(prev), snapshot);
+  newBed.exams[0].results[0].value = '7'; // cópia profunda
+  assert.strictEqual(prev.exams[0].results[0].value, '9.5');
+});

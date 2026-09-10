@@ -712,6 +712,38 @@
     };
   }
 
+  // ---- Reinternação: nova internação da mesma pessoa -------------------------
+  // Copia o que é da PESSOA (nome, idade, HPP, exames, trackers, problemas crônicos)
+  // e zera o que é da INTERNAÇÃO (HDA, condutas, notas, textos, docs, checks).
+  // Trackers abertos são fechados com a data da alta anterior para não nascerem alertando.
+  // Não muta previousBed: devolve o patch a aplicar nele (personId).
+  function buildReadmission(previousBed, bedNumber, todayStr) {
+    const prev = previousBed || {};
+    const personId = prev.personId || prev.patientId || uuid();
+    const closeDate = prev.dischargedAt || todayStr;
+    const problems = (prev.problems || [])
+      .filter(function (p) { return p && p.status === 'cronico'; })
+      .map(function (p, i) { return { id: uuid(), descricao: p.descricao || '', status: 'cronico', plano: p.plano || '', ordem: i }; });
+    const trackers = (prev.trackers || []).filter(Boolean).map(function (t) {
+      const c = Object.assign({}, t, { id: uuid() });
+      if (c.type === 'atb') { if (!c.endDate) c.endDate = closeDate; }
+      else if (c.type !== 'culture') { if (!c.removalDate) c.removalDate = closeDate; }
+      return c;
+    });
+    const exams = (prev.exams || []).filter(Boolean).map(function (e) {
+      const c = JSON.parse(JSON.stringify(e));
+      c.id = uuid();
+      return c;
+    });
+    const newBed = migrateBed({
+      patientId: uuid(), personId: personId, bedNumber: bedNumber || '',
+      patientName: prev.patientName || '', age: prev.age, hpp: prev.hpp || '',
+      admitDate: todayStr, problems: problems, trackers: trackers, exams: exams,
+      isAnamneseMinimized: false,
+    });
+    return { newBed: newBed, previousPatch: { personId: personId } };
+  }
+
   function migrateState(parsed, todayStr) {
     const def = defaultState(todayStr);
     const s = Object.assign({}, def, parsed || {});
@@ -936,6 +968,7 @@
     movePinnedExam: movePinnedExam,
     defaultState: defaultState,
     migrateBed: migrateBed,
+    buildReadmission: buildReadmission,
     migrateState: migrateState,
     buildPushPayload: buildPushPayload,
     applyPull: applyPull,
