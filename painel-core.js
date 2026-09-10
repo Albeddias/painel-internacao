@@ -709,6 +709,7 @@
       isCondutaMinimized: b.isCondutaMinimized !== undefined ? b.isCondutaMinimized : true,
       isRawTextsMinimized: b.isRawTextsMinimized !== undefined ? b.isRawTextsMinimized : true,
       isDocsMinimized: b.isDocsMinimized !== undefined ? b.isDocsMinimized : true,
+      isPrevAdmissionsMinimized: b.isPrevAdmissionsMinimized !== undefined ? b.isPrevAdmissionsMinimized : true,
     };
   }
 

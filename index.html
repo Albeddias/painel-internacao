@@ -547,7 +547,10 @@
   <!-- === TEMPLATE DE DETALHES DO PACIENTE (TELA B) === -->
   <template id="patientDetailTpl">
     <article class="patient-card space-y-4">
-      
+
+      <!-- Faixa: este registro é uma internação anterior de uma pessoa com outras internações -->
+      <div class="prev-admission-banner hidden bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium rounded-lg px-3 py-2"></div>
+
       <!-- Cabeçalho (Nome, Idade, Admissão) -->
       <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
         <!-- Em tela estreita os botões ficam numa linha própria ACIMA do leito/nome; em tela larga, à direita -->
@@ -608,6 +611,17 @@
             <input class="new-hpp-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo diagnóstico (HAS, DM2...)">
             <button class="add-hpp-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Seção: Internações anteriores (só aparece quando há outra internação da mesma pessoa neste aparelho) -->
+      <div class="collapsible-section prev-admissions-section hidden bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Internações anteriores <span class="prev-admissions-count text-sm font-medium text-slate-400"></span></span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="prev-admissions-list divide-y divide-slate-100"></div>
         </div>
       </div>
 
@@ -1578,6 +1592,20 @@
       const node = tpl.content.cloneNode(true);
       const art = node.querySelector('article');
 
+      // Histórico de internações da mesma pessoa
+      const prevAdm = PainelCore.previousAdmissions(state.beds, b);
+      if (prevAdm.length) {
+        art.querySelector('.prev-admissions-section').classList.remove('hidden');
+        art.querySelector('.prev-admissions-count').textContent = `(${prevAdm.length})`;
+        if (b.isArchived) {
+          const banner = art.querySelector('.prev-admission-banner');
+          banner.textContent = (b.archiveReason === 'alta' && b.dischargedAt)
+            ? `Internação anterior · alta em ${formatDateFull(b.dischargedAt)}`
+            : 'Internação anterior (arquivada)';
+          banner.classList.remove('hidden');
+        }
+      }
+
       // Bind de Dados (Cabeçalho)
       art.querySelector('.inline-bed').value = b.bedNumber || '';
       art.querySelector('.inline-bed').addEventListener('input', (e) => { b.bedNumber = e.target.value; saveData(state); patientHeaderBed.textContent = b.bedNumber; });
@@ -1693,6 +1721,7 @@
       // Seções Colapsáveis
       setupCollapsibleSection(art, '.hpp-list', 'isHppMinimized', b, (el) => renderHppList(el, b, idx));
       updateHppCount(art, b);
+      if (prevAdm.length) setupCollapsibleSection(art, '.prev-admissions-list', 'isPrevAdmissionsMinimized', b, (el) => renderPrevAdmissionsList(el, b));
       setupCollapsibleSection(art, '.problem-list', 'isProblemsMinimized', b, (el) => renderProblemList(el, b, idx));
       setupCollapsibleSection(art, '.input-anamnese-inline', 'isAnamneseMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.tracker-list', 'isTrackerMinimized', b, (el) => renderTrackerList(el, b, idx)); 
@@ -1969,6 +1998,31 @@
       if (!el) return;
       const n = PainelCore.parseHpp(bed.hpp).length;
       el.textContent = n > 0 ? `(${n})` : '';
+    }
+
+    function formatDateFull(iso) {
+      const p = String(iso || '').split('-');
+      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : '';
+    }
+
+    // Internações anteriores da mesma pessoa (só as que estão neste aparelho).
+    function renderPrevAdmissionsList(listEl, bed) {
+      listEl.innerHTML = '';
+      PainelCore.previousAdmissions(state.beds, bed).forEach(({ bed: p, index }) => {
+        const row = document.createElement('button');
+        row.className = 'w-full text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 py-2 hover:bg-slate-50 rounded';
+        const left = document.createElement('span');
+        left.className = 'text-sm text-slate-800';
+        const fim = p.dischargedAt ? formatDateFull(p.dischargedAt) : (p.isArchived ? 'sem alta registrada' : 'internado');
+        left.textContent = `${formatDateFull(p.admitDate) || '?'} → ${fim} · leito ${p.bedNumber || '—'}`;
+        const right = document.createElement('span');
+        right.className = 'text-xs text-slate-500 truncate';
+        const dx = (p.problems || []).find(x => x && (x.status || 'ativo') === 'ativo');
+        right.textContent = dx ? dx.descricao : '—';
+        row.appendChild(left); row.appendChild(right);
+        row.addEventListener('click', () => openPatientDetails(index));
+        listEl.appendChild(row);
+      });
     }
 
     function renderHppList(listElement, bed, bedIdx) {
