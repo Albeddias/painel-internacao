@@ -3056,7 +3056,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       document.getElementById('readmitModalWho').textContent = `${prevBed.patientName || '?'} — última internação em ${prevBed.bedNumber || '—'}`;
       const box = document.getElementById('readmitEmptyBeds');
       box.innerHTML = '';
-      const empties = state.beds.filter(b => !b.isArchived && !(b.patientName || '').trim());
+      const empties = state.beds.filter(b => !b.isArchived && !b.patientId && !(b.patientName || '').trim());
       if (!empties.length) {
         box.innerHTML = '<span class="text-sm text-slate-400">Nenhum leito vazio.</span>';
       }
@@ -3080,10 +3080,13 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         const v = (newNumber || '').trim();
         if (!v) { err.textContent = 'Escolha um leito vazio ou digite um número.'; err.classList.remove('hidden'); return; }
         const same = state.beds.find(b => !b.isArchived && (b.bedNumber || '').trim().toLowerCase() === v.toLowerCase());
-        if (same && (same.patientName || '').trim()) {
-          err.textContent = `O leito ${v} já está ocupado por ${same.patientName}.`; err.classList.remove('hidden'); return;
+        if (same && ((same.patientName || '').trim() || same.patientId)) {
+          err.textContent = (same.patientName || '').trim()
+            ? `O leito ${v} já está ocupado por ${same.patientName}.`
+            : `O leito ${v} já está em uso.`;
+          err.classList.remove('hidden'); return;
         }
-        if (same) targetBed = same; // número de leito vazio existente: usa ele
+        if (same) targetBed = same; // número de leito vazio existente (sem patientId): usa ele
         newNumber = v;
       }
       const { newBed, previousPatch } = PainelCore.buildReadmission(prevBed, targetBed ? targetBed.bedNumber : newNumber, todayISO());
