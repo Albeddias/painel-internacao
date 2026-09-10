@@ -29,6 +29,7 @@ Quando o usuário colar um texto do prontuário (ou pedir para processar `painel
 
 1. Leia o template em `painel_doc_templates` (`sumario_alta`, `receituario`, `laudo`) e siga as INSTRUÇÕES nele.
 2. Leia o paciente completo (todas as tabelas `painel_*` + `painel_raw_texts`).
+   Se `person_id` não for nulo, leia também as outras internações da pessoa (`where person_id = ... and id <> ...`) e cite-as quando relevante. Nunca crie nem altere `person_id`/`discharge_date`.
 3. Gere o texto com `[NOME]`, mostre no chat E grave em `painel_generated_docs` (`patient_id`, `tipo`, `conteudo`).
 4. Lembre o usuário de tocar **Sincronizar** no app para o documento aparecer na seção "Documentos Gerados".
 
