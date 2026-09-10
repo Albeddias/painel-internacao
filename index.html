@@ -305,6 +305,23 @@
     </div>
   </div>
 
+  <!-- === MODAL DE REINTERNAR (escolhe o leito de destino) === -->
+  <div id="readmitModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 class="text-lg font-bold text-slate-900">Reinternar</h3>
+      <p id="readmitModalWho" class="text-sm text-slate-600 mt-1"></p>
+      <p class="text-xs font-semibold text-slate-400 uppercase mt-4 mb-1">Leitos vazios</p>
+      <div id="readmitEmptyBeds" class="flex flex-wrap gap-2"></div>
+      <p class="text-xs font-semibold text-slate-400 uppercase mt-4 mb-1">Ou um leito novo</p>
+      <input id="readmitBedNumberInput" type="text" placeholder="Ex: 1012-A" class="w-full border border-slate-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <p id="readmitError" class="hidden text-sm text-red-600 mt-2"></p>
+      <div class="flex gap-3 mt-5">
+        <button id="cancelReadmitBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
+        <button id="saveReadmitBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Reinternar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- === MODAL DE CONFIRMAÇÃO === -->
   <div id="confirmModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
@@ -507,6 +524,7 @@
                 <div class="bed-name text-sm text-slate-600 break-words sm:truncate"></div>
             </div>
             <div class="flex flex-wrap justify-end gap-2 flex-shrink-0">
+                <button class="readmit-bed-btn text-sm bg-sky-100 text-sky-800 font-medium rounded-lg py-2 px-3 hover:bg-sky-200 transition-all" title="Nova internação da mesma pessoa">Reinternar</button>
                 <button class="restore-bed-btn text-sm bg-green-100 text-green-800 font-medium rounded-lg py-2 px-3 hover:bg-green-200 transition-all">Restaurar</button>
                 <button class="cloud-archive-btn text-sm bg-indigo-100 text-indigo-800 font-medium rounded-lg py-2 px-3 hover:bg-indigo-200 transition-all" title="Guardar só na nuvem">Nuvem</button>
                 <button class="delete-bed-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
@@ -1471,6 +1489,11 @@
 
             card.addEventListener('click', () => {
                 openPatientDetails(idx);
+            });
+
+            node.querySelector('.readmit-bed-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openReadmitModal(b);
             });
 
             node.querySelector('.restore-bed-btn').addEventListener('click', (e) => {
@@ -2968,6 +2991,64 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
           if(nameInput) nameInput.focus();
       }, 100);
     }
+
+    // --- Reinternar: nova internação da mesma pessoa num leito vazio ou novo ---
+    let readmitSource = null;
+
+    function openReadmitModal(prevBed) {
+      readmitSource = prevBed;
+      document.getElementById('readmitModalWho').textContent = `${prevBed.patientName || '?'} — última internação em ${prevBed.bedNumber || '—'}`;
+      const box = document.getElementById('readmitEmptyBeds');
+      box.innerHTML = '';
+      const empties = state.beds.filter(b => !b.isArchived && !(b.patientName || '').trim());
+      if (!empties.length) {
+        box.innerHTML = '<span class="text-sm text-slate-400">Nenhum leito vazio.</span>';
+      }
+      empties.forEach(b => {
+        const btn = document.createElement('button');
+        btn.className = 'text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-3 hover:bg-sky-50';
+        btn.textContent = b.bedNumber || '—';
+        btn.addEventListener('click', () => doReadmit(prevBed, b, null));
+        box.appendChild(btn);
+      });
+      const input = document.getElementById('readmitBedNumberInput');
+      input.value = '';
+      document.getElementById('readmitError').classList.add('hidden');
+      showModal('readmitModal');
+      if (!empties.length) input.focus();
+    }
+
+    function doReadmit(prevBed, targetBed, newNumber) {
+      const err = document.getElementById('readmitError');
+      if (!targetBed) {
+        const v = (newNumber || '').trim();
+        if (!v) { err.textContent = 'Escolha um leito vazio ou digite um número.'; err.classList.remove('hidden'); return; }
+        const same = state.beds.find(b => !b.isArchived && (b.bedNumber || '').trim().toLowerCase() === v.toLowerCase());
+        if (same && (same.patientName || '').trim()) {
+          err.textContent = `O leito ${v} já está ocupado por ${same.patientName}.`; err.classList.remove('hidden'); return;
+        }
+        if (same) targetBed = same; // número de leito vazio existente: usa ele
+        newNumber = v;
+      }
+      const { newBed, previousPatch } = PainelCore.buildReadmission(prevBed, targetBed ? targetBed.bedNumber : newNumber, todayISO());
+      prevBed.personId = previousPatch.personId;
+      let idx;
+      if (targetBed) { idx = state.beds.indexOf(targetBed); state.beds[idx] = newBed; }
+      else { state.beds.push(newBed); idx = state.beds.length - 1; }
+      saveData(state);
+      hideModal('readmitModal');
+      readmitSource = null;
+      renderScreenA();
+      setTimeout(() => openPatientDetails(idx), 100);
+    }
+
+    document.getElementById('cancelReadmitBtn').addEventListener('click', () => { hideModal('readmitModal'); readmitSource = null; });
+    document.getElementById('saveReadmitBtn').addEventListener('click', () => {
+      if (readmitSource) doReadmit(readmitSource, null, document.getElementById('readmitBedNumberInput').value);
+    });
+    document.getElementById('readmitBedNumberInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && readmitSource) doReadmit(readmitSource, null, e.target.value);
+    });
 
     // --- Inicialização e Eventos Globais ---
     
