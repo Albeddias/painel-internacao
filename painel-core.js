@@ -284,7 +284,7 @@
       // tinha o leito, move-o para o registro local preservando o nome completo.
       if (p.status === 'nuvem') {
         if (bed) {
-          state.cloudArchived[p.id] = { nome: bed.patientName || '', iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '', personId: p.person_id || null };
+          state.cloudArchived[p.id] = { nome: bed.patientName || '', iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '', personId: p.person_id || bed.personId || null };
           state.beds = state.beds.filter(function (b) { return b.patientId !== p.id; });
         } else if (!state.cloudArchived[p.id]) {
           state.cloudArchived[p.id] = { nome: '', iniciais: p.initials || '', leito: p.bed_number || '', personId: p.person_id || null };
@@ -304,7 +304,15 @@
       if (!bed) {
         // Novo aqui (criado no banco, ou restaurado da nuvem): adoção integral.
         const reg = state.cloudArchived[p.id];
-        bed = migrateBed({ patientName: (reg && reg.nome) || p.initials || '?', bedNumber: p.bed_number || '' });
+        // Reinternação feita noutro aparelho: o nome completo só existe localmente —
+        // empresta de um leito da mesma pessoa (personId, ou patientId que virou personId).
+        const kin = p.person_id && (state.beds || []).find(function (b) {
+          return b.patientName && (b.personId === p.person_id || b.patientId === p.person_id);
+        });
+        bed = migrateBed({
+          patientName: (reg && reg.nome) || (kin && kin.patientName) || p.initials || '?',
+          bedNumber: p.bed_number || '',
+        });
         bed.patientId = p.id;
         state.beds.push(bed);
         delete state.cloudArchived[p.id];
@@ -787,6 +795,10 @@
       const ordinal = all.length - all.indexOf(latest); // posição cronológica (1 = primeira internação)
       out.push({ latest: latest.bed, latestIndex: latest.index, members: members, count: members.length, ordinal: ordinal });
     });
+    // Cada grupo aparece onde sua internação arquivada mais recente está em state.beds
+    // (convenção da lista: "Dar alta" acrescenta ao final) — não onde a pessoa apareceu
+    // pela primeira vez, senão um paciente readmitido e recém-arquivado voltaria para trás.
+    out.sort(function (a, b) { return a.latestIndex - b.latestIndex; });
     return matches ? out.filter(function (g) { return g.members.some(function (m) { return matches(m.bed); }); }) : out;
   }
 

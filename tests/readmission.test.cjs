@@ -136,6 +136,60 @@ test('mergeStates: paciente nuvem registra personId em cloudArchived', () => {
   assert.strictEqual(state.cloudArchived['p-cloud'].personId, 'per-1');
 });
 
+test('mergeStates: nuvem sem person_id no banco preserva o personId que o aparelho já tinha', () => {
+  const bed = mkBed({ patientId: 'p-1', personId: 'per-1', patientName: 'Fulano de Tal' });
+  const state = PainelCore.migrateState({ beds: [bed] }, '2026-09-10');
+  state.syncedPatientIds = ['p-1'];
+  state.cloudArchived = {};
+  PainelCore.mergeStates(state, {
+    patients: [{ id: 'p-1', bed_number: '1001', initials: 'FT', status: 'nuvem', person_id: null }],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [], prefs: [],
+  });
+  assert.strictEqual(state.cloudArchived['p-1'].personId, 'per-1');
+  assert.strictEqual(state.cloudArchived['p-1'].nome, 'Fulano de Tal');
+  assert.ok(!state.beds.some(function (b) { return b.patientId === 'p-1'; }), 'leito removido de state.beds');
+});
+
+test('mergeStates: nuvem já conhecida ganha personId do banco sem perder o nome guardado', () => {
+  const state = PainelCore.migrateState({ beds: [] }, '2026-09-10');
+  state.cloudArchived = { 'p-2': { nome: 'Ciclana Souza', iniciais: 'CS', leito: '2002', personId: null } };
+  PainelCore.mergeStates(state, {
+    patients: [{ id: 'p-2', bed_number: '2002', initials: 'CS', status: 'nuvem', person_id: 'per-2' }],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [], prefs: [],
+  });
+  assert.strictEqual(state.cloudArchived['p-2'].personId, 'per-2');
+  assert.strictEqual(state.cloudArchived['p-2'].nome, 'Ciclana Souza');
+});
+
+test('mergeStates: reinternação feita noutro aparelho herda o nome de um leito da mesma pessoa', () => {
+  const bed = altaBed({ problems: [], trackers: [], exams: [], rawTexts: [], condutas: [], generatedDocs: [] });
+  const state = PainelCore.migrateState({ beds: [bed] }, '2026-09-10');
+  state.syncedPatientIds = ['p-old'];
+  state.syncBase = PainelCore.buildSyncBase(state);
+  const pulled = pulledFor(bed, { person_id: 'p-old' });
+  pulled.patients.push({
+    id: 'p-new', person_id: 'p-old', status: 'internado', initials: 'MSD', bed_number: '2004-B',
+    age: 32, admit_date: '2026-09-10', hpp: '', anamnese_inicial: '', discharge_forecast: null, discharge_date: null,
+  });
+  pulled.notes.push({ patient_id: 'p-new', texto: '' });
+  PainelCore.mergeStates(state, pulled);
+  const newBed = state.beds.find(function (b) { return b.patientId === 'p-new'; });
+  assert.ok(newBed, 'novo leito adotado');
+  assert.strictEqual(newBed.patientName, 'Mariana Silva Dias', 'nome emprestado do leito antigo da mesma pessoa');
+  assert.strictEqual(newBed.personId, 'p-old');
+});
+
+test('mergeStates: adoção sem leito local da mesma pessoa cai para as iniciais (comportamento antigo preservado)', () => {
+  const state = PainelCore.migrateState({ beds: [] }, '2026-09-10');
+  state.cloudArchived = {};
+  PainelCore.mergeStates(state, {
+    patients: [{ id: 'p-new', person_id: 'p-unknown', status: 'internado', initials: 'MSD', bed_number: '2004-B' }],
+    problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], generated_docs: [], prefs: [],
+  });
+  const newBed = state.beds.find(function (b) { return b.patientId === 'p-new'; });
+  assert.strictEqual(newBed.patientName, 'MSD');
+});
+
 // ---- Task 4: buildReadmission ----------------------------------------------
 
 test('buildReadmission: copia identidade, HPP, exames, trackers e só problemas crônicos', () => {
@@ -204,6 +258,15 @@ test('buildReadmission: mantém personId existente e não muta o registro anteri
   assert.strictEqual(prev.exams[0].results[0].value, '9.5');
 });
 
+test('buildReadmission: sem personId nem patientId (leito nomeado e arquivado na mesma sessão), gera personId novo', () => {
+  const prev = altaBed({ patientId: null, personId: null });
+  const { newBed, previousPatch } = PainelCore.buildReadmission(prev, '2004-B', '2026-09-10');
+  assert.strictEqual(typeof previousPatch.personId, 'string');
+  assert.ok(previousPatch.personId.length > 0, 'personId não vazio');
+  assert.strictEqual(newBed.personId, previousPatch.personId);
+  assert.notStrictEqual(newBed.patientId, previousPatch.personId, 'patientId do novo leito é outro uuid');
+});
+
 // ---- Task 5: agrupamento ----------------------------------------------------
 
 function mkBed(over) {
@@ -235,14 +298,25 @@ test('groupArchived: uma linha por pessoa (mais recente arquivada), sem personId
   ];
   const g = PainelCore.groupArchived(beds);
   assert.strictEqual(g.length, 2);
-  assert.strictEqual(g[0].latest.patientId, 'b');
-  assert.strictEqual(g[0].latestIndex, 2);
-  assert.strictEqual(g[0].count, 2, 'só as arquivadas');
-  assert.strictEqual(g[0].ordinal, 2, 'b é a 2ª internação da pessoa (d é a 3ª, ativa)');
-  assert.deepStrictEqual(g[0].members.map(m => m.bed.patientId), ['b', 'a']);
-  assert.strictEqual(g[1].latest.patientId, 's');
-  assert.strictEqual(g[1].count, 1);
-  assert.strictEqual(g[1].ordinal, 1);
+  // Ordem por latestIndex ascendente: 's' (idx1) vem antes do grupo de 'P' (latest 'b', idx2).
+  assert.strictEqual(g[0].latest.patientId, 's');
+  assert.strictEqual(g[0].count, 1);
+  assert.strictEqual(g[0].ordinal, 1);
+  assert.strictEqual(g[1].latest.patientId, 'b');
+  assert.strictEqual(g[1].latestIndex, 2);
+  assert.strictEqual(g[1].count, 2, 'só as arquivadas');
+  assert.strictEqual(g[1].ordinal, 2, 'b é a 2ª internação da pessoa (d é a 3ª, ativa)');
+  assert.deepStrictEqual(g[1].members.map(m => m.bed.patientId), ['b', 'a']);
+});
+
+test('groupArchived: grupo aparece na posição da internação arquivada mais recente, não da mais antiga', () => {
+  const beds = [
+    mkBed({ patientId: 'a', personId: 'P', admitDate: '2026-01-01', isArchived: true, archiveReason: 'alta', dischargedAt: '2026-01-10' }), // idx0
+    mkBed({ patientId: 's', admitDate: '2026-02-01', isArchived: true, archiveReason: 'arquivado' }), // idx1
+    mkBed({ patientId: 'b', personId: 'P', admitDate: '2026-03-01', isArchived: true, archiveReason: 'alta', dischargedAt: '2026-03-09' }), // idx2, readmissão mais recente de P
+  ];
+  const g = PainelCore.groupArchived(beds);
+  assert.deepStrictEqual(g.map(x => x.latest.patientId), ['s', 'b'], 'ordenado por latestIndex, não pelo primeiro encontro');
 });
 
 test('groupArchived: filtro bate em qualquer internação do grupo', () => {
