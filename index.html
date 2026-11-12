@@ -551,6 +551,9 @@
       <!-- Faixa: este registro é uma internação anterior de uma pessoa com outras internações -->
       <div class="prev-admission-banner hidden bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium rounded-lg px-3 py-2"></div>
 
+      <!-- Faixa: alergias registradas (sempre visível quando o campo não está vazio) -->
+      <div class="alergias-banner hidden bg-red-50 border-2 border-red-300 text-red-800 text-sm font-semibold rounded-lg px-3 py-2 whitespace-pre-wrap"></div>
+
       <!-- Cabeçalho (Nome, Idade, Admissão) -->
       <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
         <!-- Em tela estreita os botões ficam numa linha própria ACIMA do leito/nome; em tela larga, à direita -->
@@ -622,6 +625,24 @@
         </button>
         <div class="collapsible-content p-4 pt-0">
           <div class="prev-admissions-list divide-y divide-slate-100"></div>
+        </div>
+      </div>
+
+      <!-- Seção: Alergias e Medicações Prévias (painel_patients.alergias / medicacoes_previas) -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Alergias e Medicações Prévias <span class="alergias-flag hidden text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5 ml-1">ALERGIA</span></span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content alergias-content p-4 pt-0 space-y-3">
+          <div>
+            <label class="text-sm font-semibold text-slate-900 mb-1 block">Alergias</label>
+            <textarea class="input-alergias-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Alergias e reações (vazio = nenhuma registrada)..." rows="2"></textarea>
+          </div>
+          <div>
+            <label class="text-sm font-semibold text-slate-900 mb-1 block">Medicações prévias</label>
+            <textarea class="input-medprev-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Medicações em uso antes da internação..." rows="3"></textarea>
+          </div>
         </div>
       </div>
 
@@ -708,6 +729,17 @@
           <div class="condutas conduta-list space-y-1">
             <!-- Condutas são renderizadas aqui -->
           </div>
+        </div>
+      </div>
+
+      <!-- Seção: Evolução Tasy (painel_evolucoes: uma linha por dia; renderEvolucaoTasy) -->
+      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Evolução Tasy <span class="evolucao-count text-sm font-medium text-slate-400"></span></span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="evolucao-tasy space-y-3"></div>
         </div>
       </div>
 
@@ -1731,6 +1763,9 @@
       updateLabsLastLine(art, b);
       setupCollapsibleSection(art, '.input-notes-inline', 'isNotesMinimized', b, (el) => autoResizeTextarea(el));
       setupCollapsibleSection(art, '.conduta-list', 'isCondutaMinimized', b, (el) => renderCondutaList(el, b, idx));
+      setupCollapsibleSection(art, '.alergias-content', 'isAlergiasMinimized', b, (el) => el.querySelectorAll('textarea').forEach(autoResizeTextarea));
+      setupCollapsibleSection(art, '.evolucao-tasy', 'isEvolucaoTasyMinimized', b, (el) => renderEvolucaoTasy(el, b));
+      updateEvolucaoCount(art, b);
       setupCollapsibleSection(art, '.rawtext-list', 'isRawTextsMinimized', b, (el) => renderRawTextList(el, b, idx));
       setupCollapsibleSection(art, '.gendoc-list', 'isDocsMinimized', b, (el) => renderGeneratedDocsList(el, b, idx));
 
@@ -1750,6 +1785,24 @@
         saveData(state);
         autoResizeTextarea(e.target);
       });
+
+      // Alergias e medicações prévias: texto puro; alergia preenchida ganha destaque.
+      const alergiasInput = art.querySelector('.input-alergias-inline');
+      alergiasInput.value = b.alergias || '';
+      alergiasInput.addEventListener('input', (e) => {
+        b.alergias = e.target.value;
+        saveData(state);
+        autoResizeTextarea(e.target);
+        updateAlergiasHighlight(art, b);
+      });
+      const medPrevInput = art.querySelector('.input-medprev-inline');
+      medPrevInput.value = b.medicacoesPrevias || '';
+      medPrevInput.addEventListener('input', (e) => {
+        b.medicacoesPrevias = e.target.value;
+        saveData(state);
+        autoResizeTextarea(e.target);
+      });
+      updateAlergiasHighlight(art, b);
 
       const dischargeInput = art.querySelector('.inline-discharge-forecast');
       dischargeInput.value = b.dischargeForecast || '';
@@ -2165,6 +2218,135 @@
       }
     }
 
+    // Alergia registrada: faixa vermelha no topo do cartão, etiqueta no título da seção
+    // e campo em vermelho. Campo vazio (ou só espaços) = sem destaque.
+    function updateAlergiasHighlight(article, bed) {
+      const text = String(bed.alergias || '').trim();
+      const has = text !== '';
+      const banner = article.querySelector('.alergias-banner');
+      banner.textContent = has ? `⚠ Alergias: ${text}` : '';
+      banner.classList.toggle('hidden', !has);
+      article.querySelector('.alergias-flag').classList.toggle('hidden', !has);
+      const input = article.querySelector('.input-alergias-inline');
+      input.classList.toggle('border-red-400', has);
+      input.classList.toggle('bg-red-50', has);
+      input.classList.toggle('border-slate-300', !has);
+      input.classList.toggle('bg-slate-50', !has);
+    }
+
+    // --- Evolução Tasy (painel_evolucoes): uma linha por dia, nove campos ---
+    const EVOLUCAO_LABEL = {
+      problemas: 'Problemas',
+      historia_internacao: 'História da internação atual',
+      evolucao_atual: 'Evolução médica do quadro atual',
+      exames_lab: 'Exames laboratoriais',
+      culturas: 'Resultado de culturas',
+      exames_imagem: 'Exames de imagem',
+      atualizacao_problemas: 'Atualização da lista de problemas',
+      metas: 'Metas',
+      acoes: 'Ações',
+    };
+    // Data aberta em cada paciente (só na memória; ao reabrir o app volta à mais recente).
+    const evolucaoSelectedDate = {};
+
+    function updateEvolucaoCount(article, bed) {
+      const el = article.querySelector('.evolucao-count');
+      if (!el) return;
+      const n = (bed.evolucoes || []).length;
+      el.textContent = n > 0 ? `(${n})` : '';
+    }
+
+    function renderEvolucaoTasy(container, bed) {
+      container.innerHTML = '';
+      const rows = (bed.evolucoes || []).slice().sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+      const selKey = bed.patientId || '';
+      let selected = evolucaoSelectedDate[selKey];
+      if (!rows.some(r => r.data === selected)) selected = rows.length ? rows[0].data : null;
+      evolucaoSelectedDate[selKey] = selected;
+
+      const bar = document.createElement('div');
+      bar.className = 'flex flex-wrap gap-2 items-center';
+      if (rows.length) {
+        const sel = document.createElement('select');
+        sel.className = 'evolucao-date text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1 min-w-0';
+        sel.title = 'Data da evolução';
+        rows.forEach((r) => {
+          const opt = document.createElement('option');
+          opt.value = r.data;
+          opt.textContent = formatDateFull(r.data) + (r.data === todayISO() ? ' (hoje)' : '');
+          sel.appendChild(opt);
+        });
+        sel.value = selected;
+        sel.addEventListener('change', () => {
+          evolucaoSelectedDate[selKey] = sel.value;
+          renderEvolucaoTasy(container, bed);
+        });
+        bar.appendChild(sel);
+      }
+      const newBtn = document.createElement('button');
+      newBtn.className = 'new-evolucao-btn text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-3 px-4 hover:bg-sky-100 transition-all print:hidden';
+      newBtn.textContent = 'Nova evolução de hoje';
+      newBtn.title = 'Cria a evolução de hoje a partir da anterior (se já existir, apenas abre)';
+      newBtn.addEventListener('click', () => {
+        const row = PainelCore.newEvolucaoForToday(bed, todayISO());
+        evolucaoSelectedDate[selKey] = row.data;
+        saveData(state);
+        renderEvolucaoTasy(container, bed);
+        const article = container.closest('article');
+        if (article) updateEvolucaoCount(article, bed);
+      });
+      bar.appendChild(newBtn);
+      container.appendChild(bar);
+
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'text-sm text-slate-500 px-1';
+        empty.textContent = 'Nenhuma evolução. Peça à IA para preparar a evolução do dia e toque em Sincronizar, ou crie a de hoje.';
+        container.appendChild(empty);
+        return;
+      }
+
+      // A linha é procurada pela data a cada uso: uma sincronização troca os objetos do leito.
+      const currentRow = () => (bed.evolucoes || []).find(r => r.data === selected);
+      const row = currentRow();
+      PainelCore.EVOLUCAO_FIELDS.forEach((field) => {
+        const wrap = document.createElement('div');
+        const head = document.createElement('div');
+        head.className = 'flex justify-between items-center gap-2 mb-1';
+        const label = document.createElement('label');
+        label.className = 'text-sm font-semibold text-slate-900';
+        label.textContent = EVOLUCAO_LABEL[field];
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-evolucao-field flex-shrink-0 text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden disabled:opacity-40 disabled:cursor-not-allowed';
+        copyBtn.textContent = 'Copiar';
+        const ta = document.createElement('textarea');
+        ta.className = 'w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden';
+        ta.rows = 2;
+        ta.value = row[field] || '';
+        copyBtn.disabled = ta.value.trim() === '';
+        ta.addEventListener('input', () => {
+          const r = currentRow();
+          if (!r) return;
+          r[field] = ta.value;
+          saveData(state);
+          autoResizeTextarea(ta);
+          copyBtn.disabled = ta.value.trim() === '';
+        });
+        // Copia só o texto do campo (sem rótulo); [NOME] vira o nome completo, como nos documentos.
+        copyBtn.addEventListener('click', async () => {
+          const ok = await copyTextToClipboard(PainelCore.fillPatientName(ta.value, bed.patientName));
+          copyBtn.textContent = ok ? 'Copiado ✓' : 'Falhou';
+          setTimeout(() => { copyBtn.textContent = 'Copiar'; }, 2000);
+        });
+        head.appendChild(label);
+        head.appendChild(copyBtn);
+        wrap.appendChild(head);
+        wrap.appendChild(ta);
+        container.appendChild(wrap);
+        autoResizeTextarea(ta);
+      });
+    }
+
     const RAWTEXT_LABEL = { evolucao: 'Evolução', prescricao: 'Prescrição', admissao: 'Admissão' };
 
     function renderRawTextList(listElement, bed, bedIdx) {
@@ -2221,6 +2403,9 @@
       }
     }
 
+    // Só rótulos do histórico (o app não lista tipos de documento para gerar). 'receituario'
+    // foi aposentado, mas os já gerados continuam aparecendo; 'evolucao_tasy' é guia interno
+    // da IA em painel_doc_templates e nunca chega aqui.
     const GENDOC_LABEL = { sumario_alta: 'Sumário de Alta', receituario: 'Receituário', laudo: 'Laudo' };
 
     async function copyTextToClipboard(text) {
@@ -2237,6 +2422,39 @@
         document.body.removeChild(ta);
         return ok;
       }
+    }
+
+    // Um bloco de documento: título + "Copiar" (só o conteúdo, sem a linha de título).
+    // O bloco PARA CONFERIR é só para leitura: visual de aviso e sem botão.
+    function renderDocBlock(blk) {
+      const box = document.createElement('div');
+      box.className = blk.conferir
+        ? 'doc-block mt-2 p-2 rounded-md border-2 border-dashed border-amber-400 bg-amber-50'
+        : 'doc-block mt-2 p-2 rounded-md border border-slate-200 bg-white';
+      const head = document.createElement('div');
+      head.className = 'flex justify-between items-center gap-2';
+      const title = document.createElement('span');
+      title.className = 'text-xs font-bold uppercase tracking-wide ' + (blk.conferir ? 'text-amber-800' : 'text-slate-500');
+      title.textContent = blk.title;
+      head.appendChild(title);
+      if (!blk.conferir) {
+        const btn = document.createElement('button');
+        btn.className = 'copy-doc-block flex-shrink-0 text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden disabled:opacity-40 disabled:cursor-not-allowed';
+        btn.textContent = 'Copiar';
+        btn.disabled = blk.content.trim() === '';
+        btn.addEventListener('click', async () => {
+          const ok = await copyTextToClipboard(blk.content);
+          btn.textContent = ok ? 'Copiado ✓' : 'Falhou';
+          setTimeout(() => { btn.textContent = 'Copiar'; }, 2000);
+        });
+        head.appendChild(btn);
+      }
+      const body = document.createElement('p');
+      body.className = 'whitespace-pre-wrap mt-1 text-xs ' + (blk.conferir ? 'text-amber-900' : 'text-slate-600');
+      body.textContent = blk.content;
+      box.appendChild(head);
+      box.appendChild(body);
+      return box;
     }
 
     function renderGeneratedDocsList(listElement, bed, bedIdx) {
@@ -2256,10 +2474,20 @@
           <button class="copy-gendoc text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden">Copiar</button>
         `;
         summary.querySelector('.gendoc-label').textContent = `${GENDOC_LABEL[doc.tipo] || doc.tipo} ${createdStr}`.trim();
+        const fullText = PainelCore.fillPatientName(doc.conteudo || '', bed.patientName);
+        // Sumário de alta em blocos ("=== CAMPO ==="): um "Copiar" por bloco, sem o geral
+        // (que levaria junto o bloco PARA CONFERIR). Sem marcadores: exibição de sempre.
+        const blocks = doc.tipo === 'sumario_alta' ? PainelCore.parseDocBlocks(fullText) : null;
+        det.appendChild(summary);
+        if (blocks) {
+          summary.querySelector('.copy-gendoc').remove();
+          blocks.forEach((blk) => det.appendChild(renderDocBlock(blk)));
+          listElement.appendChild(det);
+          return;
+        }
         const body = document.createElement('p');
         body.className = 'text-slate-600 whitespace-pre-wrap mt-2 text-xs';
-        body.textContent = PainelCore.fillPatientName(doc.conteudo || '', bed.patientName);
-        det.appendChild(summary);
+        body.textContent = fullText;
         det.appendChild(body);
         summary.querySelector('.copy-gendoc').addEventListener('click', async (e) => {
           e.preventDefault();
@@ -3319,6 +3547,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1aHltdGlrb21ta291cHluaGtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxOTQwNjEsImV4cCI6MjA4NDc3MDA2MX0.8yCEVzQ6KLBCgRhzDNgV9ar4l_UO1AakNS1VTgrVCLQ';
     const TABLE_PREFIX = 'painel_'; // tabelas convivem com outro app no mesmo projeto
     const SYNC_CHILD_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'exams', 'condutas', 'raw_texts'];
+    // Tudo o que um sync baixa. 'evolucoes' entra na mescla como as filhas, mas é gravada
+    // por upsert em (patient_id, data) — fora de SYNC_CHILD_TABLES, que é delete+insert.
+    const SYNC_PULL_TABLES = ['patients', ...SYNC_CHILD_TABLES, 'evolucoes', 'notes', 'generated_docs', 'prefs'];
     let sbClient = null;
 
     function setSyncStatus(msg, isError = false) {
@@ -3430,7 +3661,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       let merged = false;
       try {
         const sb = await getSupabaseClient();
-        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs', 'prefs'];
+        const tables = SYNC_PULL_TABLES;
         const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
         const pulled = {};
         tables.forEach((t, i) => {
@@ -3448,7 +3679,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         const delIds = payload.deletePatientIds || [];
         let res;
         if (delIds.length) {
-          const delResults = await Promise.all([...SYNC_CHILD_TABLES, 'notes', 'generated_docs']
+          const delResults = await Promise.all([...SYNC_CHILD_TABLES, 'evolucoes', 'notes', 'generated_docs']
             .map(t => sb.from(TABLE_PREFIX + t).delete().in('patient_id', delIds)));
           for (const r of delResults) { if (r.error) throw r.error; }
           res = await sb.from(TABLE_PREFIX + 'patients').delete().in('id', delIds);
@@ -3472,6 +3703,13 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             }),
             (async () => {
               const r = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
+              if (r.error) throw r.error;
+            })(),
+            // Evoluções: upsert na chave única (patient_id, data) — nunca insert puro,
+            // para o mesmo dia jamais duplicar. Nenhum delete nesta tabela.
+            (async () => {
+              if (!payload.evolucoes.length) return;
+              const r = await sb.from(TABLE_PREFIX + 'evolucoes').upsert(payload.evolucoes, { onConflict: 'patient_id,data' });
               if (r.error) throw r.error;
             })(),
           ]);
@@ -3569,7 +3807,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         const sb = await getSupabaseClient();
         // Baixa TUDO primeiro (selects em paralelo); só zeramos o local depois que o servidor
         // respondeu com sucesso, para nunca deixar o app vazio se estiver offline / a conexão cair.
-        const tables = ['patients', ...SYNC_CHILD_TABLES, 'notes', 'generated_docs', 'prefs'];
+        const tables = SYNC_PULL_TABLES;
         const results = await Promise.all(tables.map(t => sb.from(TABLE_PREFIX + t).select('*')));
         const pulled = {};
         tables.forEach((t, i) => {

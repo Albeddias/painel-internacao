@@ -81,11 +81,39 @@
     return hash8(kind === 'procedimento' ? base + SEP + 'procedimento' : base);
   }
 
+  // ---- Evolução Tasy (painel_evolucoes): uma linha por paciente por dia --------
+  // Os nove campos, na ordem do Tasy. O leito guarda as linhas com os nomes das
+  // colunas do banco: { id, data, problemas, historia_internacao, ... }.
+  const EVOLUCAO_FIELDS = ['problemas', 'historia_internacao', 'evolucao_atual', 'exames_lab', 'culturas',
+    'exames_imagem', 'atualizacao_problemas', 'metas', 'acoes'];
+  // Cumulativos: seguem de um dia para o outro. Os demais são diários (nascem vazios).
+  const EVOLUCAO_CUMULATIVE = ['problemas', 'historia_internacao', 'exames_lab', 'culturas', 'exames_imagem'];
+
+  function evolucaoRow(r) {
+    const row = { id: r.id, data: r.data || null };
+    EVOLUCAO_FIELDS.forEach(function (f) { row[f] = r[f] || ''; });
+    return row;
+  }
+  function evolucaoHash(r) {
+    return hash8(j.apply(null, EVOLUCAO_FIELDS.map(function (f) { return r[f]; })));
+  }
+
+  // Campos de texto do paciente com três-vias POR CAMPO (hash próprio na foto,
+  // fora do hash geral dos scalars): assim as fotos tiradas antes de as colunas
+  // existirem continuam válidas e o vazio de um aparelho recém-atualizado nunca
+  // apaga o que a IA já gravou no banco.
+  const PATIENT_TEXT_FIELDS = [
+    { local: 'alergias', col: 'alergias' },
+    { local: 'medicacoesPrevias', col: 'medicacoes_previas' },
+  ];
+
   // Linhas do leito no formato do banco (sem patient_id), com hash de conteúdo e
   // posição original (ord). A identidade dos labs é a própria chave de conteúdo
   // data|nome|valor: editar um valor = deletar a linha antiga + criar uma nova.
+  // A identidade de uma evolução é a DATA (o banco tem UNIQUE (patient_id, data)):
+  // o mesmo dia criado no aparelho e no banco é a mesma linha, nunca duas.
   function localRowSets(bed) {
-    const out = { problems: [], antibiotics: [], cultures: [], devices: [], condutas: [], raw_texts: [], examsImage: [], examsLab: [] };
+    const out = { problems: [], antibiotics: [], cultures: [], devices: [], condutas: [], raw_texts: [], examsImage: [], examsLab: [], evolucoes: [] };
     (bed.problems || []).forEach(function (p, i) {
       const row = { id: p.id, descricao: p.descricao || '', status: p.status || 'ativo', plano: p.plano || '' };
       out.problems.push({ key: row.id, hash: hash8(j(row.descricao, row.status, row.plano)), ord: i, row: row });
@@ -121,13 +149,17 @@
       const row = { id: r.id, tipo: r.tipo || 'evolucao', data: r.data || null, texto: r.texto || '' };
       out.raw_texts.push({ key: row.id, hash: hash8(j(row.tipo, row.data, row.texto)), ord: i, row: row });
     });
+    (bed.evolucoes || []).forEach(function (e, i) {
+      const row = evolucaoRow(e);
+      out.evolucoes.push({ key: String(row.data), hash: evolucaoHash(row), ord: i, row: row });
+    });
     return out;
   }
 
   // Mesmos conjuntos, a partir das linhas baixadas do banco de UM paciente.
-  // rows = { problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], raw_texts: [] }
+  // rows = { problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], raw_texts: [], evolucoes: [] }
   function pulledRowSets(rows) {
-    const out = { problems: [], antibiotics: [], cultures: [], devices: [], condutas: [], raw_texts: [], examsImage: [], examsLab: [] };
+    const out = { problems: [], antibiotics: [], cultures: [], devices: [], condutas: [], raw_texts: [], examsImage: [], examsLab: [], evolucoes: [] };
     (rows.problems || []).forEach(function (r) {
       out.problems.push({ key: r.id, hash: hash8(j(r.descricao, r.status, r.plano)), ord: r.ordem, row: r });
     });
@@ -150,6 +182,9 @@
     (rows.raw_texts || []).forEach(function (r, i) {
       out.raw_texts.push({ key: r.id, hash: hash8(j(r.tipo, r.data, r.texto)), ord: i, row: r });
     });
+    (rows.evolucoes || []).forEach(function (r, i) {
+      out.evolucoes.push({ key: String(r.data), hash: evolucaoHash(r), ord: i, row: r });
+    });
     return out;
   }
 
@@ -162,7 +197,7 @@
       bed.personId, bed.dischargedAt));
   }
 
-  const ROW_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'condutas', 'raw_texts', 'examsImage', 'examsLab'];
+  const ROW_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'condutas', 'raw_texts', 'examsImage', 'examsLab', 'evolucoes'];
 
   // A "foto" da última sincronização: chaves + hashes de tudo que foi gravado.
   // A chave reservada '#prefs' (nunca colide com uuid de paciente) fotografa as
@@ -177,7 +212,9 @@
         rows[t] = {};
         sets[t].forEach(function (e) { rows[t][e.key] = e.hash; });
       });
-      base[bed.patientId] = { rows: rows, scalars: localScalarsHash(bed) };
+      const fields = {};
+      PATIENT_TEXT_FIELDS.forEach(function (f) { fields[f.col] = hash8(bed[f.local]); });
+      base[bed.patientId] = { rows: rows, scalars: localScalarsHash(bed), fields: fields };
     });
     base['#prefs'] = { lab_ranges: hash8(state.labRangesText == null ? '' : state.labRangesText) };
     return base;
@@ -219,7 +256,7 @@
   // aparelho e a próxima sincronização vê duas linhas distintas (duplicata).
   function ensureRowIds(state) {
     (state.beds || []).forEach(function (bed) {
-      ['problems', 'condutas', 'trackers', 'exams', 'rawTexts'].forEach(function (k) {
+      ['problems', 'condutas', 'trackers', 'exams', 'rawTexts', 'evolucoes'].forEach(function (k) {
         (bed[k] || []).forEach(function (r) { if (r && !r.id) r.id = uuid(); });
       });
     });
@@ -238,7 +275,7 @@
       cultures = byPatient(pulled.cultures), devices = byPatient(pulled.devices),
       exams = byPatient(pulled.exams), condutas = byPatient(pulled.condutas),
       notes = byPatient(pulled.notes), rawTexts = byPatient(pulled.raw_texts),
-      docs = byPatient(pulled.generated_docs);
+      docs = byPatient(pulled.generated_docs), evolucoes = byPatient(pulled.evolucoes);
 
     state.syncBase = state.syncBase || {};
     state.cloudArchived = state.cloudArchived || {};
@@ -298,6 +335,7 @@
         problems: problems[p.id] || [], antibiotics: atbs[p.id] || [], cultures: cultures[p.id] || [],
         devices: devices[p.id] || [], exams: exams[p.id] || [], condutas: condutas[p.id] || [],
         raw_texts: rawTexts[p.id] || [], generated_docs: docs[p.id] || [],
+        evolucoes: evolucoes[p.id] || [],
       };
       const remoteNote = (notes[p.id] && notes[p.id][0] && notes[p.id][0].texto) || '';
 
@@ -317,6 +355,7 @@
         state.beds.push(bed);
         delete state.cloudArchived[p.id];
         applyPatientScalars(bed, p, remoteNote);
+        applyPatientTextFields(bed, p);
         applyRowsToBed(bed, remoteRows);
         return;
       }
@@ -335,6 +374,23 @@
       // tem e o aparelho não, adota sempre (senão o push apagaria o vínculo com null).
       if (!bed.personId && p.person_id) bed.personId = p.person_id;
 
+      // alergias / medicações prévias: três-vias por campo. Sem foto do campo (foto
+      // anterior às colunas, ou nenhuma), só o vazio local adota o banco.
+      PATIENT_TEXT_FIELDS.forEach(function (f) {
+        const localVal = bed[f.local] || '';
+        const untouched = (base && base.fields)
+          ? hash8(localVal) === base.fields[f.col]
+          : localVal === '';
+        if (untouched) bed[f.local] = p[f.col] || '';
+      });
+
+      // Evoluções: mesma regra das outras linhas, com a data como chave. Se o banco
+      // já tem a linha do dia, o id dele prevalece (o conteúdo é o do vencedor).
+      const mergedEvolucoes = mergeRowSets(local.evolucoes, remote.evolucoes, baseRows('evolucoes'));
+      const remoteEvoId = {};
+      remote.evolucoes.forEach(function (e) { remoteEvoId[e.key] = e.row.id; });
+      mergedEvolucoes.forEach(function (r) { if (remoteEvoId[String(r.data)]) r.id = remoteEvoId[String(r.data)]; });
+
       applyRowsToBed(bed, {
         problems: mergeRowSets(local.problems, remote.problems, baseRows('problems')),
         antibiotics: mergeRowSets(local.antibiotics, remote.antibiotics, baseRows('antibiotics'), true),
@@ -345,6 +401,7 @@
         exams: mergeRowSets(local.examsLab, remote.examsLab, baseRows('examsLab'))
           .concat(mergeRowSets(local.examsImage, remote.examsImage, baseRows('examsImage'))),
         generated_docs: remoteRows.generated_docs,
+        evolucoes: mergedEvolucoes,
       });
     });
 
@@ -688,6 +745,7 @@
       bedNumber: b.bedNumber || '', patientName: b.patientName || '',
       age: b.age === 0 ? 0 : (b.age || ''), admitDate: b.admitDate || '',
       hpp: b.hpp || '', anamneseInicial: b.anamneseInicial || '',
+      alergias: b.alergias || '', medicacoesPrevias: b.medicacoesPrevias || '',
       problems: (b.problems && b.problems.length > 0)
         ? b.problems
         : (b.diagnoses || []).map(function (d, i) {
@@ -702,6 +760,7 @@
       exams: (b.exams || []).filter(Boolean).map(function (e) { return Object.assign({}, e, { id: e.id || uuid() }); }),
       rawTexts: (b.rawTexts || []).filter(Boolean).map(function (r) { return Object.assign({}, r, { id: r.id || uuid() }); }),
       generatedDocs: (b.generatedDocs || []).filter(Boolean).slice(),
+      evolucoes: (b.evolucoes || []).filter(Boolean).map(function (e) { return Object.assign({}, e, { id: e.id || uuid() }); }),
       externalDoctor: b.externalDoctor || { active: false, name: '' },
       checks: b.checks || { ev: false, p: false, ex: false, tev: false },
       isVisited: !!b.isVisited, reminderDate: b.reminderDate || '',
@@ -711,6 +770,8 @@
       dischargedAt: b.dischargedAt || '',
       isProblemsMinimized: b.isProblemsMinimized !== undefined ? b.isProblemsMinimized : (b.isDxMinimized !== undefined ? b.isDxMinimized : false),
       isAnamneseMinimized: b.isAnamneseMinimized !== undefined ? b.isAnamneseMinimized : true,
+      isAlergiasMinimized: b.isAlergiasMinimized !== undefined ? b.isAlergiasMinimized : true,
+      isEvolucaoTasyMinimized: b.isEvolucaoTasyMinimized !== undefined ? b.isEvolucaoTasyMinimized : true,
       isTrackerMinimized: b.isTrackerMinimized !== undefined ? b.isTrackerMinimized : true,
       isExamsMinimized: b.isExamsMinimized !== undefined ? b.isExamsMinimized : true,
       isNotesMinimized: b.isNotesMinimized !== undefined ? b.isNotesMinimized : true,
@@ -722,8 +783,9 @@
   }
 
   // ---- Reinternação: nova internação da mesma pessoa -------------------------
-  // Copia o que é da PESSOA (nome, idade, HPP, exames, trackers, problemas crônicos)
-  // e zera o que é da INTERNAÇÃO (HDA, condutas, notas, textos, docs, checks).
+  // Copia o que é da PESSOA (nome, idade, HPP, alergias, medicações prévias, exames,
+  // trackers, problemas crônicos) e zera o que é da INTERNAÇÃO (HDA, condutas, notas,
+  // textos, docs, evoluções, checks).
   // Trackers abertos são fechados com a data da alta anterior para não nascerem alertando.
   // Não muta previousBed: devolve o patch a aplicar nele (personId).
   function buildReadmission(previousBed, bedNumber, todayStr) {
@@ -747,10 +809,59 @@
     const newBed = migrateBed({
       patientId: uuid(), personId: personId, bedNumber: bedNumber || '',
       patientName: prev.patientName || '', age: prev.age, hpp: prev.hpp || '',
+      alergias: prev.alergias || '', medicacoesPrevias: prev.medicacoesPrevias || '',
       admitDate: todayStr, problems: problems, trackers: trackers, exams: exams,
       isAnamneseMinimized: false,
     });
     return { newBed: newBed, previousPatch: { personId: personId } };
+  }
+
+  // "Nova evolução de hoje": se a linha de hoje já existe, devolve-a intacta; senão
+  // cria a de hoje copiando os campos cumulativos da linha anterior mais recente e
+  // deixando os diários vazios. Muta bed.evolucoes e devolve a linha.
+  function newEvolucaoForToday(bed, todayStr) {
+    bed.evolucoes = bed.evolucoes || [];
+    const existing = bed.evolucoes.find(function (e) { return e.data === todayStr; });
+    if (existing) return existing;
+    const prev = bed.evolucoes
+      .filter(function (e) { return e.data && e.data < todayStr; })
+      .sort(function (a, b) { return String(a.data).localeCompare(String(b.data)); })
+      .pop();
+    const row = { id: uuid(), data: todayStr };
+    EVOLUCAO_FIELDS.forEach(function (f) {
+      row[f] = (prev && EVOLUCAO_CUMULATIVE.indexOf(f) !== -1) ? (prev[f] || '') : '';
+    });
+    bed.evolucoes.push(row);
+    return row;
+  }
+
+  // ---- Documentos em blocos ("=== NOME DO CAMPO ===") ------------------------
+  // Devolve [{ title, content, conferir }] ou null se o texto não tem marcadores
+  // (documento antigo: exibido inteiro, como sempre). O conteúdo perde só as linhas
+  // em branco das bordas; "conferir" marca o bloco "PARA CONFERIR (NÃO COLAR...)".
+  function parseDocBlocks(text) {
+    const lines = String(text == null ? '' : text).split(/\r?\n/);
+    const blocks = [];
+    let current = { title: '', lines: [] };
+    let found = false;
+    lines.forEach(function (line) {
+      const m = line.match(/^\s*={3,}\s*(.+?)\s*={3,}\s*$/);
+      if (m) {
+        found = true;
+        blocks.push(current);
+        current = { title: m[1], lines: [] };
+      } else {
+        current.lines.push(line);
+      }
+    });
+    if (!found) return null;
+    blocks.push(current);
+    return blocks.map(function (b) {
+      const ls = b.lines.slice();
+      while (ls.length && !ls[0].trim()) ls.shift();
+      while (ls.length && !ls[ls.length - 1].trim()) ls.pop();
+      return { title: b.title, content: ls.join('\n'), conferir: /^PARA CONFERIR/i.test(b.title) };
+    }).filter(function (b) { return b.title || b.content; });
   }
 
   // ---- Internações da mesma pessoa -------------------------------------------
@@ -861,7 +972,7 @@
   }
 
   function buildPushPayload(state) {
-    const out = { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], deletePatientIds: (state.deletedPatientIds || []).slice() };
+    const out = { patients: [], problems: [], antibiotics: [], cultures: [], devices: [], exams: [], condutas: [], notes: [], raw_texts: [], evolucoes: [], deletePatientIds: (state.deletedPatientIds || []).slice() };
     out.prefs = [{ key: 'lab_ranges', value: state.labRangesText == null ? '' : state.labRangesText }];
     (state.beds || []).forEach(function (b) {
       if (!b.patientId) return;
@@ -874,6 +985,8 @@
         admit_date: b.admitDate || null,
         hpp: b.hpp || '',
         anamnese_inicial: b.anamneseInicial || '',
+        alergias: b.alergias || '',
+        medicacoes_previas: b.medicacoesPrevias || '',
         discharge_forecast: b.dischargeForecast || null,
         status: b.isArchived ? (b.archiveReason === 'alta' ? 'alta' : 'arquivado') : 'internado',
         person_id: b.personId || null,
@@ -908,6 +1021,14 @@
       (b.rawTexts || []).forEach(function (r) {
         out.raw_texts.push({ id: r.id || uuid(), patient_id: pid, tipo: r.tipo || 'evolucao', data: r.data || null, texto: r.texto || '' });
       });
+      // Gravadas por upsert em (patient_id, data) — nunca delete+insert. Linha sem data não vai.
+      (b.evolucoes || []).forEach(function (e) {
+        if (!e || !e.data) return;
+        const row = evolucaoRow(e);
+        row.id = row.id || uuid();
+        row.patient_id = pid;
+        out.evolucoes.push(row);
+      });
     });
     return out;
   }
@@ -924,6 +1045,12 @@
     bed.personId = p.person_id || null;
     bed.dischargedAt = p.discharge_date || '';
     bed.notes = notesTexto || '';
+  }
+
+  // Adoção integral (paciente novo no aparelho / pull limpo). Na mescla de um leito
+  // que já existe, quem decide campo a campo é o três-vias em mergeStates.
+  function applyPatientTextFields(bed, p) {
+    PATIENT_TEXT_FIELDS.forEach(function (f) { bed[f.local] = p[f.col] || ''; });
   }
 
   function applyRowsToBed(bed, rows) {
@@ -962,6 +1089,8 @@
     bed.generatedDocs = (rows.generated_docs || []).slice()
       .sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); })
       .map(function (r) { return { id: r.id, tipo: r.tipo, conteudo: r.conteudo, createdAt: r.created_at }; });
+    bed.evolucoes = (rows.evolucoes || []).map(evolucaoRow)
+      .sort(function (a, b) { return String(a.data || '').localeCompare(String(b.data || '')); });
   }
 
   function applyPull(state, pulled) {
@@ -974,7 +1103,7 @@
       cultures = byPatient(pulled.cultures), devices = byPatient(pulled.devices),
       exams = byPatient(pulled.exams), condutas = byPatient(pulled.condutas),
       notes = byPatient(pulled.notes), rawTexts = byPatient(pulled.raw_texts),
-      docs = byPatient(pulled.generated_docs);
+      docs = byPatient(pulled.generated_docs), evolucoes = byPatient(pulled.evolucoes);
 
     // Pull limpo: o banco é a verdade também para as preferências globais.
     const pulledPref = (pulled.prefs || []).find(function (r) { return r.key === 'lab_ranges'; });
@@ -1009,10 +1138,12 @@
         state.beds.push(bed);
       }
       applyPatientScalars(bed, p, (notes[p.id] && notes[p.id][0] && notes[p.id][0].texto) || '');
+      applyPatientTextFields(bed, p);
       applyRowsToBed(bed, {
         problems: problems[p.id] || [], antibiotics: atbs[p.id] || [], cultures: cultures[p.id] || [],
         devices: devices[p.id] || [], exams: exams[p.id] || [], condutas: condutas[p.id] || [],
         raw_texts: rawTexts[p.id] || [], generated_docs: docs[p.id] || [],
+        evolucoes: evolucoes[p.id] || [],
       });
     });
 
@@ -1056,5 +1187,8 @@
     buildSyncBase: buildSyncBase,
     mergeRowSets: mergeRowSets,
     mergeStates: mergeStates,
+    EVOLUCAO_FIELDS: EVOLUCAO_FIELDS,
+    newEvolucaoForToday: newEvolucaoForToday,
+    parseDocBlocks: parseDocBlocks,
   };
 });
