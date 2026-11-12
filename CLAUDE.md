@@ -62,6 +62,12 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
 - `painel_patients.alergias` e `medicacoes_previas` têm three-way POR CAMPO (hash próprio na
   foto, `syncBase[id].fields`), fora do hash geral dos scalars: a IA pode preenchê-los mesmo
   que o aparelho tenha editado outros campos do paciente.
+- O pull lê cada tabela INTEIRA, em páginas (`pullAllTables` → `PainelCore.fetchAllRows`:
+  ordem por chave primária + contagem exata). A API devolve no máximo ~1000 linhas por
+  requisição sem erro, e uma tabela truncada seria lida pela mescla como deleção remota
+  (o push então apagaria de verdade). Nunca volte a um `select('*')` simples no sync.
+- Leito com nome sempre tem `patientId` na hora do sync (`ensurePatientIds`, no início de
+  `mergeStates`): o leito nasce vazio e sem id, e o push pula leito sem id.
 - `painel_patients.status` inclui `'nuvem'` = paciente guardado só no banco (nenhum aparelho
   tem leito dele). Não mude status para/de `'nuvem'` por conta própria; o app gerencia isso.
 

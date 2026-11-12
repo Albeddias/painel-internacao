@@ -262,9 +262,40 @@
     });
   }
 
+  // Baixa uma tabela INTEIRA, em páginas. A API do Supabase devolve no máximo N linhas
+  // por requisição (padrão 1000) sem erro algum; ler só a primeira página fazia a mescla
+  // entender o resto como "apagado no banco" e o push apagar de verdade.
+  // fetchPage(from) → Promise<{ data, error, count }>: a página que começa na posição
+  // `from` (em ordem estável) e, se o servidor informar, o total de linhas da tabela.
+  // Não presume o tamanho da página: avança pelo que de fato chegou. Qualquer erro
+  // rejeita — nunca devolve tabela parcial.
+  async function fetchAllRows(fetchPage) {
+    const rows = [];
+    for (;;) {
+      const res = await fetchPage(rows.length);
+      if (res.error) throw res.error;
+      const page = res.data || [];
+      for (let i = 0; i < page.length; i++) rows.push(page[i]);
+      if (page.length === 0) break;
+      if (res.count != null && rows.length >= res.count) break;
+    }
+    return rows;
+  }
+
+  // Garante patientId em todo leito com paciente. O leito nasce vazio (sem id) e o nome
+  // é digitado depois; migrateBed só dá o id na carga do app. Sem isto, um paciente
+  // criado e sincronizado na mesma sessão ficava fora do push (que pula leito sem id)
+  // sem erro algum, até o app ser recarregado. Leito sem nome continua sem id.
+  function ensurePatientIds(state) {
+    (state.beds || []).forEach(function (bed) {
+      if (bed && !bed.patientId && String(bed.patientName || '').trim()) bed.patientId = uuid();
+    });
+  }
+
   // Mescla three-way do estado inteiro com o que veio do banco.
   // Muta e retorna state, pronto para buildPushPayload. Ver spec 2026-08-25.
   function mergeStates(state, pulled) {
+    ensurePatientIds(state);
     ensureRowIds(state);
     function byPatient(rows) {
       const m = {};
@@ -763,6 +794,9 @@
       evolucoes: (b.evolucoes || []).filter(Boolean).map(function (e) { return Object.assign({}, e, { id: e.id || uuid() }); }),
       externalDoctor: b.externalDoctor || { active: false, name: '' },
       checks: b.checks || { ev: false, p: false, ex: false, tev: false },
+      // Termo de ciência do risco de queda: uma vez por internação. Fica fora de `checks`
+      // de propósito — aquele objeto zera todo dia; este vale até a alta. Só no aparelho.
+      quedaOrientada: !!b.quedaOrientada,
       isVisited: !!b.isVisited, reminderDate: b.reminderDate || '',
       dischargeForecast: b.dischargeForecast || '',
       isArchived: !!b.isArchived,
@@ -1158,6 +1192,7 @@
     parseHpp: parseHpp,
     joinHpp: joinHpp,
     fillPatientName: fillPatientName,
+    fetchAllRows: fetchAllRows,
     filterSuggestions: filterSuggestions,
     dayNumber: dayNumber,
     formatDateBR: formatDateBR,
