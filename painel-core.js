@@ -550,9 +550,11 @@
   // Extrai o valor numérico de um resultado ("9,5", "12.300", "120k", "<1,0").
   // Heurística: ponto seguido de exatamente 3 dígitos é milhar brasileiro
   // (12.300 = 12300); sufixo k multiplica por mil. null se não houver número.
+  // Exceção: "0.xxx" é sempre decimal (troponina 0.034 não é 34). "7.350" segue como
+  // milhar — pH com ponto é ambíguo com leucócitos 7.350; digite pH com vírgula.
   function labNumber(v) {
-    const s = String(v == null ? '' : v);
-    const mil = s.match(/-?\d{1,3}(?:\.\d{3})+(?!\d)/);
+    const s = String(v == null ? '' : v).replace(/−/g, '-'); // sinal de menos tipográfico
+    const mil = s.match(/-?(?!0+\.)\d{1,3}(?:\.\d{3})+(?!\d)/);
     if (mil) return parseFloat(mil[0].replace(/\./g, ''));
     const norm = s.replace(',', '.');
     const m = norm.match(/-?\d+(?:\.\d+)?/);
@@ -604,9 +606,10 @@
       const idx = line.indexOf(':');
       if (idx === -1) return;
       const name = line.slice(0, idx).trim();
-      const sides = line.slice(idx + 1).split(/[-–]/);
-      if (!name || sides.length !== 2) return;
-      const min = labNumber(sides[0]), max = labNumber(sides[1]);
+      // "min-max": cada lado pode ter sinal próprio ("-2-2", "-5--1"); o separador é hífen ou travessão.
+      const sides = line.slice(idx + 1).match(/^\s*([-−]?\s*\d[\d.,]*)\s*[-–]\s*([-−]?\s*\d[\d.,]*)/);
+      if (!name || !sides) return;
+      const min = labNumber(sides[1].replace(/\s+/g, '')), max = labNumber(sides[2].replace(/\s+/g, ''));
       if (min === null || max === null) return;
       out[name.toLowerCase()] = { min: min, max: max };
     });
@@ -626,7 +629,8 @@
 
   // ---- Lançamento de coleta laboratorial ------------------------------------
   // Texto da textarea -> { results: [{name, value}], ignored: [linha crua] }.
-  // Aceita "Nome: valor", "Nome = valor" e "Nome valor" (ex.: "Hb 9.5").
+  // Aceita "Nome: valor", "Nome = valor" e "Nome valor" (ex.: "Hb 9.5", "BE -2,5").
+  // Em "Nome valor", um "19-9" seguido de outro número faz parte do nome ("CA 19-9 35").
   function parseLabText(text) {
     const results = [], ignored = [];
     String(text == null ? '' : text).split(/\r?\n/).forEach(function (line) {
@@ -636,8 +640,13 @@
       const sep = raw.match(/^([^:=]+?)\s*[:=]\s*(.+)$/);
       if (sep) { name = sep[1].trim(); value = sep[2].trim(); }
       else {
-        const sp = raw.match(/^(\D.*?)\s+([<>]?=?\s*[\d.,].*)$/);
-        if (sp) { name = sp[1].trim(); value = sp[2].trim(); }
+        const VALUE = '[<>]?=?\\s*[-−]?[\\d.,].*';
+        const sp = raw.match(new RegExp('^(\\D.*?)\\s+(' + VALUE + ')$'));
+        if (sp) {
+          name = sp[1].trim(); value = sp[2].trim();
+          const inName = value.match(new RegExp('^(\\d+-\\d+)\\s+(' + VALUE + ')$'));
+          if (inName) { name += ' ' + inName[1]; value = inName[2].trim(); }
+        }
       }
       if (name && value) results.push({ name: name, value: value });
       else ignored.push(raw);
@@ -695,13 +704,41 @@
     return entry;
   }
 
-  // ---- Ordem dos exames fixados --------------------------------------------
+  // ---- Exames fixados (sempre sem diferenciar maiúsculas de minúsculas) -------
+  // A tabela mostra a primeira grafia vista ("HB"); o fixado pode estar como "Hb".
+  function lcName(s) { return String(s == null ? '' : s).toLowerCase(); }
+
+  // Posição de `name` em `pinned`; -1 se não estiver fixado.
+  function pinnedExamIndex(pinned, name) {
+    const n = lcName(name);
+    return (pinned || []).findIndex(function (p) { return lcName(p) === n; });
+  }
+
+  // Fixados primeiro (na ordem de `pinned`); os demais em ordem alfabética. Lista nova.
+  function sortExamNames(names, pinned) {
+    return (names || []).slice().sort(function (a, b) {
+      const ia = pinnedExamIndex(pinned, a), ib = pinnedExamIndex(pinned, b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return String(a).localeCompare(String(b));
+    });
+  }
+
+  // Fixa `name` no topo, ou desafixa se já estava. Lista nova.
+  function togglePinnedExam(pinned, name) {
+    const out = (pinned || []).slice();
+    const idx = pinnedExamIndex(out, name);
+    if (idx !== -1) out.splice(idx, 1); else out.unshift(name);
+    return out;
+  }
+
   // Move `name` um passo (dir -1 = sobe, +1 = desce) dentro de `pinned`. Se `visible`
   // (nomes das linhas na tela) vier, o passo é relativo ao vizinho fixado VISÍVEL,
   // para que uma seta corresponda a uma linha da tabela. Devolve uma lista nova.
   function movePinnedExam(pinned, name, dir, visible) {
     const out = (pinned || []).slice();
-    const lc = function (s) { return String(s == null ? '' : s).toLowerCase(); };
+    const lc = lcName;
     const idx = out.findIndex(function (p) { return lc(p) === lc(name); });
     if (idx === -1) return out;
     const vis = visible ? visible.map(lc) : null;
@@ -713,6 +750,34 @@
     const nIdx = out.indexOf(neighbor);
     out.splice(dir < 0 ? nIdx : nIdx + 1, 0, item);
     return out;
+  }
+
+  // ---- Selo do antibiótico na lista de trackers -------------------------------
+  // { label, tone }. tone: 'ended' (suspenso, contagem congelada) | 'scheduled' (D1 futuro) |
+  // 'due' (último dia ou prazo vencido) | 'long' (sem duração e D8+) | 'normal'.
+  // Prazo vencido mostra o dia REAL (D9/7): o ATB segue em uso até alguém dar a data de fim.
+  function atbBadge(t, todayStr) {
+    const n = dayNumber(t.startDate, todayStr);
+    if (t.endDate && t.endDate <= todayStr) {
+      const used = dayNumber(t.startDate, t.endDate);
+      return { label: used ? 'Suspenso D' + used : 'Suspenso', tone: 'ended' };
+    }
+    if (n === null) return { label: 'D-', tone: 'normal' };
+    if (n === 0) return { label: 'Agendado', tone: 'scheduled' };
+    if (t.duration) {
+      if (n > t.duration) return { label: 'D' + n + '/' + t.duration + ' (prazo vencido)', tone: 'due' };
+      if (n === t.duration) return { label: 'D' + n + '/' + t.duration + ' (último dia)', tone: 'due' };
+      return { label: 'D' + n + '/' + t.duration, tone: 'normal' };
+    }
+    return { label: 'D' + n, tone: n >= 8 ? 'long' : 'normal' };
+  }
+
+  // Check "Queda" (termo de ciência, uma vez por internação): só em leito ativo, ocupado e
+  // acompanhado pelo próprio médico — como os checks de visita, não vale para médico externo.
+  function showsQuedaCheck(bed) {
+    if (!bed || !bed.patientName || String(bed.patientName).trim() === '') return false;
+    if (bed.isArchived) return false;
+    return !(bed.externalDoctor && bed.externalDoctor.active);
   }
 
   // ---- Resumo do dia: texto pronto para colar na evolução --------------------
@@ -1257,7 +1322,12 @@
     classifyLab: classifyLab,
     parseLabText: parseLabText,
     applyLabEntry: applyLabEntry,
+    pinnedExamIndex: pinnedExamIndex,
+    sortExamNames: sortExamNames,
+    togglePinnedExam: togglePinnedExam,
     movePinnedExam: movePinnedExam,
+    atbBadge: atbBadge,
+    showsQuedaCheck: showsQuedaCheck,
     defaultState: defaultState,
     migrateBed: migrateBed,
     buildReadmission: buildReadmission,

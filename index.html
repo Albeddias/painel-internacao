@@ -1177,22 +1177,13 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
     
-    function getDayNumber(startDate) {
-        if (!startDate) return null;
-        try {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const start = new Date(startDate + 'T00:00:00');
-            if (isNaN(start.getTime())) return null;
-            const diffTime = today.getTime() - start.getTime();
-            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-            if (diffDays < 0) return 0; 
-            return diffDays + 1; // D1
-        } catch (e) { return null; }
+    // Contagem de dias e "dd/mm" vêm do core (PainelCore.dayNumber / formatDateBR) — sem cópias aqui.
+    function dayNumberToday(startDate) {
+      return PainelCore.dayNumber(startDate, todayISO());
     }
 
     function calculateDaysSince(startDate) {
-      const dayNum = getDayNumber(startDate);
+      const dayNum = dayNumberToday(startDate);
       if (dayNum === null) return 'D-';
       return `D${dayNum}`;
     }
@@ -1343,14 +1334,28 @@
     // Check "Queda": termo de ciência do risco de queda, aplicado uma vez por internação.
     // Diferente dos quatro checks diários (bed.checks), vive em bed.quedaOrientada: não zera
     // na virada do dia nem no "Resetar dia" e não conta para o leito "concluído" do dia.
-    // Pendente = âmbar com "Q"; feito = verde. Leito vazio não mostra.
+    // Pendente = âmbar com "Q"; feito = verde. Leito vazio, arquivado ou de médico externo
+    // não mostra (PainelCore.showsQuedaCheck).
+    function checkIconSvg(sizeClass) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="${sizeClass}"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>`;
+    }
     function quedaDotHtml(bed) {
-      if (!bed.patientName || bed.patientName.trim() === '') return '';
+      if (!PainelCore.showsQuedaCheck(bed)) return '';
       const done = !!bed.quedaOrientada;
       return `
         <div class="queda-dot ml-1.5 w-9 h-9 rounded-md border-2 ${done ? 'bg-green-500 border-green-500 text-white' : 'bg-amber-50 border-amber-400 text-amber-700'} flex items-center justify-center text-xs font-bold cursor-pointer" title="${done ? 'Queda: termo de ciência aplicado nesta internação' : 'Queda: termo de ciência pendente'}">
-          ${done ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>` : 'Q'}
+          ${done ? checkIconSvg('w-4 h-4') : 'Q'}
         </div>`;
+    }
+    // Os quatro checks diários (EV, P, EX, TEV) + o de Queda: mesmo HTML na lista e no detalhe.
+    function checkDotsHtml(bed) {
+      return ['ev', 'p', 'ex', 'tev'].map(k => {
+        const on = !!(bed.checks && bed.checks[k]);
+        return `
+        <div class="dot w-9 h-9 rounded-md border-2 ${on ? 'bg-sky-500 border-sky-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-400'} flex items-center justify-center text-xs font-bold cursor-pointer" data-check-key="${k}" title="${k.toUpperCase()}">
+          ${on ? checkIconSvg('w-4 h-4') : k.toUpperCase()[0]}
+        </div>`;
+      }).join('') + quedaDotHtml(bed);
     }
     // Liga o clique do check de Queda dentro de `area` (lista ou detalhe) e redesenha a tela.
     function bindQuedaDot(area, bed, rerender) {
@@ -1515,7 +1520,7 @@
             const dStatus = getDischargeStatus(b.dischargeForecast);
             if (isOccupied && dStatus) {
               dischargeTag.classList.remove('hidden');
-              const dStr = formatDate(b.dischargeForecast);
+              const dStr = PainelCore.formatDateBR(b.dischargeForecast);
               if (dStatus === 'today') {
                 dischargeTag.textContent = 'Alta hoje';
                 dischargeTag.classList.add('bg-green-100', 'text-green-800');
@@ -1533,7 +1538,7 @@
 
             if (b.isVisited) {
               visitCheck.classList.add('bg-green-500', 'border-green-500', 'text-white');
-              visitCheck.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>`;
+              visitCheck.innerHTML = checkIconSvg('w-5 h-5');
             } else {
               visitCheck.classList.add('bg-slate-100', 'border-slate-200', 'text-slate-400');
             }
@@ -1547,11 +1552,7 @@
             });
             
             const checksArea = node.querySelector('.checks');
-            checksArea.innerHTML = ['ev', 'p', 'ex', 'tev'].map(k => `
-              <div class="dot w-9 h-9 rounded-md border-2 ${b.checks && b.checks[k] ? 'bg-sky-500 border-sky-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-400'} flex items-center justify-center text-xs font-bold cursor-pointer" data-check-key="${k}" data-bed-index="${idx}" title="${k.toUpperCase()}">
-                ${b.checks && b.checks[k] ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>` : k.toUpperCase()[0]}
-              </div>
-            `).join('') + quedaDotHtml(b);
+            checksArea.innerHTML = checkDotsHtml(b);
             bindQuedaDot(checksArea, b, renderScreenA);
 
             checksArea.querySelectorAll('.dot').forEach(dot => {
@@ -1590,7 +1591,7 @@
             const node = tpl.content.cloneNode(true);
             const card = node.querySelector('.list-card');
             node.querySelector('.bed-id').textContent = b.bedNumber || '—';
-            const altaInfo = b.archiveReason === 'alta' && b.dischargedAt ? ` · Alta em ${formatDate(b.dischargedAt)}` : '';
+            const altaInfo = b.archiveReason === 'alta' && b.dischargedAt ? ` · Alta em ${PainelCore.formatDateBR(b.dischargedAt)}` : '';
             const ordinalInfo = g.count > 1 ? ` · ${g.ordinal}ª internação` : '';
             node.querySelector('.bed-name').textContent = (b.patientName || 'Vazio') + altaInfo + ordinalInfo;
 
@@ -1796,11 +1797,7 @@
 
       // Renderiza os checkmarks sincronizados
       const inlineChecks = art.querySelector('.inline-checks');
-      inlineChecks.innerHTML = ['ev', 'p', 'ex', 'tev'].map(k => `
-        <div class="dot w-9 h-9 rounded-md border-2 ${b.checks && b.checks[k] ? 'bg-sky-500 border-sky-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-400'} flex items-center justify-center text-xs font-bold cursor-pointer" data-check-key="${k}" title="${k.toUpperCase()}">
-          ${b.checks && b.checks[k] ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>` : k.toUpperCase()[0]}
-        </div>
-      `).join('') + quedaDotHtml(b);
+      inlineChecks.innerHTML = checkDotsHtml(b);
       bindQuedaDot(inlineChecks, b, renderScreenB);
 
       inlineChecks.querySelectorAll('.dot').forEach(dot => {
@@ -1940,47 +1937,26 @@
             item.dataset.trackerId = t.id;
             let html = '';
             
-            const formatDate = (dateStr) => {
-                if (!dateStr) return '';
-                try {
-                    const [y, m, d] = dateStr.split('-');
-                    return `${d}/${m}`;
-                } catch { return ''; }
-            };
-
             if (t.type === 'atb') {
-                const dayNum = getDayNumber(t.startDate);
-                const d1Date = formatDate(t.startDate);
-                const ended = t.endDate && t.endDate <= todayISO();
-                let dayDisplay = dayNum === null ? 'D-' : `D${dayNum}`;
-                let badgeClass = 'bg-sky-100 text-sky-800';
+                const d1Date = PainelCore.formatDateBR(t.startDate);
+                // Texto e tom do selo vêm do core (suspenso congela; prazo vencido mostra o dia real).
+                const badge = PainelCore.atbBadge(t, todayISO());
+                const ended = badge.tone === 'ended';
+                const dayDisplay = badge.label;
+                const badgeClass = {
+                    ended: 'bg-slate-100 text-slate-500',
+                    scheduled: 'bg-slate-100 text-slate-600',
+                    due: 'bg-red-100 text-red-800',
+                    long: 'bg-amber-100 text-amber-800',
+                }[badge.tone] || 'bg-sky-100 text-sky-800';
                 let extra = '';
-
                 if (ended) {
-                    // Suspenso/finalizado em data conhecida: contagem congela e o item fica discreto.
-                    const usedDays = daysBetween(t.startDate, t.endDate);
-                    dayDisplay = usedDays === null ? 'Suspenso' : `Suspenso D${usedDays + 1}`;
-                    badgeClass = 'bg-slate-100 text-slate-500';
-                    extra = `<span class="text-xs text-slate-500 ml-1">(fim ${formatDate(t.endDate)})</span>`;
-                } else if (dayNum === 0) {
-                    dayDisplay = 'Agendado';
-                    badgeClass = 'bg-slate-100 text-slate-600';
-                } else if (dayNum !== null && t.duration) {
-                    if (dayNum > t.duration) {
-                        dayDisplay = `D${t.duration}/${t.duration} (Finalizado)`;
-                        badgeClass = 'bg-red-100 text-red-800';
-                    } else if (dayNum === t.duration) {
-                        dayDisplay = `D${dayNum}/${t.duration} (último dia)`;
-                        badgeClass = 'bg-red-100 text-red-800';
-                    } else {
-                        dayDisplay = `D${dayNum}/${t.duration}`;
-                    }
-                } else if (dayNum !== null && !t.duration && dayNum >= 8) {
-                    badgeClass = 'bg-amber-100 text-amber-800';
+                    extra = `<span class="text-xs text-slate-500 ml-1">(fim ${PainelCore.formatDateBR(t.endDate)})</span>`;
+                } else if (badge.tone === 'long') {
                     extra = `<span class="text-xs font-medium text-amber-700 ml-1">• ATB longo, reavaliar</span>`;
                 }
                 if (!ended && t.endDate) {
-                    extra += `<span class="text-xs text-slate-500 ml-1">(fim previsto ${formatDate(t.endDate)})</span>`;
+                    extra += `<span class="text-xs text-slate-500 ml-1">(fim previsto ${PainelCore.formatDateBR(t.endDate)})</span>`;
                 }
 
                 html = `<div class="flex-1 min-w-0 ${ended ? 'opacity-60' : ''}">
@@ -1989,8 +1965,8 @@
                             <span class="text-xs text-slate-500 ml-1">(D1: ${d1Date})</span>${extra}
                         </div>`;
             } else if (t.type === 'culture') {
-                const d1Date = formatDate(t.collectionDate);
-                const cDays = getDayNumber(t.collectionDate);
+                const d1Date = PainelCore.formatDateBR(t.collectionDate);
+                const cDays = dayNumberToday(t.collectionDate);
                 const resultText = (t.result || '').trim();
                 const pending = resultText === '' || /aguard/i.test(resultText);
                 const alertCulture = pending && cDays !== null && cDays >= 3;
@@ -2001,8 +1977,8 @@
                         </div>`;
             } else if (t.kind === 'procedimento') {
                 // Cirurgia/procedimento: conta pós-operatório, nunca alerta.
-                const d1Date = formatDate(t.installDate);
-                const dDays = getDayNumber(t.installDate);
+                const d1Date = PainelCore.formatDateBR(t.installDate);
+                const dDays = dayNumberToday(t.installDate);
                 const poDisplay = dDays === null ? 'PO D-' : (dDays === 0 ? 'Agendado' : `PO D${dDays}`);
                 html = `<div class="flex-1 min-w-0">
                             <span class="font-medium text-violet-700">Proc:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
@@ -2010,7 +1986,7 @@
                             <span class="text-xs text-slate-500 ml-1">(Data: ${d1Date})</span>
                         </div>`;
             } else { // device
-                const d1Date = formatDate(t.installDate);
+                const d1Date = PainelCore.formatDateBR(t.installDate);
                 const removed = !!t.removalDate;
                 if (removed) {
                     // Retirado: contagem congelada no total de dias de uso, sem alerta.
@@ -2019,11 +1995,11 @@
                     html = `<div class="flex-1 min-w-0 opacity-60">
                                 <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>
                                 <span class="text-xs font-semibold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full ml-1">${usedDisplay}</span>
-                                <span class="text-xs text-slate-500 ml-1">• removido ${formatDate(t.removalDate)}</span>
+                                <span class="text-xs text-slate-500 ml-1">• removido ${PainelCore.formatDateBR(t.removalDate)}</span>
                                 <span class="text-xs text-slate-500 ml-1">(Início: ${d1Date})</span>
                             </div>`;
                 } else {
-                    const dDays = getDayNumber(t.installDate);
+                    const dDays = dayNumberToday(t.installDate);
                     const alertDevice = dDays !== null && dDays >= 7;
                     const devBadge = alertDevice ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800';
                     html = `<div class="flex-1 min-w-0">
@@ -2430,7 +2406,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
           </button>
         `;
-        summary.querySelector('.rawtext-label').textContent = `${RAWTEXT_LABEL[r.tipo] || r.tipo} · ${formatDate(r.data)} · ${(r.texto || '').length} caracteres`;
+        summary.querySelector('.rawtext-label').textContent = `${RAWTEXT_LABEL[r.tipo] || r.tipo} · ${PainelCore.formatDateBR(r.data)} · ${(r.texto || '').length} caracteres`;
         const body = document.createElement('p');
         body.className = 'text-slate-600 whitespace-pre-wrap mt-2 text-xs';
         body.textContent = r.texto || '';
@@ -2890,7 +2866,7 @@ function renderLabTab(contentEl, bed, bedIdx) {
             const date = deleteBtn.dataset.date;
             const entryIndex = bed.exams.findIndex(ex => ex.type === 'lab' && ex.date === date);
             if (entryIndex > -1) {
-                showConfirm(`Deletar todos os exames da coleta do dia ${formatDate(date)}?`, () => {
+                showConfirm(`Deletar todos os exames da coleta do dia ${PainelCore.formatDateBR(date)}?`, () => {
                     bed.exams.splice(entryIndex, 1);
                     saveData(state);
                     rerenderFlowsheet(); // Apenas re-renderiza a tabela
@@ -2912,14 +2888,8 @@ function renderLabTab(contentEl, bed, bedIdx) {
             const examName = pinBtn.dataset.examName;
             if (!examName) return;
             
-            const pinIndex = state.pinnedExams.indexOf(examName);
-            if (pinIndex > -1) {
-                // Já está fixado, remove
-                state.pinnedExams.splice(pinIndex, 1);
-            } else {
-                // Não está fixado, adiciona ao topo
-                state.pinnedExams.unshift(examName);
-            }
+            // Fixado sai; não fixado entra no topo (sem diferenciar "Hb" de "HB")
+            state.pinnedExams = PainelCore.togglePinnedExam(state.pinnedExams, examName);
             saveData(state);
             rerenderFlowsheet(); // Re-renderiza a tabela com a nova ordem
         }
@@ -3027,13 +2997,11 @@ function renderLabFlowsheet(container, bed, filters) {
     tableHtml += '<thead class="bg-slate-50">';
     tableHtml += '<tr><th class="sticky left-0 bg-slate-50 px-3 py-2 text-left font-medium text-slate-600">Exame</th>';
     filteredDates.forEach(date => {
-        const [y, m, d] = date.split('-');
-        
         // CORREÇÃO: Adiciona os ícones de editar/deletar na data
         tableHtml += `
             <th class="px-3 py-2 text-center font-medium text-slate-600 whitespace-nowrap">
                 <div class="flex items-center justify-center gap-1">
-                    <span>${d}/${m}</span>
+                    <span>${PainelCore.formatDateBR(date)}</span>
                     <svg class="edit-collection-btn w-3 h-3 text-slate-400 hover:text-sky-600 cursor-pointer" data-date="${date}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                     <svg class="delete-collection-btn w-3 h-3 text-slate-400 hover:text-red-600 cursor-pointer" data-date="${date}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
                 </div>
@@ -3044,23 +3012,16 @@ function renderLabFlowsheet(container, bed, filters) {
 
     // Corpo (Resultados)
     // Lógica de ordenação por exames fixados
-    filteredExamNames.sort((a, b) => {
-        const aPinned = state.pinnedExams.includes(a);
-        const bPinned = state.pinnedExams.includes(b);
-        if (aPinned && !bPinned) return -1;
-        if (!aPinned && bPinned) return 1;
-        if (aPinned && bPinned) {
-            return state.pinnedExams.indexOf(a) - state.pinnedExams.indexOf(b);
-        }
-        return a.localeCompare(b);
-    });
+    // (no core: "Hb" fixado vale para a linha "HB")
+    const isPinnedName = (n) => PainelCore.pinnedExamIndex(state.pinnedExams, n) !== -1;
+    filteredExamNames = PainelCore.sortExamNames(filteredExamNames, state.pinnedExams);
 
-    const visiblePinned = filteredExamNames.filter(n => state.pinnedExams.includes(n));
+    const visiblePinned = filteredExamNames.filter(isPinnedName);
     const arrowBtn = (name, dir, enabled) => `<button type="button" class="pin-move-btn text-xs leading-none px-1 py-0.5 rounded ${enabled ? 'text-slate-400 hover:text-sky-600 hover:bg-sky-50' : 'invisible'}" data-exam-name="${escapeHtml(name)}" data-dir="${dir}" title="${dir < 0 ? 'Subir' : 'Descer'}" aria-label="${dir < 0 ? 'Subir' : 'Descer'} ${escapeHtml(name)}">${dir < 0 ? '▲' : '▼'}</button>`;
 
     tableHtml += '<tbody class="divide-y divide-slate-100 bg-white">';
     filteredExamNames.forEach(examName => {
-        const isPinned = state.pinnedExams.includes(examName);
+        const isPinned = isPinnedName(examName);
         const pinPos = visiblePinned.indexOf(examName);
         const arrows = isPinned && visiblePinned.length > 1
           ? `<span class="flex flex-col ml-auto">${arrowBtn(examName, -1, pinPos > 0)}${arrowBtn(examName, 1, pinPos < visiblePinned.length - 1)}</span>`
@@ -3137,11 +3098,10 @@ function renderImageTab(contentEl, bed, bedIdx) {
     imageExams.forEach(exam => {
         const item = document.createElement('div');
         item.className = 'image-exam-item group text-sm p-2 rounded-md hover:bg-slate-50';
-        const [y, m, d] = (exam.date || '---').split('-');
         item.innerHTML = `
             <div class="flex justify-between items-center">
                 <span class="font-medium text-slate-800">${escapeHtml(exam.name || 'Exame')}</span>
-                <span class="text-xs font-medium text-slate-500">${d}/${m}</span>
+                <span class="text-xs font-medium text-slate-500">${PainelCore.formatDateBR(exam.date)}</span>
             </div>
             <p class="text-slate-600 whitespace-pre-wrap">${escapeHtml(exam.summary || 'Sem resumo.')}</p>
             <div class="text-right -mt-2">
@@ -3162,7 +3122,7 @@ function renderImageTab(contentEl, bed, bedIdx) {
         item.querySelector('.remove-image-btn').addEventListener('click', () => {
             const examIndex = bed.exams.findIndex(e => e.id === exam.id);
             if (examIndex > -1) {    
-                        showConfirm(`Deletar o exame "${exam.name}" de ${formatDate(exam.date)}?`, () => {
+                        showConfirm(`Deletar o exame "${exam.name}" de ${PainelCore.formatDateBR(exam.date)}?`, () => {
                         bed.exams.splice(examIndex, 1);
                         saveData(state);
                         renderImageTab(contentEl, bed, bedIdx); // Re-renderiza só esta aba
@@ -3245,15 +3205,6 @@ document.getElementById('saveImageExamBtn').addEventListener('click', () => {
 
 // Ajusta o textarea do modal de imagem
 document.getElementById('image-exam-summary').addEventListener('input', (e) => autoResizeTextarea(e.target));
-
-   // NOVO: Adiciona um helper para formatar a data (usado nos botões de deletar)
-    function formatDate(dateStr) {
-        if (!dateStr) return '';
-        try {
-            const [y, m, d] = dateStr.split('-');
-            return `${d}/${m}`;
-        } catch { return ''; }
-    };
 
 // --- FIM DO NOVO CÓDIGO (v12) ---
 

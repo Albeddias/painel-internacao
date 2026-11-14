@@ -85,4 +85,6 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
 - Schema: `supabase/migrations/`. Mudanças de schema exigem migration nova + atualização de `buildPushPayload`/`applyPull` + testes.
 - Classes Tailwind novas em `index.html` exigem regenerar o CSS: `npx tailwindcss@3 -o styles.css --content ./index.html --minify`. Ao mudar arquivos do app, suba a versão do cache em `sw.js`.
 - Service worker: tudo o que é do próprio app é network-first (o cache é só a reserva offline), para o `index.html` e o `painel-core.js` virem sempre da mesma versão; só CDNs são cache-first. Não volte a servir o JS do app do cache (`tests/sw.test.cjs`).
+- Regra de tela que dá para testar mora no core, não no `index.html`: contagem de dias e datas (`dayNumber`, `formatDateBR`), selo do antibiótico (`atbBadge`), check de Queda (`showsQuedaCheck`) e exames fixados (`pinnedExamIndex` / `sortExamNames` / `togglePinnedExam`, sempre sem diferenciar maiúsculas). Não recrie cópias locais (`tests/tela.test.cjs`).
+- Leitura de labs (`labNumber`): ponto + 3 dígitos é milhar (`7.350` = 7350), exceto `0.xxx`, que é decimal. Valores e faixas aceitam negativo (`BE -2,5`, `BE: -2-2`).
 - Toda operação de sync roda com a tela bloqueada (`lockScreen` / `unlockScreen`): a mescla troca os objetos do estado, e uma edição feita no meio se perderia.
