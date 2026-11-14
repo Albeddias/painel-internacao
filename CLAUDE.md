@@ -74,7 +74,9 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
 ## Desenvolvimento
 
 - Testes: `node --test` (sempre rodar após mexer em `painel-core.js`).
-- O app deve continuar funcionando 100% offline em `file://` — não introduza ES modules nem dependências de build. A biblioteca supabase-js é carregada sob demanda (lazy) só quando o usuário sincroniza.
+- O app deve continuar funcionando 100% offline em `file://` — não introduza ES modules nem dependências de build. A biblioteca supabase-js é carregada sob demanda (lazy) só quando o usuário sincroniza, em versão fixa e com `integrity` (`SUPABASE_LIB_URL` / `SUPABASE_LIB_SRI` no `index.html`): ao atualizar, troque a versão e o hash juntos, e use o arquivo original do pacote (o `.min.js` do jsDelivr é gerado na hora e não serve para integridade).
 - A lógica de sync é prefix-agnóstica em `painel-core.js` (chaves lógicas `patients`, `problems`, ...); o mapeamento para os nomes físicos `painel_*` é feito no `index.html` via a constante `TABLE_PREFIX`.
 - Schema: `supabase/migrations/`. Mudanças de schema exigem migration nova + atualização de `buildPushPayload`/`applyPull` + testes.
 - Classes Tailwind novas em `index.html` exigem regenerar o CSS: `npx tailwindcss@3 -o styles.css --content ./index.html --minify`. Ao mudar arquivos do app, suba a versão do cache em `sw.js`.
+- Service worker: tudo o que é do próprio app é network-first (o cache é só a reserva offline), para o `index.html` e o `painel-core.js` virem sempre da mesma versão; só CDNs são cache-first. Não volte a servir o JS do app do cache (`tests/sw.test.cjs`).
+- Toda operação de sync roda com a tela bloqueada (`lockScreen` / `unlockScreen`): a mescla troca os objetos do estado, e uma edição feita no meio se perderia.

@@ -790,11 +790,23 @@
   </template>
 
 
+  <!-- === BLOQUEIO DE TELA DURANTE A SINCRONIZAÇÃO === -->
+  <!-- Depois dos modais (mesmo z-50): fica por cima deles; o portão de login (z-60) fica acima. -->
+  <div id="syncOverlay" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="status" aria-live="polite">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
+      <h3 id="syncOverlayMsg" class="text-lg font-bold text-slate-900">Sincronizando...</h3>
+      <p class="text-sm text-slate-600 mt-1">Aguarde: a tela fica bloqueada até terminar.</p>
+    </div>
+  </div>
+
   <script src="painel-core.js"></script>
   <script>
     // Nova chave de storage
     const STORAGE_KEY = 'wardBookData_v16';
     const OLD_STORAGE_KEY = 'wardBookData_v14_tasks';
+    // Preenchido por loadData quando o dado salvo existe mas não pôde ser lido: { raw, message }.
+    // Enquanto estiver preenchido, flushSave não grava — o dado original fica intacto.
+    let loadFailure = null;
 
     // --- Variáveis de Estado Global ---
     const globalNotesTemplate = "S: (Subjetivo)\n\nO: (Objetivo)\n- SSVV:\n- Exame:\n- Labs:\n- Imagem:\n\nA: (Avaliação)\n\nP: (Plano)\n";
@@ -1123,7 +1135,7 @@
             } else {
                 // Adição
                 // "proc" é um dispositivo com kind 'procedimento' (mesma tabela no banco)
-                const newTracker = { id: crypto.randomUUID(), type: currentTrackerType === 'proc' ? 'device' : currentTrackerType };
+                const newTracker = { id: PainelCore.uuid(), type: currentTrackerType === 'proc' ? 'device' : currentTrackerType };
                 if (currentTrackerType === 'atb') {
                     newTracker.name = document.getElementById('tracker-atb-name').value.trim() || 'Antibiótico';
                     newTracker.startDate = document.getElementById('tracker-atb-start').value;
@@ -1240,17 +1252,25 @@
     }
     
     function loadData() {
+      let raw = null;
       try {
-        let raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-          // migração automática a partir da versão antiga (mesmo navegador)
-          raw = localStorage.getItem(OLD_STORAGE_KEY);
-          if (!raw) return PainelCore.defaultState(todayISO());
-        }
-        const migrated = PainelCore.migrateState(JSON.parse(raw), todayISO());
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-        return migrated;
-      } catch (e) { return PainelCore.defaultState(todayISO()); }
+        // migração automática a partir da versão antiga (mesmo navegador)
+        raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY);
+      } catch (e) { /* armazenamento indisponível: nada salvo a proteger */ }
+      if (!raw) return PainelCore.defaultState(todayISO());
+      let migrated;
+      try {
+        migrated = PainelCore.migrateState(JSON.parse(raw), todayISO());
+      } catch (e) {
+        // Dado salvo ilegível. Abrir vazio e seguir salvando apagaria os leitos — e os nomes
+        // completos só existem neste aparelho. O app abre vazio, mas NÃO grava nada até o
+        // usuário guardar uma cópia do dado bruto (ver aviso na inicialização).
+        loadFailure = { raw: raw, message: e.message };
+        return PainelCore.defaultState(todayISO());
+      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); }
+      catch (e) { /* sem espaço: segue com o estado em memória; flushSave avisa se persistir */ }
+      return migrated;
     }
     // Gravação adiada (debounce): serializar o estado inteiro (incluindo textos de
     // prontuário colados) a cada tecla trava a digitação no celular. O estado em memória
@@ -1266,10 +1286,29 @@
     }
     function flushSave() {
       clearTimeout(saveTimer);
-      if (pendingSave) {
+      if (!pendingSave) return;
+      if (loadFailure) return; // dado salvo ilegível: não sobrescreve até a cópia ser guardada
+      try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingSave));
         pendingSave = null;
+      } catch (e) {
+        // Sem espaço/armazenamento bloqueado: antes falhava em silêncio. Mantém pendingSave
+        // para a próxima tentativa e avisa — o que está na tela ainda não foi gravado.
+        setSyncStatus('Não foi possível salvar neste aparelho: ' + e.message, true);
       }
+    }
+
+    function downloadTextFile(filename, text) {
+      // Blob em vez de data: URI — o download via data: abre aba em branco no iOS Safari.
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
     window.addEventListener('pagehide', flushSave);
     document.addEventListener('visibilitychange', () => {
@@ -3196,7 +3235,7 @@ document.getElementById('saveImageExamBtn').addEventListener('click', () => {
         }
     } else {
         // Adiciona
-        bed.exams.push({ ...examData, id: crypto.randomUUID() });
+        bed.exams.push({ ...examData, id: PainelCore.uuid() });
     }
 
     saveData(state);
@@ -3517,7 +3556,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         const text = newTaskInput.value.trim();
         if (text) {
             state.generalTasks.push({
-                id: crypto.randomUUID(),
+                id: PainelCore.uuid(),
                 text: text,
                 done: false
             });
@@ -3535,16 +3574,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // Backup (Importar/Exportar)
     document.getElementById('exportDataBtn').addEventListener('click', () => {
       try {
-        // Blob em vez de data: URI — o download via data: abre aba em branco no iOS Safari.
-        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `backup_caderno_visitas_${todayISO()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        downloadTextFile(`backup_caderno_visitas_${todayISO()}.json`, JSON.stringify(state, null, 2));
       } catch (e) { showConfirm(`Erro ao exportar: ${e.message}`, () => {}, "Erro", 'bg-red-600', 'Entendi'); }
     });
     document.getElementById('importDataInput').addEventListener('change', (e) => {
@@ -3558,6 +3588,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
           showConfirm("Isso substituirá TODOS os dados atuais. Continuar?", () => {
             const migrated = PainelCore.migrateState(newState, todayISO());
             state = migrated;
+            loadFailure = null; // o backup importado substitui de propósito o dado ilegível
             saveData(state);
             renderScreenA();
           }, "Importar Backup?", 'bg-green-600', 'Importar');
@@ -3599,15 +3630,44 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       el.className = 'text-xs ' + (isError ? 'text-red-600' : 'text-slate-500');
     }
 
+    // supabase-js em versão FIXA e com verificação de integridade: o navegador recusa o
+    // arquivo se o conteúdo não bater com o hash (este app guarda dados de paciente e o
+    // token da sessão). É o arquivo original do pacote — o ".min.js" do jsDelivr é gerado na
+    // hora e não serve para integridade. Para atualizar, troque a versão E o hash juntos:
+    //   curl -sL <URL> | openssl dgst -sha384 -binary | openssl base64 -A
+    const SUPABASE_LIB_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';
+    const SUPABASE_LIB_SRI = 'sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK';
+
     async function ensureSupabaseLib() {
       if (window.supabase) return;
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+        s.integrity = SUPABASE_LIB_SRI;
+        s.crossOrigin = 'anonymous';
+        s.src = SUPABASE_LIB_URL;
         s.onload = resolve;
-        s.onerror = () => reject(new Error('sem conexão (não carregou a biblioteca)'));
+        s.onerror = () => {
+          s.remove(); // deixa a próxima tentativa começar limpa
+          reject(new Error('não carregou a biblioteca de sincronização (sem conexão ou arquivo diferente do esperado)'));
+        };
         document.head.appendChild(s);
       });
+    }
+
+    // Bloqueio da tela enquanto uma sincronização roda. A mescla troca os objetos do estado
+    // (listas de problemas, condutas, trackers) e pode mudar os índices dos leitos: qualquer
+    // edição feita no meio cairia em objetos órfãos ou no leito errado, e sumiria sem aviso.
+    // Contador: as operações compostas (guardar/trazer da nuvem) bloqueiam por fora do doSync.
+    let syncLockDepth = 0;
+    function lockScreen(msg) {
+      syncLockDepth++;
+      document.getElementById('syncOverlayMsg').textContent = msg;
+      document.getElementById('syncOverlay').classList.remove('hidden');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+    function unlockScreen() {
+      syncLockDepth = Math.max(0, syncLockDepth - 1);
+      if (syncLockDepth === 0) document.getElementById('syncOverlay').classList.add('hidden');
     }
 
     async function getSupabaseClient() {
@@ -3699,6 +3759,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     async function doSync() {
       if (syncInFlight) throw new Error('Sincronização já em andamento.');
       syncInFlight = true;
+      lockScreen('Sincronizando...');
       let merged = false;
       try {
         const sb = await getSupabaseClient();
@@ -3774,6 +3835,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         throw e;
       } finally {
         syncInFlight = false;
+        unlockScreen();
       }
     }
 
@@ -3797,37 +3859,47 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // no banco, remove os leitos do aparelho e guarda o nome completo só localmente.
     // Recebe TODAS as internações da pessoa para o histórico não ficar partido.
     async function archiveBedsToCloud(beds) {
-      beds.forEach(bed => { if (!bed.patientId) bed.patientId = PainelCore.uuid(); });
-      setSyncStatus('Sincronizando...');
-      await doSync();
-      const sb = await getSupabaseClient();
-      const ids = beds.map(b => b.patientId);
-      const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'nuvem' }).in('id', ids);
-      if (r.error) throw r.error;
-      beds.forEach(bed => {
-        state.cloudArchived[bed.patientId] = {
-          nome: bed.patientName || '',
-          iniciais: PainelCore.initialsFromName(bed.patientName),
-          leito: bed.bedNumber || '',
-          personId: bed.personId || null,
-        };
-        delete state.syncBase[bed.patientId];
-      });
-      state.beds = state.beds.filter(b => !ids.includes(b.patientId));
-      saveData(state, { fromSync: true });
-      flushSave();
-      renderScreenA();
-      setSyncStatus('Guardado na nuvem ✓');
+      lockScreen('Guardando na nuvem...');
+      try {
+        beds.forEach(bed => { if (!bed.patientId) bed.patientId = PainelCore.uuid(); });
+        setSyncStatus('Sincronizando...');
+        await doSync();
+        const sb = await getSupabaseClient();
+        const ids = beds.map(b => b.patientId);
+        const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'nuvem' }).in('id', ids);
+        if (r.error) throw r.error;
+        beds.forEach(bed => {
+          state.cloudArchived[bed.patientId] = {
+            nome: bed.patientName || '',
+            iniciais: PainelCore.initialsFromName(bed.patientName),
+            leito: bed.bedNumber || '',
+            personId: bed.personId || null,
+          };
+          delete state.syncBase[bed.patientId];
+        });
+        state.beds = state.beds.filter(b => !ids.includes(b.patientId));
+        saveData(state, { fromSync: true });
+        flushSave();
+        renderScreenA();
+        setSyncStatus('Guardado na nuvem ✓');
+      } finally {
+        unlockScreen();
+      }
     }
 
     async function restoreBedsFromCloud(ids) {
-      setSyncStatus('Trazendo da nuvem...');
-      const sb = await getSupabaseClient();
-      const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'arquivado' }).in('id', ids);
-      if (r.error) throw r.error;
-      await doSync(); // a mescla adota os pacientes e reencaixa os nomes do registro local
-      renderScreenA();
-      setSyncStatus('Trazido da nuvem ✓');
+      lockScreen('Trazendo da nuvem...');
+      try {
+        setSyncStatus('Trazendo da nuvem...');
+        const sb = await getSupabaseClient();
+        const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'arquivado' }).in('id', ids);
+        if (r.error) throw r.error;
+        await doSync(); // a mescla adota os pacientes e reencaixa os nomes do registro local
+        renderScreenA();
+        setSyncStatus('Trazido da nuvem ✓');
+      } finally {
+        unlockScreen();
+      }
     }
 
     // Reseta os leitos deste dispositivo e recebe limpo do servidor. Serve para eliminar
@@ -3838,6 +3910,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       if (btn.disabled) return;
       btn.disabled = true;
       setSyncStatus('Recebendo...');
+      lockScreen('Recebendo do servidor...');
       try {
         const sb = await getSupabaseClient();
         // Baixa TUDO primeiro (selects em paralelo); só zeramos o local depois que o servidor
@@ -3855,6 +3928,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         setSyncStatus('Falha ao resetar/receber: ' + e.message, true);
       } finally {
         btn.disabled = false;
+        unlockScreen();
       }
     }
 
@@ -3895,6 +3969,29 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     ensureDailyReset();
     renderScreenA();
     updateSyncBadge();
+
+    // Dado salvo ilegível (ver loadData): o app abriu vazio e está sem gravar. Só volta a
+    // gravar depois que o dado bruto for baixado para um arquivo (ou um backup for importado).
+    if (loadFailure) {
+      setSyncStatus('Dados deste aparelho ilegíveis — nada será salvo até baixar a cópia', true);
+      showConfirm(
+        'Não foi possível ler os dados salvos neste aparelho (' + loadFailure.message + '). ' +
+        'Nada foi apagado, mas o app abriu vazio e NÃO está salvando. ' +
+        'Toque em "Baixar cópia" para guardar o dado bruto num arquivo; depois disso o app volta a salvar ' +
+        'e você pode Sincronizar ou Importar um backup. Se cancelar, este aviso volta na próxima abertura.',
+        () => {
+          try {
+            downloadTextFile(`backup_caderno_visitas_bruto_${todayISO()}.json`, loadFailure.raw);
+          } catch (e) {
+            setSyncStatus('Não foi possível baixar a cópia: ' + e.message, true);
+            return; // sem cópia guardada, continua sem gravar
+          }
+          loadFailure = null;
+          saveData(state);
+          flushSave();
+          setSyncStatus('Cópia baixada. O app voltou a salvar neste aparelho.');
+        }, 'Dados locais ilegíveis', 'bg-amber-600', 'Baixar cópia');
+    }
   </script>
 </body>
 </html>
