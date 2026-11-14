@@ -176,8 +176,10 @@
       if (r.tipo === 'lab') out.examsLab.push({ key: j(r.data, r.nome, r.resultado), hash: '', ord: i, row: r });
       else out.examsImage.push({ key: r.id, hash: hash8(j(r.nome, r.data, r.resultado)), ord: i, row: r });
     });
-    (rows.condutas || []).forEach(function (r, i) {
-      out.condutas.push({ key: r.id, hash: hash8(j(r.texto, r.done)), ord: i, row: r });
+    // ord = coluna "ordem" (o pull chega em ordem de chave primária, não de lista);
+    // sem ordem (linha antiga, ou criada sem a coluna) → a mescla põe no fim.
+    (rows.condutas || []).forEach(function (r) {
+      out.condutas.push({ key: r.id, hash: hash8(j(r.texto, r.done)), ord: r.ordem, row: r });
     });
     (rows.raw_texts || []).forEach(function (r, i) {
       out.raw_texts.push({ key: r.id, hash: hash8(j(r.tipo, r.data, r.texto)), ord: i, row: r });
@@ -188,13 +190,57 @@
     return out;
   }
 
-  // Hash dos campos "corridos" do paciente, na mesma normalização do push —
-  // assim o hash local bate com o que uma versão intocada teria após o pull.
+  function localStatus(bed) {
+    return bed.isArchived ? (bed.archiveReason === 'alta' ? 'alta' : 'arquivado') : 'internado';
+  }
+  function localAge(bed) {
+    return (bed.age === '' || bed.age == null) ? '' : String(Number(bed.age));
+  }
+
+  // Hash ÚNICO dos campos "corridos" do paciente, na mesma normalização do push. Era a
+  // base do tudo-ou-nada antigo; continua na foto só para as fotos tiradas antes dos
+  // hashes por campo (ver PATIENT_SCALAR_FIELDS) seguirem legíveis. Não mude a fórmula.
   function localScalarsHash(bed) {
-    const status = bed.isArchived ? (bed.archiveReason === 'alta' ? 'alta' : 'arquivado') : 'internado';
-    const age = (bed.age === '' || bed.age == null) ? '' : String(Number(bed.age));
-    return hash8(j(bed.bedNumber, age, bed.admitDate, bed.hpp, bed.anamneseInicial, bed.dischargeForecast, status, bed.notes,
-      bed.personId, bed.dischargedAt));
+    return hash8(j(bed.bedNumber, localAge(bed), bed.admitDate, bed.hpp, bed.anamneseInicial, bed.dischargeForecast,
+      localStatus(bed), bed.notes, bed.personId, bed.dischargedAt));
+  }
+
+  // Campos corridos do paciente, com três-vias POR CAMPO: cada um tem o seu hash na foto
+  // (syncBase[id].fields[col]). Antes o hash era um só — bastava o aparelho editar um
+  // campo (uma anotação) para o push regravar todos e apagar o que a IA tinha escrito
+  // nos outros (anamnese, HPP...).
+  //   get(bed)             valor local normalizado (o que entra no hash)
+  //   set(bed, p, notas)   adota o valor do banco
+  //   emptyAdopts          sem hash do campo na foto, o vazio local adota o banco
+  // status e data da alta andam juntos (um só hash): nunca ficam meio de cada lado.
+  // "notes" vem de painel_notes, não de painel_patients.
+  const PATIENT_SCALAR_FIELDS = [
+    { col: 'bed_number', get: function (b) { return b.bedNumber; },
+      set: function (b, p) { b.bedNumber = p.bed_number || b.bedNumber; } },
+    { col: 'age', get: localAge,
+      set: function (b, p) { b.age = p.age == null ? '' : p.age; } },
+    { col: 'admit_date', get: function (b) { return b.admitDate; },
+      set: function (b, p) { b.admitDate = p.admit_date || ''; } },
+    { col: 'hpp', emptyAdopts: true, get: function (b) { return b.hpp; },
+      set: function (b, p) { b.hpp = p.hpp || ''; } },
+    { col: 'anamnese_inicial', emptyAdopts: true, get: function (b) { return b.anamneseInicial; },
+      set: function (b, p) { b.anamneseInicial = p.anamnese_inicial || ''; } },
+    { col: 'discharge_forecast', get: function (b) { return b.dischargeForecast; },
+      set: function (b, p) { b.dischargeForecast = p.discharge_forecast || ''; } },
+    { col: 'status', get: function (b) { return j(localStatus(b), b.dischargedAt); },
+      set: function (b, p) {
+        b.isArchived = p.status !== 'internado';
+        b.archiveReason = p.status === 'internado' ? null : p.status;
+        b.dischargedAt = p.discharge_date || '';
+      } },
+    { col: 'notes', get: function (b) { return b.notes; },
+      set: function (b, p, notesTexto) { b.notes = notesTexto || ''; } },
+    { col: 'person_id', get: function (b) { return b.personId; },
+      set: function (b, p) { b.personId = p.person_id || null; } },
+  ];
+  function scalarValue(f, bed) {
+    const v = f.get(bed);
+    return String(v == null ? '' : v);
   }
 
   const ROW_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'condutas', 'raw_texts', 'examsImage', 'examsLab', 'evolucoes'];
@@ -214,6 +260,7 @@
       });
       const fields = {};
       PATIENT_TEXT_FIELDS.forEach(function (f) { fields[f.col] = hash8(bed[f.local]); });
+      PATIENT_SCALAR_FIELDS.forEach(function (f) { fields[f.col] = hash8(scalarValue(f, bed)); });
       base[bed.patientId] = { rows: rows, scalars: localScalarsHash(bed), fields: fields };
     });
     base['#prefs'] = { lab_ranges: hash8(state.labRangesText == null ? '' : state.labRangesText) };
@@ -396,10 +443,20 @@
       const remote = pulledRowSets(remoteRows);
       function baseRows(t) { return base ? (base.rows[t] || {}) : null; }
 
-      // Scalars antes das linhas: usa o leito ainda intocado para o hash local.
-      if (base && base.scalars === localScalarsHash(bed)) {
-        applyPatientScalars(bed, p, remoteNote);
-      }
+      // Campos corridos, um a um: intocado desde a foto adota o banco; editado no
+      // aparelho fica (o push regrava). Foto sem o hash do campo (tirada pela versão
+      // anterior do app) ou sem foto: vale o hash único antigo — paciente inteiro
+      // intocado adota tudo — e, fora isso, só o vazio local de HPP/anamnese adota o
+      // banco (é onde a IA escreve; o vazio não tem o que perder).
+      // Decide tudo antes de aplicar: o hash único é calculado com o leito intocado.
+      const legacyUntouched = !!base && base.scalars === localScalarsHash(bed);
+      PATIENT_SCALAR_FIELDS.filter(function (f) {
+        const localVal = scalarValue(f, bed);
+        if (base && base.fields && Object.prototype.hasOwnProperty.call(base.fields, f.col)) {
+          return hash8(localVal) === base.fields[f.col];
+        }
+        return legacyUntouched || (!!f.emptyAdopts && localVal === '');
+      }).forEach(function (f) { f.set(bed, p, remoteNote); });
 
       // person_id só nasce pelo botão Reinternar e nunca é editado à mão: se o banco
       // tem e o aparelho não, adota sempre (senão o push apagaria o vínculo com null).
@@ -1048,8 +1105,8 @@
           out.exams.push({ id: e.id || uuid(), patient_id: pid, tipo: 'imagem', nome: e.name || '', data: e.date || null, resultado: e.summary || '' });
         }
       });
-      (b.condutas || []).forEach(function (c) {
-        out.condutas.push({ id: c.id || uuid(), patient_id: pid, texto: c.text || '', done: !!c.done, data: null });
+      (b.condutas || []).forEach(function (c, i) {
+        out.condutas.push({ id: c.id || uuid(), patient_id: pid, texto: c.text || '', done: !!c.done, data: null, ordem: i });
       });
       out.notes.push({ patient_id: pid, texto: b.notes || '' });
       (b.rawTexts || []).forEach(function (r) {
@@ -1067,18 +1124,9 @@
     return out;
   }
 
+  // Adoção integral dos campos corridos (paciente novo no aparelho / pull limpo).
   function applyPatientScalars(bed, p, notesTexto) {
-    bed.bedNumber = p.bed_number || bed.bedNumber;
-    bed.age = p.age == null ? '' : p.age;
-    bed.admitDate = p.admit_date || '';
-    bed.hpp = p.hpp || '';
-    bed.anamneseInicial = p.anamnese_inicial || '';
-    bed.dischargeForecast = p.discharge_forecast || '';
-    bed.isArchived = p.status !== 'internado';
-    bed.archiveReason = p.status === 'internado' ? null : p.status;
-    bed.personId = p.person_id || null;
-    bed.dischargedAt = p.discharge_date || '';
-    bed.notes = notesTexto || '';
+    PATIENT_SCALAR_FIELDS.forEach(function (f) { f.set(bed, p, notesTexto); });
   }
 
   // Adoção integral (paciente novo no aparelho / pull limpo). Na mescla de um leito
@@ -1118,7 +1166,11 @@
       return { id: r.id, type: 'image', date: r.data || '', name: r.nome || '', summary: r.resultado || '' };
     }));
 
-    bed.condutas = (rows.condutas || []).map(function (r) { return { id: r.id, text: r.texto || '', done: !!r.done }; });
+    // Pela coluna "ordem"; sem ordem vai para o fim, na sequência em que chegou.
+    bed.condutas = (rows.condutas || [])
+      .map(function (r, i) { return { ord: r.ordem == null ? 1000000 + i : r.ordem, r: r }; })
+      .sort(function (a, b) { return a.ord - b.ord; })
+      .map(function (m) { return { id: m.r.id, text: m.r.texto || '', done: !!m.r.done }; });
     bed.rawTexts = (rows.raw_texts || []).map(function (r) { return { id: r.id, tipo: r.tipo, data: r.data || '', texto: r.texto || '' }; });
     bed.generatedDocs = (rows.generated_docs || []).slice()
       .sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); })

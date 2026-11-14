@@ -13,7 +13,7 @@ App pessoal de um médico internista: `index.html` (offline-first, localStorage)
 - Projeto: **Gestão Médica** (`kuhymtikommkoupynhkj`, região sa-east-1). As tabelas do Painel convivem com outro app no mesmo projeto, por isso usam o **prefixo `painel_`**.
 - Acesso restrito por RLS ao usuário dono do painel (o e-mail real está configurado nas policies do banco; o projeto tem outros usuários, mas só o dono enxerga as tabelas `painel_*`).
 
-Tabelas: `painel_patients` (status: internado/alta/arquivado/nuvem; `person_id` agrupa as internações da mesma pessoa — nulo = internação única; `discharge_date` = data da alta; `alergias` e `medicacoes_previas` = texto puro, '' quando não há), `painel_problems` (status: ativo/resolvido/cronico, com `plano` e `ordem`), `painel_antibiotics`, `painel_cultures`, `painel_devices` (`kind`: device/procedimento — cirurgias contam "PO Dn" e não alertam), `painel_exams` (tipo: lab/imagem), `painel_condutas`, `painel_notes` (1 linha por paciente, PK = patient_id), `painel_raw_texts` (tipo: evolucao/prescricao/admissao — textos crus colados do prontuário), `painel_evolucoes` (evolução no formato do Tasy: UMA linha por paciente por dia, `UNIQUE (patient_id, data)`; nove campos de texto puro: `problemas`, `historia_internacao`, `evolucao_atual`, `exames_lab`, `culturas`, `exames_imagem`, `atualizacao_problemas`, `metas`, `acoes`), `painel_doc_templates` (`sumario_alta`, `laudo`; `evolucao_tasy` é um guia interno para a IA preencher `painel_evolucoes`, não um documento gerável; `receituario` foi aposentado — a linha continua no banco, não use), `painel_generated_docs`, `painel_prefs` (preferências globais do app, PK = key; hoje só `lab_ranges` — upsert por chave no push, três-vias na mescla).
+Tabelas: `painel_patients` (status: internado/alta/arquivado/nuvem; `person_id` agrupa as internações da mesma pessoa — nulo = internação única; `discharge_date` = data da alta; `alergias` e `medicacoes_previas` = texto puro, '' quando não há), `painel_problems` (status: ativo/resolvido/cronico, com `plano` e `ordem`), `painel_antibiotics`, `painel_cultures`, `painel_devices` (`kind`: device/procedimento — cirurgias contam "PO Dn" e não alertam), `painel_exams` (tipo: lab/imagem), `painel_condutas` (`ordem` = posição na lista; nula = fim da lista), `painel_notes` (1 linha por paciente, PK = patient_id), `painel_raw_texts` (tipo: evolucao/prescricao/admissao — textos crus colados do prontuário), `painel_evolucoes` (evolução no formato do Tasy: UMA linha por paciente por dia, `UNIQUE (patient_id, data)`; nove campos de texto puro: `problemas`, `historia_internacao`, `evolucao_atual`, `exames_lab`, `culturas`, `exames_imagem`, `atualizacao_problemas`, `metas`, `acoes`), `painel_doc_templates` (`sumario_alta`, `laudo`; `evolucao_tasy` é um guia interno para a IA preencher `painel_evolucoes`, não um documento gerável; `receituario` foi aposentado — a linha continua no banco, não use), `painel_generated_docs`, `painel_prefs` (preferências globais do app, PK = key; hoje só `lab_ranges` — upsert por chave no push, três-vias na mescla).
 
 Identifique pacientes por `bed_number` + `initials` (ex.: "leito 1012-A"). Em ambiguidade, pergunte.
 
@@ -22,7 +22,7 @@ Identifique pacientes por `bed_number` + `initials` (ex.: "leito 1012-A"). Em am
 Quando o usuário colar um texto do prontuário (ou pedir para processar `painel_raw_texts` pendentes):
 1. Salve o texto em `painel_raw_texts` (tipo: evolucao/prescricao/admissao) se ainda não estiver lá.
 2. Extraia e atualize: `painel_problems` (criar novos, atualizar status/plano dos existentes — não duplique problemas já cadastrados; compare por significado, não por string), `painel_antibiotics` (nome, D1, duração, indicação), `painel_condutas`, `anamnese_inicial` em `painel_patients` (apenas se for texto de admissão e o campo estiver vazio).
-3. Gere `id` uuid para linhas novas. Não delete linhas que você não criou, a menos que o texto diga explicitamente (ex.: "suspenso ATB").
+3. Gere `id` uuid para linhas novas. Item novo entra no fim da lista: `ordem` = maior `ordem` do paciente + 1 em `painel_problems` e `painel_condutas` (nos trackers, a maior entre `painel_antibiotics`, `painel_cultures` e `painel_devices`). Não delete linhas que você não criou, a menos que o texto diga explicitamente (ex.: "suspenso ATB").
 4. Resuma para o usuário o que mudou e lembre-o de tocar **Sincronizar** no app.
 
 ## Fluxo 2 — Gerar documento
@@ -59,9 +59,15 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
   (não o `id`) e a gravação é upsert em `(patient_id, data)` — o app nunca faz delete nessa
   tabela. O mesmo dia criado pela IA e no aparelho vira uma linha só (conteúdo: regra de
   conflito de sempre; `id`: o do banco).
-- `painel_patients.alergias` e `medicacoes_previas` têm three-way POR CAMPO (hash próprio na
-  foto, `syncBase[id].fields`), fora do hash geral dos scalars: a IA pode preenchê-los mesmo
-  que o aparelho tenha editado outros campos do paciente.
+- Os campos do paciente têm three-way POR CAMPO (um hash por campo na foto,
+  `syncBase[id].fields`; lista em `PATIENT_SCALAR_FIELDS` + `PATIENT_TEXT_FIELDS`): leito,
+  idade, admissão, `hpp`, `anamnese_inicial`, `discharge_forecast`, status + `discharge_date`
+  (um bloco só), `person_id`, `alergias`, `medicacoes_previas` e a anotação (`painel_notes`).
+  A IA pode preencher um campo mesmo que o aparelho tenha editado outros; só perde se o
+  aparelho editou AQUELE campo. Campo novo no paciente entra nessa lista, com hash próprio —
+  nunca no hash único antigo (`localScalarsHash`, mantido só para ler fotos antigas).
+- `painel_condutas.ordem` guarda a posição na lista (o push grava 0, 1, 2...; o pull chega
+  em ordem de chave primária e é reordenado por ela). Nula = fim da lista.
 - O pull lê cada tabela INTEIRA, em páginas (`pullAllTables` → `PainelCore.fetchAllRows`:
   ordem por chave primária + contagem exata). A API devolve no máximo ~1000 linhas por
   requisição sem erro, e uma tabela truncada seria lida pela mescla como deleção remota
