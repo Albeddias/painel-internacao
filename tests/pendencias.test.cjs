@@ -106,3 +106,41 @@ test('pendências: bedIndex aponta para o leito original mesmo com leitos pulado
   assert.strictEqual(out[0].bedIndex, 1);
   assert.strictEqual(out[0].bedNumber, '1013-B');
 });
+
+test('pendências: gravidade e rótulo curto de cada tipo', () => {
+  const out = pend([bed({
+    trackers: [
+      { id: 'a', type: 'atb', name: 'Cefepime', startDate: '2026-08-20', duration: 7 },
+      { id: 'b', type: 'atb', name: 'Pipe-tazo', startDate: '2026-08-21', duration: 7 },
+      { id: 'c', type: 'culture', name: 'HMC', collectionDate: '2026-08-24', result: 'Aguardando' },
+      { id: 'd', type: 'device', name: 'CVC Subclávia D', installDate: '2026-08-19' },
+    ],
+    dischargeForecast: '2026-08-25', reminderDate: '2026-08-27',
+  })]);
+  assert.deepStrictEqual(out.map((p) => [p.tipo, p.gravidade, p.curto]), [
+    ['atb', 'alerta', 'ATB D8/7'], ['atb', 'atencao', 'ATB D7/7'], ['cultura', 'atencao', 'Cultura D4'],
+    ['dispositivo', 'atencao', 'CVC D9'], ['alta', 'alerta', 'Alta atrasada'], ['lembrete', 'atencao', 'Lembrete'],
+  ]);
+});
+
+test('pendências: alta de hoje é info; dispositivo de nome longo ou sem nome', () => {
+  assert.deepStrictEqual(pend([bed({ dischargeForecast: TODAY })]).map((p) => [p.gravidade, p.curto]), [['info', 'Alta hoje']]);
+  const disp = (name) => pend([bed({ trackers: [{ id: 'd', type: 'device', name: name, installDate: '2026-08-20' }] })])[0].curto;
+  assert.strictEqual(disp('Traqueostomia'), 'Traqueos D8');
+  assert.strictEqual(disp(''), 'Disp D8');
+  assert.strictEqual(disp('   '), 'Disp D8');
+});
+
+test('agruparPendencias: uma entrada por leito, a mais grave primeiro', () => {
+  const g = PainelCore.agruparPendencias(pend([
+    bed({ bedNumber: '1010', dischargeForecast: TODAY }),
+    bed({ bedNumber: '1013', reminderDate: TODAY }),
+    bed({ bedNumber: '1012-A', reminderDate: TODAY, dischargeForecast: '2026-08-25' }),
+    bed({ bedNumber: '1011', reminderDate: TODAY }),
+  ]));
+  assert.deepStrictEqual(g.map((x) => [x.bedNumber, x.gravidadeMax, x.itens.length]),
+    [['1012-A', 'alerta', 2], ['1011', 'atencao', 1], ['1013', 'atencao', 1], ['1010', 'info', 1]]);
+  assert.deepStrictEqual(g[0].itens.map((i) => i.gravidade), ['alerta', 'atencao'], 'dentro do leito, por gravidade');
+  assert.strictEqual(g[0].bedIndex, 2);
+  assert.deepStrictEqual(PainelCore.agruparPendencias([]), []);
+});

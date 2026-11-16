@@ -329,3 +329,10 @@ test('index.html: cabeçalho da lista em três linhas, com a frase do progresso 
   assert.ok(cab.includes('placeholder="Buscar leito, nome ou diagnóstico"'));
   assert.ok(html.includes('PainelCore.progressoDoDia(state)') && html.includes('PainelCore.fraseProgresso(') && html.includes('PainelCore.fraseArquivados('));
 });
+
+test('LIMIARES: os limiares de alerta vivem num lugar só', () => {
+  assert.deepStrictEqual(PainelCore.LIMIARES, { culturaDias: 3, dispositivoDias: 7, atbLongoDia: 8 });
+  assert.ok(!/cDays >= 3/.test(html) && !/dDays >= 7/.test(html), 'o index.html usa PainelCore.LIMIARES');
+  assert.ok(html.includes('PainelCore.agruparPendencias('));
+  assert.ok(!html.includes('PENDENCIA_COLORS'), 'a bolinha segue a gravidade, não o tipo');
+});

@@ -1604,32 +1604,37 @@
     // --- Funções de Renderização (TELA A) ---
 
     // Painel "Pendências do dia": agregado do que pede ação hoje (calculado na hora, nada sincroniza).
-    const PENDENCIA_COLORS = { atb: 'bg-sky-500', cultura: 'bg-amber-500', dispositivo: 'bg-slate-500', alta: 'bg-green-500', lembrete: 'bg-blue-500' };
+    // Gravidade da pendência → tom (spec 2.3; o "info" usa a primária). Também usado pelos selos do cartão.
+    const TOM_GRAVIDADE = { alerta: 'danger', atencao: 'warn', info: 'primary' };
+    // Painel de pendências: uma linha por leito, bolinha na cor da gravidade máxima.
     function renderPendenciasPanel() {
       const pend = PainelCore.buildPendencias(state, todayISO());
       if (pend.length === 0) return;
+      const grupos = PainelCore.agruparPendencias(pend);
       const open = !state.isPendenciasMinimized;
+      const nL = grupos.length, nI = pend.length;
+      const titulo = `Pendências (${nL} ${nL === 1 ? 'leito' : 'leitos'}, ${nI} ${nI === 1 ? 'item' : 'itens'})`;
       const wrap = document.createElement('div');
-      wrap.className = 'bg-white rounded-xl shadow-lg border border-amber-300/60';
+      wrap.className = 'card';
       wrap.innerHTML = `
-        <button class="pendencias-toggle w-full flex justify-between items-center p-3 text-left">
-          <span class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-amber-500"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /></svg>
-            Pendências do dia <span class="text-amber-600">(${pend.length})</span>
+        <button type="button" class="pendencias-toggle w-full flex justify-between items-center p-3 min-h-[44px] text-left rounded-xl" aria-expanded="${open}">
+          <span class="text-sm font-semibold flex items-center gap-1.5" style="color: var(--c-text)">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" style="color: var(--c-warn-mark)" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /></svg>
+            ${titulo}
           </span>
-          <svg class="toggle-icon w-5 h-5 transition-transform ${open ? 'rotate-90' : ''}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+          <svg class="toggle-icon w-5 h-5 transition-transform ${open ? 'rotate-90' : ''}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
-        <div class="pendencias-list ${open ? '' : 'hidden'} px-3 pb-3 space-y-0.5">
-          ${pend.map(p => `
-            <button class="pendencia-item w-full flex items-center gap-2 text-left text-sm p-2 rounded-md hover:bg-slate-50" data-bed-index="${p.bedIndex}">
-              <span class="w-2 h-2 rounded-full flex-shrink-0 ${PENDENCIA_COLORS[p.tipo] || 'bg-slate-400'}"></span>
-              <span class="font-semibold text-slate-800 flex-shrink-0">${escapeHtml(p.bedNumber || '—')}</span>
-              <span class="text-slate-600 truncate">${escapeHtml(p.label)}</span>
+        <div class="pendencias-list ${open ? '' : 'hidden'} px-1.5 pb-1.5">
+          ${grupos.map(g => `
+            <button type="button" class="pendencia-item w-full flex items-center gap-2 text-left text-sm px-2 min-h-[44px] rounded-md hover:bg-slate-50" data-bed-index="${g.bedIndex}">
+              <span class="mark mark-${TOM_GRAVIDADE[g.gravidadeMax]}" aria-hidden="true"></span>
+              <span class="min-w-0 truncate txt-muted"><b style="color: var(--c-text)">${escapeHtml(g.bedNumber || '—')}</b> · ${g.itens.map(i => escapeHtml(i.curto)).join(' · ')}</span>
             </button>`).join('')}
         </div>`;
-      wrap.querySelector('.pendencias-toggle').addEventListener('click', () => {
+      wrap.querySelector('.pendencias-toggle').addEventListener('click', (e) => {
         state.isPendenciasMinimized = !state.isPendenciasMinimized;
         saveData(state, { localOnly: true });
+        e.currentTarget.setAttribute('aria-expanded', String(!state.isPendenciasMinimized));
         wrap.querySelector('.pendencias-list').classList.toggle('hidden');
         wrap.querySelector('.pendencias-toggle .toggle-icon').classList.toggle('rotate-90');
       });
@@ -2196,7 +2201,7 @@
                 const cDays = dayNumberToday(t.collectionDate);
                 const resultText = (t.result || '').trim();
                 const pending = resultText === '' || /aguard/i.test(resultText);
-                const alertCulture = pending && cDays !== null && cDays >= 3;
+                const alertCulture = pending && cDays !== null && cDays >= PainelCore.LIMIARES.culturaDias;
                 html = `<div class="flex-1 min-w-0">
                             <span class="font-medium text-amber-700">Cultura:</span> <span class="text-slate-800">${escapeHtml(t.name)} (${calculateDaysSince(t.collectionDate)})</span>
                             <span class="text-xs ${alertCulture ? 'text-amber-700 font-semibold' : 'text-slate-500'} ml-1">- ${escapeHtml(resultText || 'Aguardando')}${alertCulture ? ' • resultado pendente' : ''}</span>
@@ -2227,7 +2232,7 @@
                             </div>`;
                 } else {
                     const dDays = dayNumberToday(t.installDate);
-                    const alertDevice = dDays !== null && dDays >= 7;
+                    const alertDevice = dDays !== null && dDays >= PainelCore.LIMIARES.dispositivoDias;
                     const devBadge = alertDevice ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-800';
                     html = `<div class="flex-1 min-w-0">
                                 <span class="font-medium text-slate-700">Disp:</span> <span class="text-slate-800">${escapeHtml(t.name)}</span>

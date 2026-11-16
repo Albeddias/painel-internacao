@@ -881,6 +881,9 @@
   // { label, tone }. tone: 'ended' (suspenso, contagem congelada) | 'scheduled' (D1 futuro) |
   // 'due' (último dia ou prazo vencido) | 'long' (sem duração e D8+) | 'normal'.
   // Prazo vencido mostra o dia REAL (D9/7): o ATB segue em uso até alguém dar a data de fim.
+  // Limiares de alerta, num lugar só (pendências, selo do ATB, lista de controles).
+  const LIMIARES = { culturaDias: 3, dispositivoDias: 7, atbLongoDia: 8 };
+
   function atbBadge(t, todayStr) {
     const n = dayNumber(t.startDate, todayStr);
     if (t.endDate && t.endDate <= todayStr) {
@@ -894,7 +897,7 @@
       if (n === t.duration) return { label: 'D' + n + '/' + t.duration + ' (último dia)', tone: 'due' };
       return { label: 'D' + n + '/' + t.duration, tone: 'normal' };
     }
-    return { label: 'D' + n, tone: n >= 8 ? 'long' : 'normal' };
+    return { label: 'D' + n, tone: n >= LIMIARES.atbLongoDia ? 'long' : 'normal' };
   }
 
   // Os quatro checks diários, na ordem da tela. `label` é a sigla inteira (a primeira letra
@@ -975,8 +978,9 @@
       if (!bed.patientName || !String(bed.patientName).trim()) return;
       if (bed.externalDoctor && bed.externalDoctor.active) return;
 
-      function add(tipo, label) {
-        out.push({ bedIndex: bedIndex, bedNumber: bed.bedNumber || '', patientName: bed.patientName || '', tipo: tipo, label: label });
+      // gravidade: 'alerta' | 'atencao' | 'info' (spec 2.3); curto: rótulo de selo.
+      function add(tipo, label, gravidade, curto) {
+        out.push({ bedIndex: bedIndex, bedNumber: bed.bedNumber || '', patientName: bed.patientName || '', tipo: tipo, label: label, gravidade: gravidade, curto: curto });
       }
 
       (bed.trackers || []).forEach(function (t) {
@@ -985,27 +989,58 @@
           const ended = t.endDate && t.endDate <= todayStr;
           const n = dayNumber(t.startDate, todayStr);
           if (ended || !t.duration || n === null || n === 0) return;
-          if (n === t.duration) add('atb', 'ATB ' + t.name + ': último dia (D' + n + '/' + t.duration + ')');
-          else if (n > t.duration) add('atb', 'ATB ' + t.name + ': prazo vencido (D' + n + '/' + t.duration + ')');
+          const dd = 'D' + n + '/' + t.duration;
+          if (n === t.duration) add('atb', 'ATB ' + t.name + ': último dia (' + dd + ')', 'atencao', 'ATB ' + dd);
+          else if (n > t.duration) add('atb', 'ATB ' + t.name + ': prazo vencido (' + dd + ')', 'alerta', 'ATB ' + dd);
         } else if (t.type === 'culture') {
           const resultText = String(t.result || '').trim();
           const pending = resultText === '' || /aguard/i.test(resultText);
           const n = dayNumber(t.collectionDate, todayStr);
-          if (pending && n !== null && n >= 3) add('cultura', 'Cultura ' + t.name + ': sem resultado (D' + n + ')');
+          if (pending && n !== null && n >= LIMIARES.culturaDias) add('cultura', 'Cultura ' + t.name + ': sem resultado (D' + n + ')', 'atencao', 'Cultura D' + n);
         } else {
           if (t.kind === 'procedimento' || t.removalDate) return;
           const n = dayNumber(t.installDate, todayStr);
-          if (n !== null && n >= 7) add('dispositivo', t.name + ': D' + n + ', avaliar retirada');
+          if (n !== null && n >= LIMIARES.dispositivoDias) {
+            const palavra = String(t.name || '').trim().split(/\s+/)[0].slice(0, 8) || 'Disp';
+            add('dispositivo', t.name + ': D' + n + ', avaliar retirada', 'atencao', palavra + ' D' + n);
+          }
         }
       });
 
       if (bed.dischargeForecast) {
-        if (bed.dischargeForecast === todayStr) add('alta', 'Alta prevista hoje');
-        else if (bed.dischargeForecast < todayStr) add('alta', 'Alta prevista atrasada (' + formatDateBR(bed.dischargeForecast) + ')');
+        if (bed.dischargeForecast === todayStr) add('alta', 'Alta prevista hoje', 'info', 'Alta hoje');
+        else if (bed.dischargeForecast < todayStr) add('alta', 'Alta prevista atrasada (' + formatDateBR(bed.dischargeForecast) + ')', 'alerta', 'Alta atrasada');
       }
-      if (bed.reminderDate && bed.reminderDate <= todayStr) add('lembrete', 'Lembrete para hoje');
+      if (bed.reminderDate && bed.reminderDate <= todayStr) add('lembrete', 'Lembrete para hoje', 'atencao', 'Lembrete');
     });
     return out;
+  }
+
+  const ORDEM_GRAVIDADE = { alerta: 0, atencao: 1, info: 2 };
+  function porGravidade(itens) {
+    // ordenação estável: mesmo peso mantém a ordem de chegada
+    return itens.map(function (it, i) { return { it: it, i: i }; }).sort(function (a, b) {
+      return (ORDEM_GRAVIDADE[a.it.gravidade] - ORDEM_GRAVIDADE[b.it.gravidade]) || (a.i - b.i);
+    }).map(function (x) { return x.it; });
+  }
+
+  // Uma entrada por leito: grupos pela gravidade máxima e, no empate, pelo número do leito
+  // (minúsculas + localeCompare, como a lista); dentro do grupo, itens por gravidade.
+  function agruparPendencias(pend) {
+    const byBed = {};
+    const grupos = [];
+    (pend || []).forEach(function (p) {
+      if (!byBed[p.bedIndex]) { byBed[p.bedIndex] = { bedIndex: p.bedIndex, bedNumber: p.bedNumber, gravidadeMax: p.gravidade, itens: [] }; grupos.push(byBed[p.bedIndex]); }
+      byBed[p.bedIndex].itens.push(p);
+    });
+    grupos.forEach(function (g) {
+      g.itens = porGravidade(g.itens);
+      g.gravidadeMax = g.itens[0].gravidade;
+    });
+    return grupos.sort(function (a, b) {
+      return (ORDEM_GRAVIDADE[a.gravidadeMax] - ORDEM_GRAVIDADE[b.gravidadeMax]) ||
+        String(a.bedNumber || 'zzzz').toLowerCase().localeCompare(String(b.bedNumber || 'zzzz').toLowerCase());
+    });
   }
 
   const GLOBAL_NOTES_TEMPLATE = "S: (Subjetivo)\n\nO: (Objetivo)\n- SSVV:\n- Exame:\n- Labs:\n- Imagem:\n\nA: (Avaliação)\n\nP: (Plano)\n";
@@ -1650,6 +1685,8 @@
     fraseProgresso: fraseProgresso,
     fraseArquivados: fraseArquivados,
     buildPendencias: buildPendencias,
+    agruparPendencias: agruparPendencias,
+    LIMIARES: LIMIARES,
     labNumber: labNumber,
     buildLabsLine: buildLabsLine,
     tendenciasLab: tendenciasLab,
