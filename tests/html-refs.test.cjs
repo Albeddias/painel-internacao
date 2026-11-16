@@ -14,7 +14,8 @@ const selectors = [...script.matchAll(SELECTOR_CALL)].map((m) => m[2]);
 
 test('todo id procurado pelo script existe no HTML', () => {
   const ids = new Set([...html.matchAll(/\bid="([^"${}]+)"/g)].map((m) => m[1]));
-  const refs = new Set([...script.matchAll(/getElementById\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]));
+  // showModal/hideModal recebem o id e chamam getElementById por dentro.
+  const refs = new Set([...script.matchAll(/(?:getElementById|showModal|hideModal)\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]));
   selectors.forEach((s) => { for (const m of s.matchAll(/#([A-Za-z][\w-]*)/g)) refs.add(m[1]); });
   assert.ok(refs.size > 50, 'a extração de ids parou de funcionar');
   assert.deepStrictEqual([...refs].filter((id) => !ids.has(id)), []);

@@ -169,6 +169,9 @@ test('index.html: sair dos Arquivados está sempre à vista', () => {
   assert.ok(html.includes('function setViewArchived('));
   const filtros = html.slice(html.indexOf('id="filtersPanel"'), html.indexOf('</header>'));
   assert.ok(!filtros.includes('viewSegment'), 'o seletor fica fora do painel recolhível');
+  ['viewActiveBtn', 'viewArchivedBtn'].forEach((id) => {
+    assert.ok(new RegExp('id="' + id + '" class="[^"]*\\bh-11\\b').test(html), id + ' com alvo de toque de 44 px (spec: Restrições)');
+  });
 });
 
 test('index.html: rodapé do paciente cabe numa linha', () => {
