@@ -1028,6 +1028,16 @@
     return formatDateBR(f.inicio) + ' a ' + formatDateBR(f.fim);
   }
 
+  // Aviso de iniciais (spec 3.9): o "Copiar" troca [NOME] pelo nome que o aparelho tem; no
+  // aparelho que só recebeu o paciente do banco, esse nome são as iniciais.
+  function avisoIniciais(bed, textos) {
+    const b = bed || {};
+    const nome = String(b.patientName || '').trim();
+    if (!nome || knownPatientName(b)) return '';
+    if (!(textos || []).some(function (t) { return String(t || '').indexOf('[NOME]') !== -1; })) return '';
+    return 'Este aparelho só tem as iniciais: [NOME] sai como "' + nome + '". Digite o nome completo no cartão para copiar com o nome.';
+  }
+
   // Leitos vizinhos na ordem da lista (‹ › da tela do paciente, spec 3.8): dá a volta; fora da
   // lista, ou sozinho nela, não há vizinho.
   function vizinhosNaLista(indices, atual) {
@@ -1983,6 +1993,7 @@
     janelaLabs: janelaLabs,
     rotuloFiltroLabs: rotuloFiltroLabs,
     vizinhosNaLista: vizinhosNaLista,
+    avisoIniciais: avisoIniciais,
     GENDOC_LABEL: GENDOC_LABEL,
     showsQuedaCheck: showsQuedaCheck,
     DAILY_CHECKS: DAILY_CHECKS,

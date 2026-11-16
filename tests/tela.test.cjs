@@ -575,3 +575,19 @@ test('index.html: ‹ › mostram o leito vizinho e desabilitam fora da lista', 
   assert.strictEqual((html.match(/class="nav-label /g) || []).length, 2);
   assert.ok(!/% renderedBedIndexes\.length/.test(html), 'a conta do vizinho saiu dos dois listeners');
 });
+
+test('avisoIniciais: avisa quando [NOME] vai sair como iniciais', () => {
+  const soIniciais = { patientName: 'AB', initialsPlaceholder: 'AB' };
+  const msg = 'Este aparelho só tem as iniciais: [NOME] sai como "AB". Digite o nome completo no cartão para copiar com o nome.';
+  assert.strictEqual(PainelCore.avisoIniciais(soIniciais, ['Paciente [NOME] evolui bem', '']), msg);
+  assert.strictEqual(PainelCore.avisoIniciais(soIniciais, ['sem marcador', '']), '');
+  assert.strictEqual(PainelCore.avisoIniciais(soIniciais, null), '');
+  assert.strictEqual(PainelCore.avisoIniciais({ patientName: 'Paciente Exemplo Um', initialsPlaceholder: '' }, ['[NOME]']), '');
+  assert.strictEqual(PainelCore.avisoIniciais({ patientName: '', initialsPlaceholder: '' }, ['[NOME]']), '', 'leito sem nome');
+});
+
+test('index.html: marca de copiado na Evolução Tasy e nos blocos do sumário', () => {
+  assert.ok(html.includes('const copiedMarks = new Set();'));
+  assert.ok(html.includes('PainelCore.avisoIniciais('));
+  assert.ok(html.includes('✓ copiado') && html.includes('evolucao-copy-count'));
+});

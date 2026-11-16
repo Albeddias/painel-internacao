@@ -4,6 +4,7 @@
  *   lista | arquivados | tarefas | paciente:N | paciente:N:aberto | modal:controle | aviso | menu
  *   paciente:N:menu (menu ⋯ do paciente aberto) | paciente:N:secao=<atalho> (toca o atalho)
  *   paciente:N:fixados (Exames aberto, no modo "Editar fixados")
+ *   paciente:N:copiado (Evolução Tasy aberta, dois campos de hoje marcados como copiados)
  *   lista:check (marca o primeiro check) | lista:edicao (edita um problema: "alterações a enviar")
  *   lista:vazia (sem leitos) | lista:filtro (busca sem resultado)
  * Sufixo ":medir" em qualquer tela: etiqueta amarela com a altura do cabeçalho fixo da
@@ -21,6 +22,13 @@
   } else if (tela === 'paciente') {
     var n = Number(partes[1] || 0);
     if (partes[2] === 'fixados') state.beds[n].isExamsMinimized = false;
+    if (partes[2] === 'copiado') {
+      state.beds[n].isEvolucaoTasyMinimized = false;
+      var hojeCap = todayISO();
+      ['problemas', 'evolucao_atual'].forEach(function (campo) {
+        copiedMarks.add('ev|' + state.beds[n].patientId + '|' + hojeCap + '|' + campo);
+      });
+    }
     if (partes[2] === 'aberto') {
       Object.keys(state.beds[n]).forEach(function (k) {
         if (/^is\w+Minimized$/.test(k)) state.beds[n][k] = false;
@@ -28,6 +36,7 @@
     }
     openPatientDetails(n);
     if (partes[2] === 'menu') openPatientMenu();
+    if (partes[2] === 'copiado') document.querySelector('[data-secao="evolucao"]').scrollIntoView({ block: 'start' });
     if (partes[2] === 'fixados') {
       pinEditMode = true;
       renderScreenB();

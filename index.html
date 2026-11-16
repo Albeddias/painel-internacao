@@ -1633,7 +1633,17 @@
     // rolagem não pula). O setTimeout fica como reserva para quem insere por conta própria.
     function resizeNow(el) {
       el.style.height = 'auto';
-      el.style.height = (el.scrollHeight) + 'px';
+      // scrollHeight não conta a borda; com box-sizing border-box, sem ela faltariam 2 px.
+      el.style.height = (el.scrollHeight + el.offsetHeight - el.clientHeight) + 'px';
+    }
+    // A fonte da página pode chegar depois do primeiro desenho e quebrar o texto em mais linhas:
+    // mede de novo os campos que se ajustam quando ela termina de carregar.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        document.querySelectorAll('#patientDetailContent textarea:not(.grow-wrap > textarea)').forEach((el) => {
+          if (el.style.height) resizeNow(el);
+        });
+      });
     }
     function autoResizeTextarea(el) {
       if (!el) return;
@@ -2734,6 +2744,24 @@
       el.textContent = n > 0 ? `(${n})` : '';
     }
 
+    // Marca de "copiado" (spec 3.9): só na memória — some ao editar o texto, ao trocar a data
+    // (a data faz parte da chave) ou ao recarregar o app. Não grava nem sincroniza nada.
+    // Chaves: 'ev|<patientId>|<data>|<campo>' e 'doc|<id do documento>|<índice do bloco>'.
+    const copiedMarks = new Set();
+    function copiadoMarkEl() {
+      const s = document.createElement('span');
+      s.className = 'copiado-mark hidden text-xs font-medium';
+      s.style.color = 'var(--c-success-on-bg)';
+      s.textContent = '✓ copiado';
+      return s;
+    }
+    function avisoIniciaisEl(texto) {
+      const p = document.createElement('p');
+      p.className = 'iniciais-aviso chip-warn text-sm rounded-lg px-3 py-2';
+      p.textContent = texto;
+      return p;
+    }
+
     function renderEvolucaoTasy(container, bed) {
       container.innerHTML = '';
       const rows = (bed.evolucoes || []).slice().sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
@@ -2760,6 +2788,9 @@
           renderEvolucaoTasy(container, bed);
         });
         bar.appendChild(sel);
+        const countEl = document.createElement('span');
+        countEl.className = 'evolucao-copy-count hidden text-xs txt-muted';
+        bar.appendChild(countEl);
       }
       const newBtn = document.createElement('button');
       newBtn.className = 'new-evolucao-btn text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-3 px-4 hover:bg-sky-100 transition-all print:hidden';
@@ -2787,6 +2818,19 @@
       // A linha é procurada pela data a cada uso: uma sincronização troca os objetos do leito.
       const currentRow = () => (bed.evolucoes || []).find(r => r.data === selected);
       const row = currentRow();
+      const markKey = (field) => 'ev|' + (bed.patientId || '') + '|' + selected + '|' + field;
+      // "N de M copiados": M conta só os campos com texto.
+      const refreshCopyCount = () => {
+        const el = container.querySelector('.evolucao-copy-count');
+        const r = currentRow();
+        if (!el || !r) return;
+        const comTexto = PainelCore.EVOLUCAO_FIELDS.filter((f) => String(r[f] || '').trim());
+        const n = comTexto.filter((f) => copiedMarks.has(markKey(f))).length;
+        el.textContent = n + ' de ' + comTexto.length + ' copiados';
+        el.classList.toggle('hidden', n === 0);
+      };
+      const aviso = PainelCore.avisoIniciais(bed, PainelCore.EVOLUCAO_FIELDS.map((f) => row[f] || ''));
+      if (aviso) container.appendChild(avisoIniciaisEl(aviso));
       PainelCore.EVOLUCAO_FIELDS.forEach((field) => {
         const wrap = document.createElement('div');
         const head = document.createElement('div');
@@ -2802,6 +2846,8 @@
         ta.rows = 2;
         ta.value = row[field] || '';
         copyBtn.disabled = ta.value.trim() === '';
+        const mark = copiadoMarkEl();
+        mark.classList.toggle('hidden', !copiedMarks.has(markKey(field)));
         ta.addEventListener('input', () => {
           const r = currentRow();
           if (!r) return;
@@ -2809,20 +2855,33 @@
           saveData(state);
           autoResizeTextarea(ta);
           copyBtn.disabled = ta.value.trim() === '';
+          copiedMarks.delete(markKey(field));
+          mark.classList.add('hidden');
+          refreshCopyCount();
         });
         // Copia só o texto do campo (sem rótulo); [NOME] vira o nome completo, como nos documentos.
         copyBtn.addEventListener('click', async () => {
           const ok = await copyTextToClipboard(PainelCore.fillPatientName(ta.value, bed.patientName));
           copyBtn.textContent = ok ? 'Copiado ✓' : 'Falhou';
           setTimeout(() => { copyBtn.textContent = 'Copiar'; }, 2000);
+          if (ok) {
+            copiedMarks.add(markKey(field));
+            mark.classList.remove('hidden');
+            refreshCopyCount();
+          }
         });
+        const acoes = document.createElement('div');
+        acoes.className = 'flex items-center gap-2 flex-shrink-0';
+        acoes.appendChild(mark);
+        acoes.appendChild(copyBtn);
         head.appendChild(label);
-        head.appendChild(copyBtn);
+        head.appendChild(acoes);
         wrap.appendChild(head);
         wrap.appendChild(ta);
         container.appendChild(wrap);
         autoResizeTextarea(ta);
       });
+      refreshCopyCount();
     }
 
     const RAWTEXT_LABEL = { evolucao: 'Evolução', prescricao: 'Prescrição', admissao: 'Admissão' };
@@ -2903,7 +2962,7 @@
 
     // Um bloco de documento: título + "Copiar" (só o conteúdo, sem a linha de título).
     // O bloco PARA CONFERIR é só para leitura: visual de aviso e sem botão.
-    function renderDocBlock(blk) {
+    function renderDocBlock(blk, chave) {
       const box = document.createElement('div');
       box.className = blk.conferir
         ? 'doc-block mt-2 p-2 rounded-md border-2 border-dashed border-amber-400 bg-amber-50'
@@ -2919,12 +2978,19 @@
         btn.className = 'copy-doc-block flex-shrink-0 text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden disabled:opacity-40 disabled:cursor-not-allowed';
         btn.textContent = 'Copiar';
         btn.disabled = blk.content.trim() === '';
+        const mark = copiadoMarkEl();
+        mark.classList.toggle('hidden', !copiedMarks.has(chave));
         btn.addEventListener('click', async () => {
           const ok = await copyTextToClipboard(blk.content);
           btn.textContent = ok ? 'Copiado ✓' : 'Falhou';
           setTimeout(() => { btn.textContent = 'Copiar'; }, 2000);
+          if (ok) { copiedMarks.add(chave); mark.classList.remove('hidden'); }
         });
-        head.appendChild(btn);
+        const acoes = document.createElement('div');
+        acoes.className = 'flex items-center gap-2 flex-shrink-0';
+        acoes.appendChild(mark);
+        acoes.appendChild(btn);
+        head.appendChild(acoes);
       }
       const body = document.createElement('p');
       body.className = 'whitespace-pre-wrap mt-1 text-xs ' + (blk.conferir ? 'text-amber-900' : 'text-slate-600');
@@ -2940,6 +3006,8 @@
         listElement.innerHTML = `<p class="text-sm text-slate-500 px-1">Nenhum documento. Peça à IA para gerar (ex.: sumário de alta) e toque em Sincronizar.</p>`;
         return;
       }
+      const aviso = PainelCore.avisoIniciais(bed, bed.generatedDocs.map((d) => d.conteudo || ''));
+      if (aviso) listElement.appendChild(avisoIniciaisEl(aviso));
       bed.generatedDocs.forEach((doc) => {
         const det = document.createElement('details');
         det.className = 'text-sm p-2 rounded-md bg-slate-50 border border-slate-200';
@@ -2958,7 +3026,7 @@
         det.appendChild(summary);
         if (blocks) {
           summary.querySelector('.copy-gendoc').remove();
-          blocks.forEach((blk) => det.appendChild(renderDocBlock(blk)));
+          blocks.forEach((blk, bi) => det.appendChild(renderDocBlock(blk, 'doc|' + (doc.id || doc.createdAt || '') + '|' + bi)));
           listElement.appendChild(det);
           return;
         }
