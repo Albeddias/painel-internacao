@@ -122,7 +122,7 @@ test('index.html: leito e nome mantêm o tamanho no celular; campo-linha sem alt
   assert.ok(/\.inline-bed\s*\{\s*font-size:\s*1\.5rem\s*!important/.test(html));
   assert.ok(/\.inline-name\s*\{\s*font-size:\s*1\.125rem\s*!important/.test(html));
   assert.ok(/input\.campo-linha\s*\{[^}]*min-height:\s*0/.test(html));
-  ['inline-age', 'inline-admit', 'problem-plan'].forEach((c) => assert.ok(juntas(c, 'campo-linha'), c));
+  ['inline-age', 'problem-plan'].forEach((c) => assert.ok(juntas(c, 'campo-linha'), c));
 });
 
 test('DAILY_CHECKS: quatro checks, siglas distintas e nome por extenso', () => {
@@ -413,4 +413,23 @@ test('index.html: ações do paciente no menu ⋯ do cabeçalho, ligadas uma vez
   const rb = html.slice(html.indexOf('function renderScreenB()'), html.indexOf('function setupCollapsibleSection('));
   assert.ok(!/getElementById\('(pm\w+|patientMenuBtn|patientAllergyFlag)'\)\.addEventListener/.test(rb), 'elemento fixo não é religado a cada redesenho');
   ['Dar alta no paciente do leito', 'Arquivar o leito', 'Deletar PERMANENTEMENTE o leito'].forEach((t) => assert.ok(html.includes(t), 'texto de confirmação: ' + t));
+});
+
+test('chipAdmissao: data curta e dia de internação', () => {
+  const H = '2026-11-16';
+  assert.strictEqual(PainelCore.chipAdmissao('2026-11-07', H), 'Adm 07/11 · D10');
+  assert.strictEqual(PainelCore.chipAdmissao('2026-11-16', H), 'Adm 16/11 · D1');
+  assert.strictEqual(PainelCore.chipAdmissao('2026-11-20', H), 'Adm 20/11', 'admissão futura não tem dia');
+  ['', null, undefined].forEach((d) => assert.strictEqual(PainelCore.chipAdmissao(d, H), 'Admissão'));
+});
+
+test('index.html: identificação em chips; a previsão de alta mora no cartão', () => {
+  assert.ok(!tpl.includes('>Previsão de Alta</label>'), 'a seção solta do fim da página saiu');
+  ['inline-age', 'inline-admit', 'inline-discharge-forecast', 'clear-discharge-forecast-btn', 'admit-text', 'alta-text',
+    'ext-doc-details', 'ext-doc-summary'].forEach((c) => assert.ok(tpl.includes(c), c));
+  assert.ok(/\.chip-nativo > input,\s*\.chip-nativo > select\s*\{[^}]*opacity:\s*0;[^}]*font-size:\s*16px;/.test(html));
+  assert.ok(html.includes('PainelCore.chipAdmissao(') && html.includes('function refreshIdChips('));
+  assert.ok(tpl.includes('aria-label="Salvar médico na lista de sugestões"'));
+  assert.ok(tpl.includes('aria-label="Adicionar a conduta e salvar na lista"'));
+  assert.ok(/class="clear-discharge-forecast-btn[^"]*"[^>]*aria-label="Limpar previsão de alta"/.test(tpl));
 });

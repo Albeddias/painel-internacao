@@ -190,6 +190,15 @@
     /* Campo secundário que parece texto (idade, admissão, plano do problema): sem a faixa
        de 48 px. O "input" na frente é necessário para vencer input[type="text"]. */
     input.campo-linha { min-height: 0; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+    /* Chip com um campo nativo transparente por cima (spec 3.1): o chip mostra o texto do app,
+       o toque cai no campo e abre o seletor do sistema. Fonte de 16 px: sem zoom no iOS. */
+    .chip-nativo { position: relative; min-height: 36px; }
+    .chip-nativo > input, .chip-nativo > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; min-height: 0; padding: 0; cursor: pointer; }
+    .patient-meta .chip { min-height: 36px; font-size: 0.875rem; line-height: 1.25rem; }
+    .patient-meta input.inline-age { background: transparent; border: 0; padding: 0; text-align: right; }
+    .ext-doc-details > summary { list-style: none; cursor: pointer; }
+    .ext-doc-details > summary::-webkit-details-marker { display: none; }
+    .ext-doc-details[open] .ext-doc-caret { transform: rotate(90deg); }
 
     /* No celular, inputs com fonte <16px fazem o iOS Safari dar zoom automático ao focar
        (o pinch-zoom agora está liberado no viewport). 16px neutraliza isso. */
@@ -749,33 +758,31 @@
           </div>
         </div>
         
-        <div class="patient-meta flex flex-wrap gap-x-3 gap-y-2 text-sm text-slate-600 mt-3">
-          <div>
-            <span class="font-medium">Idade:</span>
-            <input class="inline-age campo-linha p-1 rounded-md w-12 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="-" type="number" min="0">
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="font-medium">Admissão:</span>
-            <input class="inline-admit campo-linha p-1 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50" type="date">
-          </div>
+        <div class="patient-meta flex flex-wrap items-center gap-2 mt-3">
+          <label class="chip"><input class="inline-age campo-linha w-12" type="number" min="0" inputmode="numeric" placeholder="Idade" aria-label="Idade"><span class="age-suffix">a</span></label>
+          <label class="chip chip-nativo"><span class="admit-text"></span><input class="inline-admit" type="date" aria-label="Data de admissão"></label>
+          <span class="inline-flex items-center">
+            <label class="chip chip-nativo alta-chip"><span class="alta-text"></span><input class="inline-discharge-forecast" type="date" aria-label="Previsão de alta"></label>
+            <button type="button" class="clear-discharge-forecast-btn hidden min-w-[44px] min-h-[44px] txt-muted print:hidden" aria-label="Limpar previsão de alta">✕</button>
+          </span>
         </div>
 
         <div class="inline-checks checks flex gap-1 flex-shrink-0 mt-4">
           <!-- JS vai renderizar os 4 checks diários + check de Queda aqui -->
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <details class="ext-doc-details mt-3">
+          <summary class="text-sm text-slate-700 min-h-[44px] flex items-center gap-1"><span class="font-medium">Médico externo:</span> <span class="ext-doc-summary truncate">—</span> <span class="ext-doc-caret inline-block transition-transform txt-muted" aria-hidden="true">▸</span></summary>
           <div>
-            <label class="section-title text-sm font-semibold text-slate-900 mb-1 block">Médico Externo</label>
             <div class="flex gap-2 w-full">
               <input class="inline-ext-name text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nome do médico">
               <datalist class="common-ext-docs-list"></datalist>
-              <button class="add-ext-doc-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Salvar médico na lista de sugestões">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M15.75 3a.75.75 0 00-.75.75v3.25H5a.75.75 0 000 1.5h10v3.25a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" clip-rule="evenodd" /><path d="M5.151 3.522A.75.75 0 004 4.25v11.5a.75.75 0 001.5 0V4.25a.75.75 0 00-.349-.649zM6.5 15.75v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM8.5 15.75v-3.5a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0zM10.5 15.75v-5.5a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0zM12.5 15.75v-7.5a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0zM14.5 15.75v-9.5a.75.75 0 00-1.5 0v9.5a.75.75 0 001.5 0z" clip-rule="evenodd" /></svg>
+              <button type="button" class="add-ext-doc-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Salvar médico na lista de sugestões" aria-label="Salvar médico na lista de sugestões">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 0 0 1.075.676L10 15.082l5.925 2.844A.75.75 0 0 0 17 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0 0 10 2Z" clip-rule="evenodd" /></svg>
               </button>
             </div>
           </div>
-        </div>
+        </details>
       </div>
 
       <!-- Seção: HPP / Comorbidades (lista sobre o campo de texto bed.hpp) -->
@@ -897,8 +904,8 @@
           <div class="conduta-suggestions flex gap-2 overflow-x-auto mb-2" style="display:none"></div>
           <div class="flex gap-2 w-full mb-3">
             <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nova conduta" autocomplete="off">
-            <button class="add-conduta-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar e Salvar na lista">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M15.75 3a.75.75 0 00-.75.75v3.25H5a.75.75 0 000 1.5h10v3.25a.75.75 0 001.5 0V3.75a.75.75 0 00-.75-.75z" clip-rule="evenodd" /><path d="M5.151 3.522A.75.75 0 004 4.25v11.5a.75.75 0 001.5 0V4.25a.75.75 0 00-.349-.649zM6.5 15.75v-1.5a.75.75 0 00-1.5 0v1.5a.75.75 0 001.5 0zM8.5 15.75v-3.5a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0zM10.5 15.75v-5.5a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0zM12.5 15.75v-7.5a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0zM14.5 15.75v-9.5a.75.75 0 00-1.5 0v9.5a.75.75 0 001.5 0z" clip-rule="evenodd" /></svg>
+            <button type="button" class="add-conduta-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar a conduta e salvar na lista" aria-label="Adicionar a conduta e salvar na lista">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 0 0 1.075.676L10 15.082l5.925 2.844A.75.75 0 0 0 17 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0 0 10 2Z" clip-rule="evenodd" /></svg>
             </button>
             <button class="add-conduta-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar">Add</button>
           </div>
@@ -950,15 +957,6 @@
         </button>
         <div class="collapsible-content p-4 pt-0">
           <div class="gendoc-list space-y-2"></div>
-        </div>
-      </div>
-
-      <!-- Seção: Previsão de Alta -->
-      <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
-        <label class="section-title text-sm font-semibold text-slate-900 mb-2 block">Previsão de Alta</label>
-        <div class="flex gap-2 items-center">
-          <input class="inline-discharge-forecast flex-1 text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" type="date">
-          <button class="clear-discharge-forecast-btn text-sm bg-slate-100 text-slate-700 font-medium rounded-lg py-3 px-4 hover:bg-slate-200 transition-all print:hidden">Limpar</button>
         </div>
       </div>
 
@@ -1100,8 +1098,10 @@
     // resetada ao abrir outro paciente. Evita voltar sempre para "Laboratoriais" a cada toque.
     let currentExamTab = 'labs';
 
+    let extDocOpen = false; // "Médico externo" expandido; volta a recolher ao abrir outro paciente
     function openPatientDetails(bedIndex) {
       if (screenList.classList.contains('active')) listScrollY = window.scrollY;
+      if (currentPatientIndex !== bedIndex) extDocOpen = false;
       currentPatientIndex = bedIndex;
       currentExamTab = 'labs';
       renderScreenB();
@@ -2051,9 +2051,9 @@
       art.querySelector('.inline-name').value = b.patientName || '';
       art.querySelector('.inline-name').addEventListener('input', (e) => { b.patientName = e.target.value; saveData(state); patientHeaderName.textContent = b.patientName; });
       art.querySelector('.inline-age').value = b.age || '';
-      art.querySelector('.inline-age').addEventListener('input', (e) => { b.age = e.target.value; saveData(state); });
+      art.querySelector('.inline-age').addEventListener('input', (e) => { b.age = e.target.value; saveData(state); refreshIdChips(art, b); });
       art.querySelector('.inline-admit').value = b.admitDate || '';
-      art.querySelector('.inline-admit').addEventListener('input', (e) => { b.admitDate = e.target.value; saveData(state); });
+      art.querySelector('.inline-admit').addEventListener('input', (e) => { b.admitDate = e.target.value; saveData(state); refreshIdChips(art, b); });
       const extNameInput = art.querySelector('.inline-ext-name');
       const extDatalist = art.querySelector('.common-ext-docs-list');
       const extDatalistId = `common-ext-docs-list-${idx}`;
@@ -2072,7 +2072,12 @@
           const name = e.target.value.trim();
           b.externalDoctor = { active: !!name, name: name };
           saveData(state, { localOnly: true });
+          art.querySelector('.ext-doc-summary').textContent = name || '—';
       });
+      art.querySelector('.ext-doc-summary').textContent = (b.externalDoctor && b.externalDoctor.name) || '—';
+      const extDetails = art.querySelector('.ext-doc-details');
+      extDetails.open = extDocOpen;
+      extDetails.addEventListener('toggle', () => { extDocOpen = extDetails.open; });
       
       art.querySelector('.add-ext-doc-to-list-btn').addEventListener('click', () => { 
           const v = extNameInput.value.trim();
@@ -2179,12 +2184,15 @@
       dischargeInput.addEventListener('input', (e) => {
         b.dischargeForecast = e.target.value;
         saveData(state);
+        refreshIdChips(art, b);
       });
       art.querySelector('.clear-discharge-forecast-btn').addEventListener('click', () => {
         b.dischargeForecast = '';
+        dischargeInput.value = '';
         saveData(state);
-        renderScreenB();
+        refreshIdChips(art, b);
       });
+      refreshIdChips(art, b);
 
       patientDetailContent.appendChild(node);
 
@@ -2565,6 +2573,22 @@
         addBtn.addEventListener('click', addProblem);
         input.addEventListener('keydown', (e) => { if (e.key === 'Enter') addProblem(); });
       }
+    }
+
+    // Linha de dados do cartão em chips (spec 3.1): textos formatados pelo app; os campos
+    // nativos ficam por cima, invisíveis. Chamada no desenho e depois de cada gravação.
+    const TOM_CHIP_ALTA = { perigo: 'chip-danger', primaria: 'chip-primary', atencao: 'chip-warn' };
+    function refreshIdChips(art, bed) {
+      const hoje = todayISO();
+      art.querySelector('.age-suffix').classList.toggle('hidden', !String(bed.age || '').trim());
+      art.querySelector('.admit-text').textContent = PainelCore.chipAdmissao(bed.admitDate, hoje);
+      const tem = !!bed.dischargeForecast;
+      art.querySelector('.alta-text').textContent = tem ? 'Alta prev. ' + PainelCore.formatDateBR(bed.dischargeForecast) : '+ Previsão de alta';
+      const st = tem ? PainelCore.statusAltaPrevista(bed.dischargeForecast, hoje) : null;
+      const chip = art.querySelector('.alta-chip');
+      Object.values(TOM_CHIP_ALTA).forEach((c) => chip.classList.remove(c));
+      if (st && TOM_CHIP_ALTA[st.tom]) chip.classList.add(TOM_CHIP_ALTA[st.tom]);
+      art.querySelector('.clear-discharge-forecast-btn').classList.toggle('hidden', !tem);
     }
 
     // Alergia registrada: faixa vermelha no topo do cartão, etiqueta no título da seção

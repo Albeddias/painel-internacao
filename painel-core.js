@@ -682,6 +682,13 @@
     };
   }
 
+  // Chip de admissão do cartão do paciente (spec 3.1): "Adm 07/11 · D10"; vazio, "Admissão".
+  function chipAdmissao(admitDate, hojeISO) {
+    if (!admitDate) return 'Admissão';
+    const n = dayNumber(admitDate, hojeISO);
+    return 'Adm ' + formatDateBR(admitDate) + (n >= 1 ? ' · D' + n : '');
+  }
+
   // Itens do menu ⋯ da tela do paciente (spec 3.1). Arquivado: restaurar, reinternar (só com
   // paciente) e deletar. Ativo sem paciente: só deletar. Ativo com paciente: alta, arquivar, deletar.
   function acoesDoRegistro(bed) {
@@ -1732,6 +1739,7 @@
     estadoDoLeito: estadoDoLeito,
     selosDoCartao: selosDoCartao,
     acoesDoRegistro: acoesDoRegistro,
+    chipAdmissao: chipAdmissao,
     buildPendencias: buildPendencias,
     agruparPendencias: agruparPendencias,
     LIMIARES: LIMIARES,
