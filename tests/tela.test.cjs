@@ -153,3 +153,12 @@ test('index.html: a tabela de labs calcula em ordem cronológica e desenha da ma
   assert.ok(html.includes('const columnDates = filteredDates.slice().reverse();'));
   assert.ok(!html.includes('let prevNum = null;'), 'a tendência saiu do laço das colunas');
 });
+
+test('index.html: remover tarefa aparece no toque e pede confirmação', () => {
+  const tpl = html.slice(html.indexOf('id="taskItemTpl"'), html.indexOf('id="patientDetailTpl"'));
+  assert.ok(/class="remove-task [^"]*\bopacity-60 \[@media\(hover:hover\)\]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100\b/.test(tpl));
+  assert.ok(/class="remove-task [^"]*\bmin-w-\[44px\] min-h-\[44px\]/.test(tpl));
+  assert.ok(/class="remove-task [^"]*"[^>]*aria-label="Remover tarefa"/.test(tpl));
+  assert.ok(html.includes("|| 'esta tarefa'"), 'tarefa sem texto não vira Remover ""?');
+  assert.ok(html.includes("'Remover tarefa', 'bg-red-600', 'Remover'"));
+});

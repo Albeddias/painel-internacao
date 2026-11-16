@@ -544,7 +544,7 @@
     <div class="task-item flex gap-2 items-center group bg-white rounded-lg p-3 border border-slate-200">
         <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
         <input type="text" class="task-text flex-1 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50">
-        <button class="remove-task text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all print:hidden" title="Remover tarefa">
+        <button type="button" class="remove-task min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-red-600 opacity-60 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all print:hidden" title="Remover tarefa" aria-label="Remover tarefa">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
         </button>
     </div>
@@ -3255,9 +3255,14 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             });
 
             removeBtn.addEventListener('click', () => {
-                state.generalTasks.splice(index, 1);
-                saveData(state);
-                renderScreenC(); // Re-renderiza a lista
+                // Com o botão à vista no celular, um toque errado apagaria a tarefa: confirma antes.
+                const nome = String(task.text || '').trim() || 'esta tarefa';
+                showConfirm(`Remover "${nome}"?`, () => {
+                    const i = state.generalTasks.indexOf(task);
+                    if (i !== -1) state.generalTasks.splice(i, 1);
+                    saveData(state);
+                    renderScreenC(); // Re-renderiza a lista
+                }, 'Remover tarefa', 'bg-red-600', 'Remover');
             });
 
             tasksListArea.appendChild(node);

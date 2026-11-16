@@ -1,4 +1,4 @@
-// uso: node tools/captura/capturar.cjs <tela> [--largura=390] [--altura=667] [--cheia]
+// uso: node tools/captura/capturar.cjs <tela> [--largura=390] [--altura=667] [--cheia] [--toque]
 // Telas: ver tools/captura/abre-tela.js. Grava tools/captura/saida/<tela>-<largura>.png.
 // Sempre com o estado fictício de estado-ficticio.js — nunca dado real.
 const fs = require('node:fs');
@@ -41,7 +41,12 @@ const png = path.join(saida, tela.replace(/:/g, '-') + '-' + largura + '.png');
 const edge = process.env.CAPTURA_BROWSER || ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
 if (!edge) throw new Error('Edge não encontrado; defina CAPTURA_BROWSER com o caminho do navegador');
-execFileSync(edge, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--virtual-time-budget=4000',
+// --toque: aparelho sem hover e com ponteiro grosso, como o celular. Sem ele o Edge se
+// apresenta como computador e (hover:hover) esconde os botões que só aparecem no hover.
+const toque = args.includes('--toque')
+  ? ['--blink-settings=primaryHoverType=1,availableHoverTypes=1,primaryPointerType=2,availablePointerTypes=2']
+  : [];
+execFileSync(edge, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--virtual-time-budget=4000', ...toque,
   '--user-data-dir=' + path.join(work, 'perfil'), '--window-size=' + Math.max(largura, 600) + ',' + altura,
   '--screenshot=' + png, 'file:///' + path.join(work, 'wrapper.html').replace(/\\/g, '/')],
   { stdio: 'pipe', timeout: 60000 });
