@@ -597,3 +597,27 @@ test('index.html: condutas têm alça de arrasto, como as outras listas', () => 
   assert.ok(/\.conduta\.dragging/.test(html));
   assert.ok(html.includes('data-conduta-id'));
 });
+
+// ---- Revisão final da Fase 3 ----------------------------------------------------
+
+test('index.html: chip de data abre o seletor com clique em qualquer ponto no computador', () => {
+  // No Chromium de computador só o ícone do calendário abre o seletor; ele é esticado sobre o campo.
+  assert.ok(/\.chip-nativo > input\[type="date"\]::-webkit-calendar-picker-indicator\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0/.test(html));
+});
+
+test('index.html: chip com campo invisível mostra o anel de foco no próprio chip', () => {
+  assert.ok(/\.chip-nativo:has\(:focus-visible\)\s*\{[^}]*outline:/.test(html));
+});
+
+test('index.html: marca de copiado depende do texto copiado (texto trocado pela sincronização perde a marca)', () => {
+  assert.ok(/const markKey = \(field\) => [^;]*PainelCore\.hash8\(/.test(html), 'evolução');
+  assert.ok(/'doc\|'[^;]*PainelCore\.hash8\(blk\.content\)/.test(html), 'blocos do sumário');
+});
+
+test('index.html: destaque do atalho não rola a página e acende o chip tocado', () => {
+  const ini = html.indexOf('function marcarAtalho(');
+  const corpo = html.slice(ini, html.indexOf('\n    }\n', ini));
+  assert.ok(!corpo.includes('scrollIntoView'), 'scrollIntoView no chip pode interromper a rolagem suave da página');
+  const go = html.slice(html.indexOf('function goToSection('), html.indexOf('function marcarAtalho('));
+  assert.ok(go.includes('marcarAtalho(atalho)'), 'o chip tocado acende na hora');
+});

@@ -223,6 +223,11 @@
     body.digitando #sectionNav { display: none; }
     .collapsible-section { scroll-margin-top: var(--paciente-topo, 132px); }
     .chip-nativo > input, .chip-nativo > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; min-height: 0; padding: 0; cursor: pointer; }
+    /* No Chromium de computador, o clique no texto do campo de data só escolhe o dia/mês/ano;
+       quem abre o seletor é o ícone do calendário: ele é esticado sobre o campo inteiro. */
+    .chip-nativo > input[type="date"]::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: auto; height: auto; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+    /* O campo é invisível: o anel de foco vai no chip. */
+    .chip-nativo:has(:focus-visible) { outline: 2px solid var(--c-primary); outline-offset: 2px; }
     .patient-meta .chip { min-height: 36px; font-size: 0.875rem; line-height: 1.25rem; }
     .patient-meta input.inline-age { background: transparent; border: 0; padding: 0; text-align: right; }
     .ext-doc-details > summary { list-style: none; cursor: pointer; }
@@ -1302,9 +1307,12 @@
       if (!sectionNav.offsetHeight) return;
       document.documentElement.style.setProperty('--paciente-topo', (header.offsetHeight + sectionNav.offsetHeight + 8) + 'px');
     }
+    let atalhoTravadoAte = 0; // logo depois do toque, o chip tocado manda (a rolagem ainda anda)
     function goToSection(atalho) {
       const section = patientDetailContent.querySelector('[data-secao="' + ATALHO_ALVO[atalho] + '"]');
       if (!section) return;
+      marcarAtalho(atalho);
+      atalhoTravadoAte = Date.now() + 1200;
       const content = section.querySelector('.collapsible-content');
       if (content && content.classList.contains('hidden')) section.querySelector('.collapsible-toggle-btn').click();
       // Espera os campos que ajustam a altura num setTimeout antes de rolar.
@@ -1313,16 +1321,26 @@
     sectionNav.querySelectorAll('.section-nav-chip').forEach((chip) => {
       chip.addEventListener('click', () => goToSection(chip.dataset.atalho));
     });
+    // Traz o chip ativo para dentro da faixa mexendo só no scrollLeft dela: scrollIntoView
+    // poderia interromper a rolagem suave da página que o toque no atalho começou.
+    function trazerChipParaFaixa(chip) {
+      const faixa = sectionNav.querySelector('.section-nav-scroll');
+      const fr = faixa.getBoundingClientRect(), cr = chip.getBoundingClientRect();
+      const ini = cr.left - fr.left + faixa.scrollLeft;
+      const esq = ini - 12, dir = ini + cr.width + 24 - faixa.clientWidth;
+      if (faixa.scrollLeft > esq) faixa.scrollLeft = Math.max(0, esq);
+      else if (faixa.scrollLeft < dir) faixa.scrollLeft = dir;
+    }
+    let atalhoAtivo = null;
     function marcarAtalho(atalho) {
+      if (atalho === atalhoAtivo) return;
+      atalhoAtivo = atalho;
       sectionNav.querySelectorAll('.section-nav-chip').forEach((chip) => {
         const ativo = chip.dataset.atalho === atalho;
         chip.classList.toggle('chip-primary', ativo);
-        if (ativo) {
-          chip.setAttribute('aria-current', 'true');
-          chip.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-        } else {
-          chip.removeAttribute('aria-current');
-        }
+        if (ativo) chip.setAttribute('aria-current', 'true');
+        else chip.removeAttribute('aria-current');
+        if (ativo) trazerChipParaFaixa(chip);
       });
     }
     // Destaque do chip da seção que está logo abaixo da barra. O IntersectionObserver só avisa
@@ -1333,6 +1351,7 @@
       return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--paciente-topo'), 10) || 132;
     }
     function atualizarAtalhoAtivo() {
+      if (Date.now() < atalhoTravadoAte) return;
       const topo = pacienteTopo();
       const secoes = [...patientDetailContent.querySelectorAll('.collapsible-section[data-atalho]')].filter((s) => s.offsetParent);
       if (!secoes.length) return;
@@ -1644,6 +1663,8 @@
         document.querySelectorAll('#patientDetailContent textarea:not(.grow-wrap > textarea)').forEach((el) => {
           if (el.style.height) resizeNow(el);
         });
+        const chipAtivo = document.querySelector('#sectionNav .section-nav-chip[aria-current]');
+        if (chipAtivo) trazerChipParaFaixa(chipAtivo);
       });
     }
     function autoResizeTextarea(el) {
@@ -2747,7 +2768,7 @@
 
     // Marca de "copiado" (spec 3.9): só na memória — some ao editar o texto, ao trocar a data
     // (a data faz parte da chave) ou ao recarregar o app. Não grava nem sincroniza nada.
-    // Chaves: 'ev|<patientId>|<data>|<campo>' e 'doc|<id do documento>|<índice do bloco>'.
+    // Chaves: 'ev|<patientId>|<data>|<campo>|<hash do texto>' e 'doc|<id>|<bloco>|<hash do texto>'.
     const copiedMarks = new Set();
     function copiadoMarkEl() {
       const s = document.createElement('span');
@@ -2819,7 +2840,8 @@
       // A linha é procurada pela data a cada uso: uma sincronização troca os objetos do leito.
       const currentRow = () => (bed.evolucoes || []).find(r => r.data === selected);
       const row = currentRow();
-      const markKey = (field) => 'ev|' + (bed.patientId || '') + '|' + selected + '|' + field;
+      // A chave leva um hash do texto: texto trocado (pela sincronização, por exemplo) perde a marca.
+      const markKey = (field) => 'ev|' + (bed.patientId || '') + '|' + selected + '|' + field + '|' + PainelCore.hash8(((currentRow() || {})[field]) || '');
       // "N de M copiados": M conta só os campos com texto.
       const refreshCopyCount = () => {
         const el = container.querySelector('.evolucao-copy-count');
@@ -2852,11 +2874,12 @@
         ta.addEventListener('input', () => {
           const r = currentRow();
           if (!r) return;
+          const chaveAntes = markKey(field);
           r[field] = ta.value;
           saveData(state);
           autoResizeTextarea(ta);
           copyBtn.disabled = ta.value.trim() === '';
-          copiedMarks.delete(markKey(field));
+          copiedMarks.delete(chaveAntes);
           mark.classList.add('hidden');
           refreshCopyCount();
         });
@@ -3027,7 +3050,7 @@
         det.appendChild(summary);
         if (blocks) {
           summary.querySelector('.copy-gendoc').remove();
-          blocks.forEach((blk, bi) => det.appendChild(renderDocBlock(blk, 'doc|' + (doc.id || doc.createdAt || '') + '|' + bi)));
+          blocks.forEach((blk, bi) => det.appendChild(renderDocBlock(blk, 'doc|' + (doc.id || doc.createdAt || '') + '|' + bi + '|' + PainelCore.hash8(blk.content))));
           listElement.appendChild(det);
           return;
         }

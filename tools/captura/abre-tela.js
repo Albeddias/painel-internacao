@@ -25,8 +25,9 @@
     if (partes[2] === 'copiado') {
       state.beds[n].isEvolucaoTasyMinimized = false;
       var hojeCap = todayISO();
+      var evHoje = (state.beds[n].evolucoes || []).find(function (e) { return e.data === hojeCap; }) || {};
       ['problemas', 'evolucao_atual'].forEach(function (campo) {
-        copiedMarks.add('ev|' + state.beds[n].patientId + '|' + hojeCap + '|' + campo);
+        copiedMarks.add('ev|' + state.beds[n].patientId + '|' + hojeCap + '|' + campo + '|' + PainelCore.hash8(evHoje[campo] || ''));
       });
     }
     if (partes[2] === 'aberto') {
