@@ -28,6 +28,56 @@
     return words.map(function (w) { return w[0].toUpperCase(); }).join('');
   }
 
+  // ---- Iniciais no lugar do nome ---------------------------------------------
+  // O nome completo só existe no aparelho onde foi digitado. Os outros recebem o paciente
+  // com as iniciais do banco ("AB") em patientName — e NÃO sabem o nome: devolvem ao banco
+  // as mesmas iniciais. Recalcular a partir de "AB" dava "A", e o aparelho seguinte recebia
+  // o paciente com uma letra só.
+  // bed.initialsPlaceholder:
+  //   'AB'       iniciais recebidas do banco; valem enquanto patientName === 'AB'
+  //              (digitar um nome por cima desfaz sozinho)
+  //   ''         nome digitado neste aparelho
+  //   undefined  leito gravado por versão anterior: decidido uma vez, na próxima mescla
+  function isNamePlaceholder(bed) {
+    return !!bed && !!bed.initialsPlaceholder && bed.patientName === bed.initialsPlaceholder;
+  }
+  // Nome de verdade ('' se o aparelho só tem as iniciais).
+  function knownPatientName(bed) {
+    return isNamePlaceholder(bed) ? '' : String((bed && bed.patientName) || '');
+  }
+  // Iniciais que vão ao banco.
+  function bedInitials(bed) {
+    return isNamePlaceholder(bed) ? bed.initialsPlaceholder : initialsFromName(bed && bed.patientName);
+  }
+  // O formato que initialsFromName gera: uma palavra só, curta, toda em maiúsculas.
+  function looksLikeInitials(s) {
+    return /^[A-ZÀ-ÖØ-Þ]{1,5}$/.test(s);
+  }
+  // Acerta a marca de um leito com as iniciais que vieram do banco.
+  function syncNamePlaceholder(bed, remoteInitials) {
+    const remote = String(remoteInitials || '').trim();
+    if (bed.initialsPlaceholder === undefined) {
+      // Leito antigo: é "iniciais no lugar do nome" se parece iniciais e bate com o banco
+      // por prefixo ("AB" x "A": o banco encolheu, ou este aparelho recebeu já encolhido).
+      // Fica a versão mais longa — é a que ainda não foi cortada.
+      const local = String(bed.patientName || '').trim();
+      const related = !!remote && !!local && (remote.indexOf(local) === 0 || local.indexOf(remote) === 0);
+      if (looksLikeInitials(local) && related) {
+        const best = remote.length > local.length ? remote : local;
+        bed.patientName = best;
+        bed.initialsPlaceholder = best;
+      } else {
+        bed.initialsPlaceholder = '';
+      }
+      return;
+    }
+    // Aparelho sem o nome acompanha o banco (quem tem o nome corrigiu as iniciais).
+    if (remote && isNamePlaceholder(bed) && remote !== bed.initialsPlaceholder) {
+      bed.patientName = remote;
+      bed.initialsPlaceholder = remote;
+    }
+  }
+
   // ---- HPP: lista de comorbidades sobre um campo de texto ----------------
   // O banco guarda hpp como texto ("HAS, DM2"); a UI mostra como lista.
   // Vírgula dentro de parênteses não separa ("DM2 (NPH, metformina)").
@@ -212,6 +262,8 @@
   //   get(bed)             valor local normalizado (o que entra no hash)
   //   set(bed, p, notas)   adota o valor do banco
   //   emptyAdopts          sem hash do campo na foto, o vazio local adota o banco
+  //   notInLegacyHash      campo que o hash único antigo não cobre: sem hash do campo na
+  //                        foto, SÓ o vazio local adota o banco (paciente "intocado" não vale)
   // status e data da alta andam juntos (um só hash): nunca ficam meio de cada lado.
   // "notes" vem de painel_notes, não de painel_patients.
   const PATIENT_SCALAR_FIELDS = [
@@ -237,6 +289,12 @@
       set: function (b, p, notesTexto) { b.notes = notesTexto || ''; } },
     { col: 'person_id', get: function (b) { return b.personId; },
       set: function (b, p) { b.personId = p.person_id || null; } },
+    // Check de Queda (termo de ciência). Entrou depois do hash único: uma foto sem o hash
+    // deste campo não diz nada sobre ele, então só o "pendente" local adota o banco — o
+    // check marcado no aparelho nunca é desfeito na primeira sincronização.
+    // Banco sem a coluna (valor ausente): mantém o local.
+    { col: 'queda_orientada', notInLegacyHash: true, get: function (b) { return b.quedaOrientada ? '1' : ''; },
+      set: function (b, p) { if (p.queda_orientada != null) b.quedaOrientada = !!p.queda_orientada; } },
   ];
   function scalarValue(f, bed) {
     const v = f.get(bed);
@@ -399,7 +457,8 @@
       // tinha o leito, move-o para o registro local preservando o nome completo.
       if (p.status === 'nuvem') {
         if (bed) {
-          state.cloudArchived[p.id] = { nome: bed.patientName || '', iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '', personId: p.person_id || bed.personId || null };
+          syncNamePlaceholder(bed, p.initials);
+          state.cloudArchived[p.id] = { nome: knownPatientName(bed), iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '', personId: p.person_id || bed.personId || null };
           state.beds = state.beds.filter(function (b) { return b.patientId !== p.id; });
         } else if (!state.cloudArchived[p.id]) {
           state.cloudArchived[p.id] = { nome: '', iniciais: p.initials || '', leito: p.bed_number || '', personId: p.person_id || null };
@@ -422,13 +481,15 @@
         const reg = state.cloudArchived[p.id];
         // Reinternação feita noutro aparelho: o nome completo só existe localmente —
         // empresta de um leito da mesma pessoa (personId, ou patientId que virou personId).
+        // Só de quem TEM o nome: leito da mesma pessoa que só tem iniciais não serve.
         const kin = p.person_id && (state.beds || []).find(function (b) {
-          return b.patientName && (b.personId === p.person_id || b.patientId === p.person_id);
+          return knownPatientName(b) && (b.personId === p.person_id || b.patientId === p.person_id);
         });
-        bed = migrateBed({
-          patientName: (reg && reg.nome) || (kin && kin.patientName) || p.initials || '?',
-          bedNumber: p.bed_number || '',
-        });
+        const known = (reg && reg.nome) || (kin && kin.patientName) || '';
+        bed = migrateBed({ patientName: known || p.initials || '?', bedNumber: p.bed_number || '' });
+        // Sem nome conhecido, o leito nasce com as iniciais do banco no lugar do nome. Com
+        // nome vindo do registro ou de outro leito, confere se não eram iniciais antigas.
+        if (known) syncNamePlaceholder(bed, p.initials); else bed.initialsPlaceholder = p.initials || '';
         bed.patientId = p.id;
         state.beds.push(bed);
         delete state.cloudArchived[p.id];
@@ -437,6 +498,8 @@
         applyRowsToBed(bed, remoteRows);
         return;
       }
+
+      syncNamePlaceholder(bed, p.initials);
 
       const base = state.syncBase[p.id] || null;
       const local = localRowSets(bed);
@@ -455,6 +518,7 @@
         if (base && base.fields && Object.prototype.hasOwnProperty.call(base.fields, f.col)) {
           return hash8(localVal) === base.fields[f.col];
         }
+        if (f.notInLegacyHash) return localVal === '';
         return legacyUntouched || (!!f.emptyAdopts && localVal === '');
       }).forEach(function (f) { f.set(bed, p, remoteNote); });
 
@@ -892,7 +956,7 @@
   function migrateBed(b) {
     b = b || {};
     const hasPatient = !!(b.patientName && String(b.patientName).trim());
-    return {
+    const out = {
       patientId: b.patientId || (hasPatient ? uuid() : null),
       personId: b.personId || null,
       bedNumber: b.bedNumber || '', patientName: b.patientName || '',
@@ -917,7 +981,7 @@
       externalDoctor: b.externalDoctor || { active: false, name: '' },
       checks: b.checks || { ev: false, p: false, ex: false, tev: false },
       // Termo de ciência do risco de queda: uma vez por internação. Fica fora de `checks`
-      // de propósito — aquele objeto zera todo dia; este vale até a alta. Só no aparelho.
+      // de propósito — aquele objeto zera todo dia; este vale até a alta. Sincroniza em painel_patients.queda_orientada.
       quedaOrientada: !!b.quedaOrientada,
       isVisited: !!b.isVisited, reminderDate: b.reminderDate || '',
       dischargeForecast: b.dischargeForecast || '',
@@ -936,6 +1000,10 @@
       isDocsMinimized: b.isDocsMinimized !== undefined ? b.isDocsMinimized : true,
       isPrevAdmissionsMinimized: b.isPrevAdmissionsMinimized !== undefined ? b.isPrevAdmissionsMinimized : true,
     };
+    // Iniciais no lugar do nome (ver isNamePlaceholder). Leito antigo fica SEM a chave de
+    // propósito: é o sinal para a próxima mescla decidir, uma vez, se o nome são iniciais.
+    if (typeof b.initialsPlaceholder === 'string') out.initialsPlaceholder = b.initialsPlaceholder;
+    return out;
   }
 
   // ---- Reinternação: nova internação da mesma pessoa -------------------------
@@ -964,7 +1032,8 @@
     });
     const newBed = migrateBed({
       patientId: uuid(), personId: personId, bedNumber: bedNumber || '',
-      patientName: prev.patientName || '', age: prev.age, hpp: prev.hpp || '',
+      patientName: prev.patientName || '', initialsPlaceholder: prev.initialsPlaceholder,
+      age: prev.age, hpp: prev.hpp || '',
       alergias: prev.alergias || '', medicacoesPrevias: prev.medicacoesPrevias || '',
       admitDate: todayStr, problems: problems, trackers: trackers, exams: exams,
       isAnamneseMinimized: false,
@@ -1136,7 +1205,7 @@
       out.patients.push({
         id: pid,
         bed_number: b.bedNumber || '',
-        initials: initialsFromName(b.patientName),
+        initials: bedInitials(b),
         age: (b.age === '' || b.age == null) ? null : Number(b.age),
         admit_date: b.admitDate || null,
         hpp: b.hpp || '',
@@ -1147,6 +1216,7 @@
         status: b.isArchived ? (b.archiveReason === 'alta' ? 'alta' : 'arquivado') : 'internado',
         person_id: b.personId || null,
         discharge_date: b.dischargedAt || null,
+        queda_orientada: !!b.quedaOrientada,
       });
       (b.problems || []).forEach(function (p, i) {
         out.problems.push({ id: p.id, patient_id: pid, descricao: p.descricao || '', status: p.status || 'ativo', plano: p.plano || '', ordem: i });
@@ -1285,8 +1355,11 @@
       if (!bed) {
         // paciente criado direto no banco (raro): cria leito com iniciais como nome provisório
         bed = migrateBed({ patientName: p.initials || '?', bedNumber: p.bed_number || '' });
+        bed.initialsPlaceholder = p.initials || '';
         bed.patientId = p.id;
         state.beds.push(bed);
+      } else {
+        syncNamePlaceholder(bed, p.initials);
       }
       applyPatientScalars(bed, p, (notes[p.id] && notes[p.id][0] && notes[p.id][0].texto) || '');
       applyPatientTextFields(bed, p);
@@ -1306,6 +1379,8 @@
   return {
     uuid: uuid,
     initialsFromName: initialsFromName,
+    knownPatientName: knownPatientName,
+    bedInitials: bedInitials,
     parseHpp: parseHpp,
     joinHpp: joinHpp,
     fillPatientName: fillPatientName,

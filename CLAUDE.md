@@ -13,7 +13,7 @@ App pessoal de um médico internista: `index.html` (offline-first, localStorage)
 - Projeto: **Gestão Médica** (`kuhymtikommkoupynhkj`, região sa-east-1). As tabelas do Painel convivem com outro app no mesmo projeto, por isso usam o **prefixo `painel_`**.
 - Acesso restrito por RLS ao usuário dono do painel (o e-mail real está configurado nas policies do banco; o projeto tem outros usuários, mas só o dono enxerga as tabelas `painel_*`).
 
-Tabelas: `painel_patients` (status: internado/alta/arquivado/nuvem; `person_id` agrupa as internações da mesma pessoa — nulo = internação única; `discharge_date` = data da alta; `alergias` e `medicacoes_previas` = texto puro, '' quando não há), `painel_problems` (status: ativo/resolvido/cronico, com `plano` e `ordem`), `painel_antibiotics`, `painel_cultures`, `painel_devices` (`kind`: device/procedimento — cirurgias contam "PO Dn" e não alertam), `painel_exams` (tipo: lab/imagem), `painel_condutas` (`ordem` = posição na lista; nula = fim da lista), `painel_notes` (1 linha por paciente, PK = patient_id), `painel_raw_texts` (tipo: evolucao/prescricao/admissao — textos crus colados do prontuário), `painel_evolucoes` (evolução no formato do Tasy: UMA linha por paciente por dia, `UNIQUE (patient_id, data)`; nove campos de texto puro: `problemas`, `historia_internacao`, `evolucao_atual`, `exames_lab`, `culturas`, `exames_imagem`, `atualizacao_problemas`, `metas`, `acoes`), `painel_doc_templates` (`sumario_alta`, `laudo`; `evolucao_tasy` é um guia interno para a IA preencher `painel_evolucoes`, não um documento gerável; `receituario` foi aposentado — a linha continua no banco, não use), `painel_generated_docs`, `painel_prefs` (preferências globais do app, PK = key; hoje só `lab_ranges` — upsert por chave no push, três-vias na mescla).
+Tabelas: `painel_patients` (status: internado/alta/arquivado/nuvem; `person_id` agrupa as internações da mesma pessoa — nulo = internação única; `discharge_date` = data da alta; `alergias` e `medicacoes_previas` = texto puro, '' quando não há; `queda_orientada` = check "Queda" do app, termo de ciência do risco de queda aplicado nesta internação — quem marca é o médico no app, não altere), `painel_problems` (status: ativo/resolvido/cronico, com `plano` e `ordem`), `painel_antibiotics`, `painel_cultures`, `painel_devices` (`kind`: device/procedimento — cirurgias contam "PO Dn" e não alertam), `painel_exams` (tipo: lab/imagem), `painel_condutas` (`ordem` = posição na lista; nula = fim da lista), `painel_notes` (1 linha por paciente, PK = patient_id), `painel_raw_texts` (tipo: evolucao/prescricao/admissao — textos crus colados do prontuário), `painel_evolucoes` (evolução no formato do Tasy: UMA linha por paciente por dia, `UNIQUE (patient_id, data)`; nove campos de texto puro: `problemas`, `historia_internacao`, `evolucao_atual`, `exames_lab`, `culturas`, `exames_imagem`, `atualizacao_problemas`, `metas`, `acoes`), `painel_doc_templates` (`sumario_alta`, `laudo`; `evolucao_tasy` é um guia interno para a IA preencher `painel_evolucoes`, não um documento gerável; `receituario` foi aposentado — a linha continua no banco, não use), `painel_generated_docs`, `painel_prefs` (preferências globais do app, PK = key; hoje só `lab_ranges` — upsert por chave no push, três-vias na mescla).
 
 Identifique pacientes por `bed_number` + `initials` (ex.: "leito 1012-A"). Em ambiguidade, pergunte.
 
@@ -62,10 +62,14 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
 - Os campos do paciente têm three-way POR CAMPO (um hash por campo na foto,
   `syncBase[id].fields`; lista em `PATIENT_SCALAR_FIELDS` + `PATIENT_TEXT_FIELDS`): leito,
   idade, admissão, `hpp`, `anamnese_inicial`, `discharge_forecast`, status + `discharge_date`
-  (um bloco só), `person_id`, `alergias`, `medicacoes_previas` e a anotação (`painel_notes`).
+  (um bloco só), `person_id`, `queda_orientada`, `alergias`, `medicacoes_previas` e a anotação
+  (`painel_notes`).
   A IA pode preencher um campo mesmo que o aparelho tenha editado outros; só perde se o
   aparelho editou AQUELE campo. Campo novo no paciente entra nessa lista, com hash próprio —
-  nunca no hash único antigo (`localScalarsHash`, mantido só para ler fotos antigas).
+  nunca no hash único antigo (`localScalarsHash`, mantido só para ler fotos antigas) — e com
+  `notInLegacyHash`, como `queda_orientada`: na primeira sincronização após a atualização a
+  foto ainda não tem o hash do campo, e sem essa marca o valor do aparelho seria trocado pelo
+  default do banco.
 - `painel_condutas.ordem` guarda a posição na lista (o push grava 0, 1, 2...; o pull chega
   em ordem de chave primária e é reordenado por ela). Nula = fim da lista.
 - O pull lê cada tabela INTEIRA, em páginas (`pullAllTables` → `PainelCore.fetchAllRows`:
@@ -74,6 +78,11 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
   (o push então apagaria de verdade). Nunca volte a um `select('*')` simples no sync.
 - Leito com nome sempre tem `patientId` na hora do sync (`ensurePatientIds`, no início de
   `mergeStates`): o leito nasce vazio e sem id, e o push pula leito sem id.
+- O nome completo só existe no aparelho onde foi digitado. Aparelho que recebe o paciente do
+  banco mostra as iniciais no lugar do nome (`bed.initialsPlaceholder`) e devolve ao banco as
+  MESMAS iniciais (`bedInitials`); nunca recalcule iniciais a partir de `patientName` sem passar
+  por `bedInitials` — "AB" viraria "A" e o aparelho seguinte receberia uma letra só. Para saber
+  se o aparelho tem o nome de verdade, use `knownPatientName` (`tests/iniciais.test.cjs`).
 - `painel_patients.status` inclui `'nuvem'` = paciente guardado só no banco (nenhum aparelho
   tem leito dele). Não mude status para/de `'nuvem'` por conta própria; o app gerencia isso.
 

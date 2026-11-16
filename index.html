@@ -1334,6 +1334,7 @@
     // Check "Queda": termo de ciência do risco de queda, aplicado uma vez por internação.
     // Diferente dos quatro checks diários (bed.checks), vive em bed.quedaOrientada: não zera
     // na virada do dia nem no "Resetar dia" e não conta para o leito "concluído" do dia.
+    // Sincroniza entre aparelhos (painel_patients.queda_orientada, três-vias por campo).
     // Pendente = âmbar com "Q"; feito = verde. Leito vazio, arquivado ou de médico externo
     // não mostra (PainelCore.showsQuedaCheck).
     function checkIconSvg(sizeClass) {
@@ -3821,8 +3822,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         if (r.error) throw r.error;
         beds.forEach(bed => {
           state.cloudArchived[bed.patientId] = {
-            nome: bed.patientName || '',
-            iniciais: PainelCore.initialsFromName(bed.patientName),
+            // aparelho que só tem as iniciais no lugar do nome não as guarda como "nome"
+            nome: PainelCore.knownPatientName(bed),
+            iniciais: PainelCore.bedInitials(bed),
             leito: bed.bedNumber || '',
             personId: bed.personId || null,
           };
