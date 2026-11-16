@@ -505,3 +505,10 @@ test('index.html: controles desenhados a partir do core, sem âmbar para cultura
   assert.ok(/data-type="culture"[^>]*teal/.test(html), 'o botão de Cultura do modal é teal');
   assert.ok(/\.tracker-item\[data-tipo="cultura"\]/.test(html));
 });
+
+test('index.html: resumo no título de cada seção fechada', () => {
+  assert.strictEqual((tpl.match(/class="section-summary /g) || []).length, 11, 'todas as seções menos Exames, que já tem a linha de labs');
+  assert.ok(html.includes('PainelCore.resumoSecao(') && html.includes('function refreshSectionSummary('));
+  assert.ok(!html.includes('const GENDOC_LABEL') && html.includes('PainelCore.GENDOC_LABEL'));
+  assert.ok(juntas('labs-last-line', 'line-clamp-2'));
+});

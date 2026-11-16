@@ -1010,6 +1010,100 @@
     return somaDias(t.startDate, Number(t.duration) - 1);
   }
 
+  // Texto de uma linha só: quebras (e o espaço em volta delas) viram um espaço.
+  function umaLinha(texto) {
+    return String(texto == null ? '' : texto).replace(/\s*[\r\n]+\s*/g, ' ').trim();
+  }
+  function cortar(texto, n) {
+    return texto.length > n ? texto.slice(0, n) + '…' : texto;
+  }
+  function plural2(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
+  function maiorData(lista, campo) {
+    return (lista || []).reduce(function (m, x) { const d = (x && x[campo]) || ''; return d > m ? d : m; }, '');
+  }
+
+  const GENDOC_LABEL = { sumario_alta: 'Sumário de Alta', receituario: 'Receituário', laudo: 'Laudo' };
+
+  // Resumo de uma linha no título da seção fechada (spec 3.4). opts = { hoje, pinnedExams,
+  // notesTemplate, anteriores, diaLocal }. Seção desconhecida ou sem conteúdo: ''.
+  function resumoSecao(bed, secao, opts) {
+    const b = bed || {};
+    const o = opts || {};
+    const hoje = o.hoje;
+    const br = formatDateBR;
+    switch (secao) {
+      case 'problemas': {
+        const ps = b.problems || [];
+        const ativos = ps.filter(function (p) { return p && p.status === 'ativo'; })
+          .map(function (p) { return umaLinha(p.descricao); }).filter(Boolean);
+        const cronicos = ps.filter(function (p) { return p && p.status === 'cronico'; }).length;
+        if (cronicos) ativos.push(plural2(cronicos, 'crônico', 'crônicos'));
+        return ativos.join(' · ');
+      }
+      case 'hpp':
+        return parseHpp(b.hpp || '').map(umaLinha).filter(Boolean).join(' · ');
+      case 'alergias': {
+        const alergia = umaLinha(b.alergias);
+        const meds = umaLinha(b.medicacoesPrevias);
+        return (alergia || 'Nenhuma alergia registrada') + (meds ? ' · ' + cortar(meds, 40) : '');
+      }
+      case 'anamnese':
+        return cortar(umaLinha(b.anamneseInicial), 60);
+      case 'internacoes': {
+        const ant = o.anteriores || [];
+        if (!ant.length) return '';
+        const ultima = maiorData(ant, 'dischargedAt');
+        return plural2(ant.length, 'internação', 'internações') + (ultima ? ' · última alta ' + br(ultima) : '');
+      }
+      case 'controles': {
+        const selos = (b.trackers || []).filter(Boolean).map(function (t) { return { t: t, s: seloControle(t, hoje) }; })
+          .filter(function (x) { return x.s.ativo; });
+        const ordem = selos.filter(function (x) { return x.s.alerta; }).concat(selos.filter(function (x) { return !x.s.alerta; }));
+        return ordem.map(function (x) {
+          return cortar(umaLinha(x.t.name), 14) + ' ' + x.s.curto + (x.s.alerta ? ' ⚠' : '');
+        }).join(' · ');
+      }
+      case 'exames':
+        return buildLabsLine(b, o.pinnedExams || []) || '';
+      case 'condutas': {
+        const cs = b.condutas || [];
+        if (!cs.length) return '';
+        const feitas = cs.filter(function (c) { return c && c.done; }).length;
+        const prox = cs.find(function (c) { return c && !c.done && umaLinha(c.text); });
+        return feitas + '/' + cs.length + ' feitas' + (prox ? ' · próxima: ' + umaLinha(prox.text) : '');
+      }
+      case 'anotacoes': {
+        const modelo = {};
+        String(o.notesTemplate || '').split(/\r?\n/).forEach(function (l) { if (l.trim()) modelo[l.trim()] = true; });
+        const linha = String(b.notes || '').split(/\r?\n/).map(function (l) { return l.trim(); })
+          .find(function (l) { return l && !modelo[l]; });
+        return linha || '';
+      }
+      case 'evolucao': {
+        const evs = b.evolucoes || [];
+        if (evs.some(function (e) { return e && e.data === hoje; })) return 'Hoje ✓';
+        const ultima = maiorData(evs, 'data');
+        return ultima ? 'Última: ' + br(ultima) : 'Nenhuma';
+      }
+      case 'textos': {
+        const ts = (b.rawTexts || []).filter(Boolean);
+        if (!ts.length) return '';
+        const ultimo = maiorData(ts, 'data');
+        return plural2(ts.length, 'texto', 'textos') + (ultimo ? ' · último ' + br(ultimo) : '');
+      }
+      case 'documentos': {
+        const docs = (b.generatedDocs || []).filter(Boolean);
+        if (!docs.length) return '';
+        const recente = docs.reduce(function (m, d) { return String(d.createdAt || '') > String(m.createdAt || '') ? d : m; });
+        const diaLocal = o.diaLocal || function (s) { return String(s || '').slice(0, 10); };
+        const dia = recente.createdAt ? diaLocal(recente.createdAt) : '';
+        return ((GENDOC_LABEL[recente.tipo] || recente.tipo || 'Documento') + (dia ? ' ' + br(dia) : '')).trim();
+      }
+      default:
+        return '';
+    }
+  }
+
   // Segunda linha do item de controle (spec 3.6).
   function linhaControle(t, hojeISO) {
     const tipo = tipoControle(t);
@@ -1849,6 +1943,8 @@
     seloControle: seloControle,
     linhaControle: linhaControle,
     fimPrevistoAtb: fimPrevistoAtb,
+    resumoSecao: resumoSecao,
+    GENDOC_LABEL: GENDOC_LABEL,
     showsQuedaCheck: showsQuedaCheck,
     DAILY_CHECKS: DAILY_CHECKS,
     defaultState: defaultState,
