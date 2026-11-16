@@ -531,3 +531,29 @@ test('index.html: campos de lista quebram linha sem inserir quebra; status por s
   assert.ok(/\.grow-wrap::after\s*\{[^}]*content:\s*attr\(data-espelho\)/.test(html));
   assert.ok(html.includes('problem-status-select') && !html.includes('PROBLEM_STATUS_NEXT'));
 });
+
+test('janelaLabs: últimos 7 dias, ou as coletas mais recentes quando não há nenhuma no período', () => {
+  const H = '2026-11-16';
+  assert.deepStrictEqual(PainelCore.janelaLabs(['2026-11-10', '2026-11-16', '2026-10-01'], H), { inicio: '2026-11-09', fim: H, rotulo: 'Últimos 7 dias' });
+  assert.deepStrictEqual(PainelCore.janelaLabs(['2026-10-01', '2026-11-06', '2026-10-20', '2026-11-01'], H), { inicio: '2026-10-20', fim: H, rotulo: 'Últimas 3 coletas' });
+  assert.deepStrictEqual(PainelCore.janelaLabs(['2026-10-20', '2026-11-01', '2026-11-01'], H), { inicio: '2026-10-20', fim: H, rotulo: 'Últimas 2 coletas' });
+  assert.deepStrictEqual(PainelCore.janelaLabs(['2026-11-01'], H), { inicio: '2026-11-01', fim: H, rotulo: 'Última coleta' });
+  assert.deepStrictEqual(PainelCore.janelaLabs([], H), { inicio: '2026-11-09', fim: H, rotulo: 'Últimos 7 dias' });
+  assert.deepStrictEqual(PainelCore.janelaLabs(['2026-11-20'], H), { inicio: '2026-11-20', fim: '2026-11-20', rotulo: 'Última coleta' }, 'data futura por erro de digitação continua visível');
+});
+
+test('rotuloFiltroLabs: diz o filtro em vigor', () => {
+  const padrao = { inicio: '2026-11-09', fim: '2026-11-16', rotulo: 'Últimos 7 dias' };
+  assert.strictEqual(PainelCore.rotuloFiltroLabs({ nome: '', inicio: '2026-11-09', fim: '2026-11-16' }, padrao), 'Últimos 7 dias');
+  assert.strictEqual(PainelCore.rotuloFiltroLabs({ nome: ' TSH ', inicio: '2026-11-09', fim: '2026-11-16' }, padrao), 'Busca: TSH');
+  assert.strictEqual(PainelCore.rotuloFiltroLabs({ nome: '', inicio: '2026-11-01', fim: '2026-11-10' }, padrao), '01/11 a 10/11');
+  assert.strictEqual(PainelCore.rotuloFiltroLabs({ nome: '', inicio: '', fim: '' }, padrao), 'Todas as coletas');
+});
+
+test('index.html: filtros de labs recolhidos e modo de editar fixados', () => {
+  assert.ok(html.includes('PainelCore.janelaLabs(') && html.includes('PainelCore.rotuloFiltroLabs('));
+  assert.ok(html.includes('id="lab-filter-summary-btn"') && html.includes('id="toggle-pin-edit-btn"'));
+  assert.ok(html.includes('let pinEditMode = false;'));
+  assert.ok(!/<svg class="pin-exam-btn/.test(html), 'o alfinete de 14 px deixou de ser o alvo do toque');
+  assert.ok(/<button type="button" class="pin-exam-btn [^"]*min-w-\[44px\]/.test(html));
+});

@@ -1142,6 +1142,7 @@
     // Aba de exames ativa ('labs' | 'images') — preservada entre re-renders do mesmo paciente,
     // resetada ao abrir outro paciente. Evita voltar sempre para "Laboratoriais" a cada toque.
     let currentExamTab = 'labs';
+    let pinEditMode = false; // "Editar fixados" ligado na tabela de labs (spec 3.7)
 
     let extDocOpen = false; // "Médico externo" expandido; volta a recolher ao abrir outro paciente
     function openPatientDetails(bedIndex) {
@@ -1149,6 +1150,7 @@
       if (currentPatientIndex !== bedIndex) extDocOpen = false;
       currentPatientIndex = bedIndex;
       currentExamTab = 'labs';
+      pinEditMode = false;
       renderScreenB();
       showScreen('details');
       pushScreenState('details');
@@ -3127,12 +3129,12 @@ function renderExamsSection(wrapperElement, bed, bedIdx) {
  * Renderiza o conteúdo da aba "Laboratoriais"
  */
 function renderLabTab(contentEl, bed, bedIdx) {
-    // Define as datas padrão para o filtro (últimos 7 dias). Usa data LOCAL (não toISOString/UTC)
-    // para casar com as datas das coletas, gravadas via todayISO() em horário local.
-    const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - 7);
-    const defaultStartDate = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
-    const defaultEndDate = todayISO();
+    // Janela padrão do filtro (core): últimos 7 dias; sem coleta nesse período, as coletas mais
+    // recentes — a tabela não abre vazia por causa do padrão. Datas locais, como as das coletas.
+    const datasColetas = (bed.exams || []).filter(ex => ex && ex.type === 'lab').map(ex => ex.date);
+    const janela = PainelCore.janelaLabs(datasColetas, todayISO());
+    const defaultStartDate = janela.inicio;
+    const defaultEndDate = janela.fim;
 
     contentEl.innerHTML = `
         <button id="toggle-lab-entry-btn" class="w-full text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-2 px-4 hover:bg-sky-100 transition-all mb-3">
@@ -3155,7 +3157,8 @@ function renderLabTab(contentEl, bed, bedIdx) {
             <button type="button" id="delete-lab-entry-btn" class="hidden w-full text-sm bg-red-100 text-red-800 font-medium rounded-lg py-3">Apagar coleta</button>
         </div>
 
-        <div class="lab-filters space-y-2 mb-3">
+        <button type="button" id="lab-filter-summary-btn" class="text-sm text-slate-600 hover:text-sky-700 min-h-[44px] mb-1" aria-expanded="false"></button>
+        <div class="lab-filters hidden space-y-2 mb-3">
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="text-xs font-medium text-slate-600">De:</label>
@@ -3172,7 +3175,10 @@ function renderLabTab(contentEl, bed, bedIdx) {
             </div>
         </div>
 
-        <button id="toggle-lab-ranges-btn" class="text-xs text-slate-500 hover:text-sky-600 mb-3 transition-all">Faixas de referência ▸</button>
+        <div class="flex items-center justify-between gap-2 mb-3">
+            <button id="toggle-lab-ranges-btn" class="text-xs text-slate-500 hover:text-sky-600 min-h-[44px] transition-all">Faixas de referência ▸</button>
+            <button type="button" id="toggle-pin-edit-btn" class="btn btn-ghost btn-sm" aria-pressed="false">Editar fixados</button>
+        </div>
         <div id="lab-ranges-form" class="hidden space-y-2 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
             <label class="text-xs font-medium text-slate-600">Uma por linha, no formato "Nome: min-max". Valores fora da faixa aparecem coloridos na tabela (alto em vermelho, baixo em azul).</label>
             <textarea id="lab-ranges-textarea" rows="6" class="w-full text-sm p-3 rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
@@ -3188,6 +3194,21 @@ function renderLabTab(contentEl, bed, bedIdx) {
     const filterStartInput = contentEl.querySelector('#lab-filter-start');
     const filterEndInput = contentEl.querySelector('#lab-filter-end');
 
+    const filtersBox = contentEl.querySelector('.lab-filters');
+    const filterSummaryBtn = contentEl.querySelector('#lab-filter-summary-btn');
+    const pinEditBtn = contentEl.querySelector('#toggle-pin-edit-btn');
+    // A linha recolhida diz o filtro em vigor; abre e fecha os campos.
+    const refreshFilterSummary = () => {
+        const aberto = !filtersBox.classList.contains('hidden');
+        const rotulo = PainelCore.rotuloFiltroLabs({ nome: filterNameInput.value, inicio: filterStartInput.value, fim: filterEndInput.value }, janela);
+        filterSummaryBtn.textContent = rotulo + ' · Filtrar ' + (aberto ? '▾' : '▸');
+        filterSummaryBtn.setAttribute('aria-expanded', String(aberto));
+    };
+    const refreshPinEditBtn = () => {
+        pinEditBtn.textContent = pinEditMode ? 'Concluir' : 'Editar fixados';
+        pinEditBtn.setAttribute('aria-pressed', String(pinEditMode));
+    };
+
     // Função para obter filtros e re-renderizar a tabela
     const rerenderFlowsheet = () => {
         const filters = {
@@ -3197,7 +3218,18 @@ function renderLabTab(contentEl, bed, bedIdx) {
         };
         renderLabFlowsheet(flowsheetContainer, bed, filters);
         updateLabsLastLine(document, bed);
+        refreshFilterSummary();
     };
+    filterSummaryBtn.addEventListener('click', () => {
+        filtersBox.classList.toggle('hidden');
+        refreshFilterSummary();
+    });
+    pinEditBtn.addEventListener('click', () => {
+        pinEditMode = !pinEditMode;
+        refreshPinEditBtn();
+        rerenderFlowsheet();
+    });
+    refreshPinEditBtn();
 
     // Editor de faixas de referência (preferência local, como pinnedExams)
     const rangesForm = contentEl.querySelector('#lab-ranges-form');
@@ -3459,7 +3491,13 @@ function renderLabFlowsheet(container, bed, filters) {
     filteredExamNames.forEach(examName => {
         const isPinned = isPinnedName(examName);
         const pinPos = visiblePinned.indexOf(examName);
-        const arrows = isPinned && visiblePinned.length > 1
+        // Fora do modo "Editar fixados", o alfinete é só um marcador e não há setas de reordenar
+        // (que se confundiriam com as setas de tendência). No modo, alfinete de toque de 44 px.
+        const pinIcon = `<svg class="w-3.5 h-3.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.868 2.884c-.521-.26-1.115-.26-1.636 0l-7 3.5A.75.75 0 002 7.22v4.574c0 .89.223 1.756.65 2.553l.004.008.018.038.004.008.058.115.008.013.012.02l.033.055.004.005.01.016.03.045.015.021.042.056.022.028.02.023.01.01a.75.75 0 001.072 0l.01-.01.02-.023.022-.028.042-.056.015-.021.03-.045.01-.016.004-.005.033-.055.012-.02.008-.013.058-.115.004-.008.018-.038.004-.008A5.965 5.965 0 0018 11.794V7.22a.75.75 0 00-.368-.656l-7-3.5zM10 5.113L16.22 8.5 10 11.887 3.78 8.5 10 5.113zM15.5 10.165v1.629a4.465 4.465 0 01-1.123 2.98l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5A4.465 4.465 0 014.5 11.794v-1.629L10 13.18l5.5-3.015z" clip-rule="evenodd" /></svg>`;
+        const pinCell = pinEditMode
+          ? `<button type="button" class="pin-exam-btn min-w-[44px] min-h-[44px] -my-2 -ml-3 flex items-center justify-center ${isPinned ? 'text-sky-600' : 'text-slate-300'} hover:text-sky-500" data-exam-name="${escapeHtml(examName)}" aria-pressed="${isPinned}" aria-label="Fixar ${escapeHtml(examName)}">${pinIcon}</button>`
+          : (isPinned ? `<span class="pin-mark text-sky-600" title="Fixado">${pinIcon}</span>` : '');
+        const arrows = pinEditMode && isPinned && visiblePinned.length > 1
           ? `<span class="flex flex-col ml-auto">${arrowBtn(examName, -1, pinPos > 0)}${arrowBtn(examName, 1, pinPos < visiblePinned.length - 1)}</span>`
           : '';
         const examNameLower = examName.toLowerCase();
@@ -3471,9 +3509,7 @@ function renderLabFlowsheet(container, bed, filters) {
         tableHtml += `
             <td class="sticky left-0 bg-white px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
                 <div class="flex items-center gap-1.5">
-                    <svg class="pin-exam-btn w-3.5 h-3.5 ${isPinned ? 'text-sky-600' : 'text-slate-300'} hover:text-sky-500 cursor-pointer" data-exam-name="${escapeHtml(examName)}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10.868 2.884c-.521-.26-1.115-.26-1.636 0l-7 3.5A.75.75 0 002 7.22v4.574c0 .89.223 1.756.65 2.553l.004.008.018.038.004.008.058.115.008.013.012.02l.033.055.004.005.01.016.03.045.015.021.042.056.022.028.02.023.01.01a.75.75 0 001.072 0l.01-.01.02-.023.022-.028.042-.056.015-.021.03-.045.01-.016.004-.005.033-.055.012-.02.008-.013.058-.115.004-.008.018-.038.004-.008A5.965 5.965 0 0018 11.794V7.22a.75.75 0 00-.368-.656l-7-3.5zM10 5.113L16.22 8.5 10 11.887 3.78 8.5 10 5.113zM15.5 10.165v1.629a4.465 4.465 0 01-1.123 2.98l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5A4.465 4.465 0 014.5 11.794v-1.629L10 13.18l5.5-3.015z" clip-rule="evenodd" />
-                    </svg>
+                    ${pinCell}
                     <span>${escapeHtml(examName)}</span>
                     ${isPinned ? sparklineSvg(nums) : ''}
                     ${arrows}

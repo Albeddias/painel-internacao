@@ -1002,6 +1002,32 @@
     return sel(n === null ? 'D-' : 'D' + n, alerta ? 'atencao' : 'neutro', true);
   }
 
+  // Janela padrão da tabela de labs (spec 3.7): os últimos 7 dias; sem coleta nesse período,
+  // as 3 coletas mais recentes (data futura digitada por engano continua visível).
+  function janelaLabs(datas, hojeISO) {
+    const unicas = Array.from(new Set((datas || []).filter(Boolean))).sort();
+    const seteDias = somaDias(hojeISO, -7);
+    const maisRecente = unicas[unicas.length - 1] || '';
+    const fim = maisRecente > hojeISO ? maisRecente : hojeISO;
+    if (!unicas.length || unicas.some(function (d) { return d >= seteDias && d <= hojeISO; })) {
+      return { inicio: seteDias, fim: fim, rotulo: 'Últimos 7 dias' };
+    }
+    const ultimas = unicas.slice(-3);
+    return { inicio: ultimas[0], fim: fim, rotulo: ultimas.length === 1 ? 'Última coleta' : 'Últimas ' + ultimas.length + ' coletas' };
+  }
+
+  // Linha que diz o filtro de labs em vigor (a busca por nome vence as datas).
+  function rotuloFiltroLabs(filtro, padrao) {
+    const f = filtro || {};
+    const nome = String(f.nome || '').trim();
+    if (nome) return 'Busca: ' + nome;
+    if (padrao && f.inicio === padrao.inicio && f.fim === padrao.fim) return padrao.rotulo;
+    if (!f.inicio && !f.fim) return 'Todas as coletas';
+    if (!f.fim) return 'Desde ' + formatDateBR(f.inicio);
+    if (!f.inicio) return 'Até ' + formatDateBR(f.fim);
+    return formatDateBR(f.inicio) + ' a ' + formatDateBR(f.fim);
+  }
+
   // Fim previsto do ATB: a data de fim digitada, se ainda não passou; senão D1 + duração − 1.
   // '' para ATB já suspenso ou sem duração.
   function fimPrevistoAtb(t, hojeISO) {
@@ -1945,6 +1971,8 @@
     fimPrevistoAtb: fimPrevistoAtb,
     resumoSecao: resumoSecao,
     umaLinha: umaLinha,
+    janelaLabs: janelaLabs,
+    rotuloFiltroLabs: rotuloFiltroLabs,
     GENDOC_LABEL: GENDOC_LABEL,
     showsQuedaCheck: showsQuedaCheck,
     DAILY_CHECKS: DAILY_CHECKS,

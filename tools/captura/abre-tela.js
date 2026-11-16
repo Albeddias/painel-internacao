@@ -3,6 +3,7 @@
  * globais do script do app. Telas:
  *   lista | arquivados | tarefas | paciente:N | paciente:N:aberto | modal:controle | aviso | menu
  *   paciente:N:menu (menu ⋯ do paciente aberto) | paciente:N:secao=<atalho> (toca o atalho)
+ *   paciente:N:fixados (Exames aberto, no modo "Editar fixados")
  *   lista:check (marca o primeiro check) | lista:edicao (edita um problema: "alterações a enviar")
  *   lista:vazia (sem leitos) | lista:filtro (busca sem resultado)
  * Sufixo ":medir" em qualquer tela: etiqueta amarela com a altura do cabeçalho fixo da
@@ -19,6 +20,7 @@
     document.getElementById('openTasksBtn').click();
   } else if (tela === 'paciente') {
     var n = Number(partes[1] || 0);
+    if (partes[2] === 'fixados') state.beds[n].isExamsMinimized = false;
     if (partes[2] === 'aberto') {
       Object.keys(state.beds[n]).forEach(function (k) {
         if (/^is\w+Minimized$/.test(k)) state.beds[n][k] = false;
@@ -26,6 +28,11 @@
     }
     openPatientDetails(n);
     if (partes[2] === 'menu') openPatientMenu();
+    if (partes[2] === 'fixados') {
+      pinEditMode = true;
+      renderScreenB();
+      document.querySelector('[data-secao="exames"]').scrollIntoView({ block: 'start' });
+    }
     if (/^secao=/.test(partes[2] || '')) {
       var atalho = partes[2].slice(6);
       goToSection(atalho);
