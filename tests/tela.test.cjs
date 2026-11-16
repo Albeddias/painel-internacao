@@ -179,3 +179,12 @@ test('index.html: rodapé do paciente cabe numa linha', () => {
   assert.ok(/id="prevPatientBtn"[^>]*aria-label="Paciente anterior"/.test(rodape));
   assert.ok(/id="nextPatientBtn"[^>]*aria-label="Próximo paciente"/.test(rodape));
 });
+
+test('index.html: a data da coleta é o botão de editar; apagar fica dentro do formulário', () => {
+  assert.ok(!html.includes('delete-collection-btn'), 'o ✕ de 12 px no cabeçalho saiu');
+  assert.ok(/<button type="button" class="edit-collection-btn [^"]*\bmin-h-\[44px\]/.test(html));
+  assert.ok(/id="delete-lab-entry-btn"[^>]*class="hidden /.test(html) || /class="hidden [^"]*"[^>]*id="delete-lab-entry-btn"/.test(html));
+  assert.strictEqual(html.split('Deletar todos os exames da coleta do dia').length - 1, 1, 'mesmo texto de confirmação, uma vez só');
+  const apagar = html.slice(html.indexOf("querySelector('#delete-lab-entry-btn').addEventListener"));
+  assert.ok(/dataset\.editDate/.test(apagar.slice(0, 600)), 'apaga a coleta da data original, não a do campo de data');
+});

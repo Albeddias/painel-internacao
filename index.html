@@ -2742,6 +2742,7 @@ function renderLabTab(contentEl, bed, bedIdx) {
             <button id="save-lab-entry-btn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">
                 Salvar Coleta
             </button>
+            <button type="button" id="delete-lab-entry-btn" class="hidden w-full text-sm bg-red-100 text-red-800 font-medium rounded-lg py-3">Apagar coleta</button>
         </div>
 
         <div class="lab-filters space-y-2 mb-3">
@@ -2817,6 +2818,7 @@ function renderLabTab(contentEl, bed, bedIdx) {
         const form = contentEl.querySelector('#lab-entry-form');
         if (editDate) form.dataset.editDate = editDate; else delete form.dataset.editDate;
         contentEl.querySelector('#save-lab-entry-btn').textContent = editDate ? 'Salvar Alterações' : 'Salvar Coleta';
+        contentEl.querySelector('#delete-lab-entry-btn').classList.toggle('hidden', !editDate);
     };
 
     contentEl.querySelector('#toggle-lab-entry-btn').addEventListener('click', (e) => {
@@ -2851,11 +2853,25 @@ function renderLabTab(contentEl, bed, bedIdx) {
         // Re-renderiza toda a aba de laboratório
         renderLabTab(contentEl, bed, bedIdx);
     });
-   
-    // CORREÇÃO: Listeners de Editar/Deletar/Fixar (movidos para cá)
+
+    // Apagar coleta (só no modo edição). Usa a data ORIGINAL da coleta em edição
+    // (form.dataset.editDate), não o campo de data, que o usuário pode ter trocado.
+    contentEl.querySelector('#delete-lab-entry-btn').addEventListener('click', () => {
+        const editDate = contentEl.querySelector('#lab-entry-form').dataset.editDate;
+        if (!editDate) return;
+        const entry = bed.exams.find(ex => ex.type === 'lab' && ex.date === editDate);
+        if (!entry) return;
+        showConfirm(`Deletar todos os exames da coleta do dia ${PainelCore.formatDateBR(editDate)}?`, () => {
+            const i = bed.exams.indexOf(entry);
+            if (i > -1) bed.exams.splice(i, 1);
+            saveData(state);
+            renderLabTab(contentEl, bed, bedIdx); // redesenha a aba e fecha o formulário
+        });
+    });
+
+    // Listeners de Editar/Fixar/Reordenar na tabela (apagar coleta fica no formulário)
     flowsheetContainer.addEventListener('click', (e) => {
         const editBtn = e.target.closest('.edit-collection-btn');
-        const deleteBtn = e.target.closest('.delete-collection-btn');
         const pinBtn = e.target.closest('.pin-exam-btn');
         const moveBtn = e.target.closest('.pin-move-btn');
         const labEntryForm = contentEl.querySelector('#lab-entry-form');
@@ -2877,19 +2893,6 @@ function renderLabTab(contentEl, bed, bedIdx) {
                 contentEl.querySelector('#toggle-lab-entry-btn').textContent = 'Fechar Formulário';
                 autoResizeTextarea(labEntryTextarea);
                 labEntryForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-
-        // Deletar Coleta
-        if (deleteBtn) {
-            const date = deleteBtn.dataset.date;
-            const entryIndex = bed.exams.findIndex(ex => ex.type === 'lab' && ex.date === date);
-            if (entryIndex > -1) {
-                showConfirm(`Deletar todos os exames da coleta do dia ${PainelCore.formatDateBR(date)}?`, () => {
-                    bed.exams.splice(entryIndex, 1);
-                    saveData(state);
-                    rerenderFlowsheet(); // Apenas re-renderiza a tabela
-                });
             }
         }
 
@@ -3021,14 +3024,13 @@ function renderLabFlowsheet(container, bed, filters) {
     tableHtml += '<thead class="bg-slate-50">';
     tableHtml += '<tr><th class="sticky left-0 bg-slate-50 px-3 py-2 text-left font-medium text-slate-600">Exame</th>';
     columnDates.forEach(date => {
-        // CORREÇÃO: Adiciona os ícones de editar/deletar na data
+        // A data inteira é o botão que abre a coleta em modo edição (apagar fica no formulário).
         tableHtml += `
-            <th class="px-3 py-2 text-center font-medium text-slate-600 whitespace-nowrap">
-                <div class="flex items-center justify-center gap-1">
+            <th class="p-0 text-center font-medium text-slate-600 whitespace-nowrap">
+                <button type="button" class="edit-collection-btn w-full min-h-[44px] px-3 flex items-center justify-center gap-1 font-medium text-slate-600 hover:text-sky-700 hover:bg-slate-100 transition-all" data-date="${date}" aria-label="Editar coleta de ${PainelCore.formatDateBR(date)}">
                     <span>${PainelCore.formatDateBR(date)}</span>
-                    <svg class="edit-collection-btn w-3 h-3 text-slate-400 hover:text-sky-600 cursor-pointer" data-date="${date}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
-                    <svg class="delete-collection-btn w-3 h-3 text-slate-400 hover:text-red-600 cursor-pointer" data-date="${date}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
-                </div>
+                    <svg class="w-3.5 h-3.5 text-slate-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                </button>
             </th>
         `;
     });
