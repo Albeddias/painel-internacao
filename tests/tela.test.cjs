@@ -109,3 +109,15 @@ test('index.html: sem cópias locais dos helpers de data nem do ícone de check'
   const checkPath = 'M16.704 4.153a.75.75';
   assert.strictEqual(html.split(checkPath).length - 1, 1, 'o ícone de check deve existir uma vez só');
 });
+
+// ---- Revisão de UI, Fase 1 ---------------------------------------------------
+
+const classAttrs = () => [...html.matchAll(/class="([^"]*)"/g)].map((m) => m[1].split(/\s+/));
+const juntas = (a, b) => classAttrs().some((t) => t.includes(a) && t.includes(b));
+
+test('index.html: leito e nome mantêm o tamanho no celular; campo-linha sem altura mínima', () => {
+  assert.ok(/\.inline-bed\s*\{\s*font-size:\s*1\.5rem\s*!important/.test(html));
+  assert.ok(/\.inline-name\s*\{\s*font-size:\s*1\.125rem\s*!important/.test(html));
+  assert.ok(/input\.campo-linha\s*\{[^}]*min-height:\s*0/.test(html));
+  ['inline-age', 'inline-admit', 'problem-plan'].forEach((c) => assert.ok(juntas(c, 'campo-linha'), c));
+});

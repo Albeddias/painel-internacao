@@ -62,6 +62,9 @@
         padding-bottom: 0.75rem;
         min-height: 48px; /* Área de toque maior */
     }
+    /* Campo secundário que parece texto (idade, admissão, plano do problema): sem a faixa
+       de 48 px. O "input" na frente é necessário para vencer input[type="text"]. */
+    input.campo-linha { min-height: 0; padding-top: 0.25rem; padding-bottom: 0.25rem; }
 
     /* No celular, inputs com fonte <16px fazem o iOS Safari dar zoom automático ao focar
        (o pinch-zoom agora está liberado no viewport). 16px neutraliza isso. */
@@ -69,6 +72,9 @@
       input, select, textarea {
         font-size: 16px !important;
       }
+      /* Os 16px acima valem como piso; leito e nome continuam maiores que o texto comum. */
+      .inline-bed { font-size: 1.5rem !important; }
+      .inline-name { font-size: 1.125rem !important; }
     }
     
     /* Remove setas de input[number] */
@@ -573,14 +579,14 @@
           </div>
         </div>
         
-        <div class="patient-meta flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600 mt-3">
+        <div class="patient-meta flex flex-wrap gap-x-3 gap-y-2 text-sm text-slate-600 mt-3">
           <div>
             <span class="font-medium">Idade:</span>
-            <input class="inline-age p-1 rounded-md w-16 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="-" type="number" min="0">
+            <input class="inline-age campo-linha p-1 rounded-md w-12 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="-" type="number" min="0">
           </div>
           <div class="flex items-center gap-2">
             <span class="font-medium">Admissão:</span>
-            <input class="inline-admit p-1 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50" type="date">
+            <input class="inline-admit campo-linha p-1 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50" type="date">
           </div>
         </div>
 
@@ -2208,7 +2214,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
             </button>
           </div>
-          <input type="text" class="problem-plan w-full text-xs p-1.5 pl-12 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 text-slate-600" placeholder="Plano (opcional)...">
+          <input type="text" class="problem-plan campo-linha w-full text-xs p-1.5 pl-12 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 text-slate-600" placeholder="Plano (opcional)...">
         `;
         it.querySelector('.problem-desc').value = p.descricao || '';
         it.querySelector('.problem-plan').value = p.plano || '';
