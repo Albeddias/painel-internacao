@@ -820,6 +820,15 @@
     return { label: 'D' + n, tone: n >= 8 ? 'long' : 'normal' };
   }
 
+  // Os quatro checks diários, na ordem da tela. `label` é a sigla inteira (a primeira letra
+  // sozinha confundia EV com EX); `nome` vai no aria-label.
+  const DAILY_CHECKS = [
+    { key: 'ev', label: 'EV', nome: 'Evolução' },
+    { key: 'p', label: 'P', nome: 'Prescrição' },
+    { key: 'ex', label: 'EX', nome: 'Exames' },
+    { key: 'tev', label: 'TEV', nome: 'Profilaxia de TEV' },
+  ];
+
   // Check "Queda" (termo de ciência, uma vez por internação): só em leito ativo, ocupado e
   // acompanhado pelo próprio médico — como os checks de visita, não vale para médico externo.
   function showsQuedaCheck(bed) {
@@ -1573,6 +1582,7 @@
     movePinnedExam: movePinnedExam,
     atbBadge: atbBadge,
     showsQuedaCheck: showsQuedaCheck,
+    DAILY_CHECKS: DAILY_CHECKS,
     defaultState: defaultState,
     migrateBed: migrateBed,
     buildReadmission: buildReadmission,

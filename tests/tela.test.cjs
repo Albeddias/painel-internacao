@@ -121,3 +121,20 @@ test('index.html: leito e nome mantêm o tamanho no celular; campo-linha sem alt
   assert.ok(/input\.campo-linha\s*\{[^}]*min-height:\s*0/.test(html));
   ['inline-age', 'inline-admit', 'problem-plan'].forEach((c) => assert.ok(juntas(c, 'campo-linha'), c));
 });
+
+test('DAILY_CHECKS: quatro checks, siglas distintas e nome por extenso', () => {
+  assert.deepStrictEqual(PainelCore.DAILY_CHECKS, [
+    { key: 'ev', label: 'EV', nome: 'Evolução' },
+    { key: 'p', label: 'P', nome: 'Prescrição' },
+    { key: 'ex', label: 'EX', nome: 'Exames' },
+    { key: 'tev', label: 'TEV', nome: 'Profilaxia de TEV' },
+  ]);
+});
+
+test('index.html: checks desenhados a partir de DAILY_CHECKS, como botões de 40 px', () => {
+  assert.ok(html.includes('PainelCore.DAILY_CHECKS'));
+  assert.ok(!html.includes('k.toUpperCase()[0]'), 'a primeira letra sozinha confunde EV com EX');
+  assert.ok(/<button type="button" class="dot [^"]*\bw-10 h-10\b[^"]*"[^>]*aria-pressed=/.test(html));
+  assert.ok(/<button type="button" class="queda-dot [^"]*\bw-10 h-10\b[^"]*"[^>]*aria-pressed=/.test(html));
+  assert.ok(!/class="(dot|queda-dot) [^"]*bg-sky-500/.test(html), '✓ branco sobre sky-500 tem contraste 2,8:1');
+});

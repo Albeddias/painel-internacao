@@ -514,7 +514,7 @@
         </div>
       </div>
       <!-- Linha de Baixo: Checks -->
-      <div class="checks flex gap-1.5 justify-end mt-3">
+      <div class="checks flex gap-1 justify-end mt-3">
         <!-- JS: 4 checks diários + check de Queda renderizados aqui -->
       </div>
     </div>
@@ -590,7 +590,7 @@
           </div>
         </div>
 
-        <div class="inline-checks checks flex gap-1.5 flex-shrink-0 mt-4">
+        <div class="inline-checks checks flex gap-1 flex-shrink-0 mt-4">
           <!-- JS vai renderizar os 4 checks diários + check de Queda aqui -->
         </div>
 
@@ -1349,19 +1349,21 @@
     function quedaDotHtml(bed) {
       if (!PainelCore.showsQuedaCheck(bed)) return '';
       const done = !!bed.quedaOrientada;
+      const nome = done ? 'Queda: termo de ciência aplicado nesta internação' : 'Queda: termo de ciência pendente';
       return `
-        <div class="queda-dot ml-1.5 w-9 h-9 rounded-md border-2 ${done ? 'bg-green-500 border-green-500 text-white' : 'bg-amber-50 border-amber-400 text-amber-700'} flex items-center justify-center text-xs font-bold cursor-pointer" title="${done ? 'Queda: termo de ciência aplicado nesta internação' : 'Queda: termo de ciência pendente'}">
-          ${done ? checkIconSvg('w-4 h-4') : 'Q'}
-        </div>`;
+        <button type="button" class="queda-dot w-10 h-10 rounded-md border-2 ${done ? 'bg-green-700 border-green-700 text-white' : 'bg-amber-50 border-amber-400 text-amber-700'} flex flex-col items-center justify-center font-bold cursor-pointer" aria-pressed="${done}" aria-label="${nome}" title="${nome}">
+          ${done ? checkIconSvg('w-3.5 h-3.5') + '<span class="text-[10px] leading-none font-bold">Q</span>' : '<span class="text-xs font-bold">Q</span>'}
+        </button>`;
     }
-    // Os quatro checks diários (EV, P, EX, TEV) + o de Queda: mesmo HTML na lista e no detalhe.
+    // Os quatro checks diários (PainelCore.DAILY_CHECKS) + o de Queda: mesmo HTML na lista e
+    // no detalhe. Caixa de 40 px com 4 px de respiro (gap-1) = alvo de 44 px por check.
     function checkDotsHtml(bed) {
-      return ['ev', 'p', 'ex', 'tev'].map(k => {
-        const on = !!(bed.checks && bed.checks[k]);
+      return PainelCore.DAILY_CHECKS.map(c => {
+        const on = !!(bed.checks && bed.checks[c.key]);
         return `
-        <div class="dot w-9 h-9 rounded-md border-2 ${on ? 'bg-sky-500 border-sky-500 text-white' : 'bg-slate-100 border-slate-200 text-slate-400'} flex items-center justify-center text-xs font-bold cursor-pointer" data-check-key="${k}" title="${k.toUpperCase()}">
-          ${on ? checkIconSvg('w-4 h-4') : k.toUpperCase()[0]}
-        </div>`;
+        <button type="button" class="dot w-10 h-10 rounded-md border-2 ${on ? 'bg-sky-700 border-sky-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-600'} flex flex-col items-center justify-center font-bold cursor-pointer" data-check-key="${c.key}" aria-pressed="${on}" aria-label="${c.nome}" title="${c.nome}">
+          ${on ? checkIconSvg('w-3.5 h-3.5') + `<span class="text-[10px] leading-none font-bold">${c.label}</span>` : `<span class="text-xs font-bold">${c.label}</span>`}
+        </button>`;
       }).join('') + quedaDotHtml(bed);
     }
     // Liga o clique do check de Queda dentro de `area` (lista ou detalhe) e redesenha a tela.
