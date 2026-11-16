@@ -101,7 +101,7 @@ test('index.html: fixados passam pelo core (nada de includes/indexOf direto em p
 
 test('index.html: selo do ATB e check de Queda vêm do core', () => {
   assert.ok(!html.includes('(Finalizado)'));
-  assert.ok(html.includes('PainelCore.atbBadge('));
+  assert.ok(html.includes('PainelCore.seloControle('));
   assert.ok(html.includes('PainelCore.showsQuedaCheck('));
 });
 
@@ -453,4 +453,55 @@ test('index.html: barra de atalhos com os sete chips do spec', () => {
   assert.ok(html.includes('function goToSection(') && html.includes('function observeSections('));
   assert.ok(/scroll-margin-top:\s*var\(--paciente-topo/.test(html));
   assert.ok(/body\.digitando #sectionNav\s*\{\s*display:\s*none/.test(html));
+});
+
+test('seloControle: os quatro tipos', () => {
+  const T = '2026-08-27';
+  const s = (t) => PainelCore.seloControle(t, T);
+  const A = (p) => Object.assign({ type: 'atb', name: 'Cefepime' }, p);
+  assert.deepStrictEqual(s(A({ startDate: '2026-08-20', duration: 7 })), { tipo: 'atb', rotulo: 'D8/7 prazo vencido', curto: 'D8/7', tom: 'perigo', alerta: true, ativo: true });
+  assert.deepStrictEqual(s(A({ startDate: '2026-08-21', duration: 7 })), { tipo: 'atb', rotulo: 'D7/7 último dia', curto: 'D7/7', tom: 'atencao', alerta: true, ativo: true });
+  assert.deepStrictEqual(s(A({ startDate: '2026-08-25', duration: 7 })), { tipo: 'atb', rotulo: 'D3/7', curto: 'D3/7', tom: 'neutro', alerta: false, ativo: true });
+  assert.deepStrictEqual(s(A({ startDate: '2026-08-20' })), { tipo: 'atb', rotulo: 'D8', curto: 'D8', tom: 'atencao', alerta: true, ativo: true });
+  assert.deepStrictEqual(s(A({ startDate: '2026-08-29', duration: 7 })), { tipo: 'atb', rotulo: 'Agendado', curto: 'Agendado', tom: 'neutro', alerta: false, ativo: true });
+  assert.deepStrictEqual(s(A({ startDate: '2026-08-20', duration: 7, endDate: '2026-08-26' })), { tipo: 'atb', rotulo: 'Suspenso D7', curto: 'Suspenso D7', tom: 'neutro', alerta: false, ativo: false });
+  const C = (p) => Object.assign({ type: 'culture', name: 'HMC' }, p);
+  assert.deepStrictEqual(s(C({ collectionDate: '2026-08-24', result: 'Aguardando' })), { tipo: 'cultura', rotulo: 'D4', curto: 'D4', tom: 'atencao', alerta: true, ativo: true });
+  assert.deepStrictEqual(s(C({ collectionDate: '2026-08-26', result: '' })), { tipo: 'cultura', rotulo: 'D2', curto: 'D2', tom: 'neutro', alerta: false, ativo: true });
+  assert.deepStrictEqual(s(C({ collectionDate: '2026-08-24', result: 'Negativa final' })), { tipo: 'cultura', rotulo: 'D4', curto: 'D4', tom: 'neutro', alerta: false, ativo: false });
+  const D = (p) => Object.assign({ type: 'device', name: 'CVC' }, p);
+  assert.deepStrictEqual(s(D({ installDate: '2026-08-19' })), { tipo: 'dispositivo', rotulo: 'D9', curto: 'D9', tom: 'atencao', alerta: true, ativo: true });
+  assert.deepStrictEqual(s(D({ installDate: '2026-08-10', removalDate: '2026-08-20' })), { tipo: 'dispositivo', rotulo: 'Removido D11', curto: 'Removido D11', tom: 'neutro', alerta: false, ativo: false });
+  assert.deepStrictEqual(s(D({ kind: 'procedimento', installDate: '2026-08-23' })), { tipo: 'procedimento', rotulo: 'PO D5', curto: 'PO D5', tom: 'neutro', alerta: false, ativo: true });
+});
+
+test('fimPrevistoAtb: data digitada, ou D1 + duração − 1', () => {
+  assert.strictEqual(PainelCore.fimPrevistoAtb({ startDate: '2026-11-12', duration: 7 }, '2026-11-18'), '2026-11-18');
+  assert.strictEqual(PainelCore.fimPrevistoAtb({ startDate: '2026-11-12', duration: 7, endDate: '2026-11-20' }, '2026-11-18'), '2026-11-20');
+  assert.strictEqual(PainelCore.fimPrevistoAtb({ startDate: '2026-08-28', duration: 7 }, '2026-08-28'), '2026-09-03', 'virada de mês');
+  assert.strictEqual(PainelCore.fimPrevistoAtb({ startDate: '2026-11-12', duration: 7, endDate: '2026-11-17' }, '2026-11-18'), '', 'já suspenso');
+  assert.strictEqual(PainelCore.fimPrevistoAtb({ startDate: '2026-11-12' }, '2026-11-18'), '');
+});
+
+test('linhaControle: a segunda linha de cada tipo', () => {
+  const T = '2026-08-27';
+  const l = (t) => PainelCore.linhaControle(t, T);
+  assert.strictEqual(PainelCore.linhaControle({ type: 'atb', startDate: '2026-11-12', duration: 7 }, '2026-11-18'), 'ATB · D1 12/11 · fim previsto 18/11');
+  assert.strictEqual(l({ type: 'atb', startDate: '2026-08-20', duration: 7, endDate: '2026-08-26' }), 'ATB · D1 20/08 · fim 26/08');
+  assert.strictEqual(l({ type: 'atb', startDate: '2026-08-20' }), 'ATB · D1 20/08 · sem prazo, reavaliar');
+  assert.strictEqual(l({ type: 'culture', collectionDate: '2026-08-24', result: 'Aguardando' }), 'Cultura · coleta 24/08 · Aguardando · resultado pendente');
+  assert.strictEqual(l({ type: 'culture', collectionDate: '2026-08-26', result: '' }), 'Cultura · coleta 26/08 · Aguardando');
+  assert.strictEqual(l({ type: 'culture', collectionDate: '2026-08-24', result: 'Negativa final' }), 'Cultura · coleta 24/08 · Negativa final');
+  assert.strictEqual(l({ type: 'device', installDate: '2026-08-19' }), 'Disp · início 19/08 · tempo prolongado');
+  assert.strictEqual(l({ type: 'device', installDate: '2026-08-10', removalDate: '2026-08-20' }), 'Disp · início 10/08 · removido 20/08');
+  assert.strictEqual(l({ type: 'device', kind: 'procedimento', installDate: '2026-08-23' }), 'Proc · 23/08');
+});
+
+test('index.html: controles desenhados a partir do core, sem âmbar para cultura', () => {
+  assert.ok(html.includes('PainelCore.seloControle(') && html.includes('PainelCore.linhaControle('));
+  const ini = html.indexOf('function renderTrackerList(');
+  const corpo = html.slice(ini, html.indexOf('function enableListDrag('));
+  assert.ok(!/opacity-60'|amber|dayNumberToday|aguard/.test(corpo), 'a regra saiu de renderTrackerList');
+  assert.ok(/data-type="culture"[^>]*teal/.test(html), 'o botão de Cultura do modal é teal');
+  assert.ok(/\.tracker-item\[data-tipo="cultura"\]/.test(html));
 });

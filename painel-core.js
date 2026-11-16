@@ -951,6 +951,95 @@
     return { label: 'D' + n, tone: n >= LIMIARES.atbLongoDia ? 'long' : 'normal' };
   }
 
+  // Soma n dias a uma data 'AAAA-MM-DD' no calendário local; '' sem data válida.
+  function somaDias(iso, n) {
+    const d = parseISODate(iso);
+    if (!d) return '';
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function tipoControle(t) {
+    if (t.type === 'atb') return 'atb';
+    if (t.type === 'culture') return 'cultura';
+    return t.kind === 'procedimento' ? 'procedimento' : 'dispositivo';
+  }
+  function culturaPendente(t) {
+    const r = String(t.result || '').trim();
+    return r === '' || /aguard/i.test(r);
+  }
+
+  // Selo de cada controle (spec 3.6), para os quatro tipos. `curto` vai no resumo da seção;
+  // `ativo` é falso para ATB suspenso, cultura com resultado e dispositivo removido.
+  function seloControle(t, hojeISO) {
+    const tipo = tipoControle(t);
+    const sel = function (rotulo, tom, ativo, curto) {
+      return { tipo: tipo, rotulo: rotulo, curto: curto || rotulo, tom: tom, alerta: tom !== 'neutro', ativo: ativo };
+    };
+    if (tipo === 'atb') {
+      const b = atbBadge(t, hojeISO);
+      const rotulo = b.label.replace(/\s*\((.*)\)$/, ' $1');
+      const curto = /^(Suspenso|Agendado)/.test(rotulo) ? rotulo : rotulo.split(' ')[0];
+      const tom = /prazo vencido/.test(b.label) ? 'perigo' : (b.tone === 'due' || b.tone === 'long') ? 'atencao' : 'neutro';
+      return sel(rotulo, tom, b.tone !== 'ended', curto);
+    }
+    if (tipo === 'cultura') {
+      const n = dayNumber(t.collectionDate, hojeISO);
+      const pendente = culturaPendente(t);
+      const alerta = pendente && n !== null && n >= LIMIARES.culturaDias;
+      return sel(n === null ? 'D-' : 'D' + n, alerta ? 'atencao' : 'neutro', pendente);
+    }
+    if (tipo === 'procedimento') {
+      const n = dayNumber(t.installDate, hojeISO);
+      return sel(n === null ? 'PO D-' : n === 0 ? 'Agendado' : 'PO D' + n, 'neutro', true);
+    }
+    if (t.removalDate) {
+      const usados = dayNumber(t.installDate, t.removalDate);
+      return sel(usados ? 'Removido D' + usados : 'Removido', 'neutro', false);
+    }
+    const n = dayNumber(t.installDate, hojeISO);
+    const alerta = n !== null && n >= LIMIARES.dispositivoDias;
+    return sel(n === null ? 'D-' : 'D' + n, alerta ? 'atencao' : 'neutro', true);
+  }
+
+  // Fim previsto do ATB: a data de fim digitada, se ainda não passou; senão D1 + duração − 1.
+  // '' para ATB já suspenso ou sem duração.
+  function fimPrevistoAtb(t, hojeISO) {
+    if (t.endDate) return t.endDate > hojeISO ? t.endDate : '';
+    if (!t.startDate || !t.duration) return '';
+    return somaDias(t.startDate, Number(t.duration) - 1);
+  }
+
+  // Segunda linha do item de controle (spec 3.6).
+  function linhaControle(t, hojeISO) {
+    const tipo = tipoControle(t);
+    const br = formatDateBR;
+    const partes = [];
+    if (tipo === 'atb') {
+      partes.push('ATB');
+      if (t.startDate) partes.push('D1 ' + br(t.startDate));
+      const s = seloControle(t, hojeISO);
+      const fim = fimPrevistoAtb(t, hojeISO);
+      if (!s.ativo) partes.push('fim ' + br(t.endDate));
+      else if (fim) partes.push('fim previsto ' + br(fim));
+      else if (t.startDate) partes.push(s.alerta ? 'sem prazo, reavaliar' : 'sem prazo');
+    } else if (tipo === 'cultura') {
+      partes.push('Cultura');
+      if (t.collectionDate) partes.push('coleta ' + br(t.collectionDate));
+      partes.push(String(t.result || '').trim() || 'Aguardando');
+      if (seloControle(t, hojeISO).alerta) partes.push('resultado pendente');
+    } else if (tipo === 'procedimento') {
+      partes.push('Proc');
+      if (t.installDate) partes.push(br(t.installDate));
+    } else {
+      partes.push('Disp');
+      if (t.installDate) partes.push('início ' + br(t.installDate));
+      if (t.removalDate) partes.push('removido ' + br(t.removalDate));
+      else if (seloControle(t, hojeISO).alerta) partes.push('tempo prolongado');
+    }
+    return partes.join(' · ');
+  }
+
   // Os quatro checks diários, na ordem da tela. `label` é a sigla inteira (a primeira letra
   // sozinha confundia EV com EX); `nome` vai no aria-label.
   const DAILY_CHECKS = [
@@ -1757,6 +1846,9 @@
     togglePinnedExam: togglePinnedExam,
     movePinnedExam: movePinnedExam,
     atbBadge: atbBadge,
+    seloControle: seloControle,
+    linhaControle: linhaControle,
+    fimPrevistoAtb: fimPrevistoAtb,
     showsQuedaCheck: showsQuedaCheck,
     DAILY_CHECKS: DAILY_CHECKS,
     defaultState: defaultState,
