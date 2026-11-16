@@ -997,6 +997,7 @@
       isArchived: !!b.isArchived,
       archiveReason: b.archiveReason || (b.isArchived ? 'arquivado' : null),
       dischargedAt: b.dischargedAt || '',
+      isHppMinimized: b.isHppMinimized !== undefined ? b.isHppMinimized : false,
       isProblemsMinimized: b.isProblemsMinimized !== undefined ? b.isProblemsMinimized : (b.isDxMinimized !== undefined ? b.isDxMinimized : false),
       isAnamneseMinimized: b.isAnamneseMinimized !== undefined ? b.isAnamneseMinimized : true,
       isAlergiasMinimized: b.isAlergiasMinimized !== undefined ? b.isAlergiasMinimized : true,

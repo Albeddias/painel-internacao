@@ -89,3 +89,10 @@ test('migrateBed: archiveReason existente é preservado', () => {
   const s = PainelCore.migrateState({ beds: [{ ...V14_BED, isArchived: true, archiveReason: 'alta' }] }, '2026-06-12');
   assert.strictEqual(s.beds[0].archiveReason, 'alta');
 });
+
+test('migrateBed: isHppMinimized sobrevive ao recarregar; sem o flag, o HPP abre', () => {
+  assert.strictEqual(PainelCore.migrateBed({ bedNumber: '1', isHppMinimized: true }).isHppMinimized, true);
+  assert.strictEqual(PainelCore.migrateBed({ bedNumber: '1' }).isHppMinimized, false);
+  const salvo = JSON.parse(JSON.stringify({ beds: [{ bedNumber: '1', patientName: 'Paciente Exemplo Um', isHppMinimized: true }] }));
+  assert.strictEqual(PainelCore.migrateState(salvo, '2026-11-16').beds[0].isHppMinimized, true);
+});
