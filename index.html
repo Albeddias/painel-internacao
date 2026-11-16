@@ -21,6 +21,70 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <style>
+    /* Cores com significado fixo (spec 4.1): forte, fundo do selo, texto do selo, marcador.
+       Marcação nova usa estes tokens e as classes abaixo, não cores soltas do Tailwind. */
+    :root {
+      --c-primary: #0369a1;
+      --c-primary-bg: #e0f2fe;
+      --c-primary-on-bg: #075985;
+      --c-primary-mark: #0284c7;
+      --c-success: #15803d;
+      --c-success-bg: #dcfce7;
+      --c-success-on-bg: #166534;
+      --c-success-mark: #16a34a;
+      --c-warn: #b45309;
+      --c-warn-bg: #fef3c7;
+      --c-warn-on-bg: #92400e;
+      --c-warn-mark: #d97706;
+      --c-danger: #dc2626;
+      --c-danger-bg: #fee2e2;
+      --c-danger-on-bg: #991b1b;
+      --c-danger-mark: #dc2626;
+      --c-neutral-bg: #f1f5f9;
+      --c-neutral-on-bg: #475569;
+      --c-surface: #ffffff;
+      --c-surface-2: #f8fafc;
+      --c-border: #e2e8f0;
+      --c-text: #1e293b;
+      --c-text-muted: #475569;
+    }
+
+    /* Componentes. Este <style> vem depois do styles.css: a classe vence um utilitário de
+       mesma especificidade. Variação de tamanho é modificador (.btn-sm), não py-1 por cima. */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+      min-height: 44px; padding: 0 0.75rem; border-radius: 0.5rem; border: 1px solid transparent;
+      font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; cursor: pointer;
+    }
+    .btn:focus-visible, .chip:focus-visible, .sheet-item:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+    .btn:disabled { opacity: 0.6; cursor: default; }
+    .btn-primary { background: var(--c-primary); color: #ffffff; }
+    .btn-ghost { background: var(--c-surface); color: var(--c-text); border-color: var(--c-border); }
+    .btn-danger { background: var(--c-danger-bg); color: var(--c-danger-on-bg); }
+    .btn-sm { min-height: 36px; font-size: 0.75rem; line-height: 1rem; padding: 0 0.5rem; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem;
+      border-radius: 9999px; font-size: 0.75rem; line-height: 1rem; font-weight: 500; white-space: nowrap;
+      background: var(--c-neutral-bg); color: var(--c-neutral-on-bg);
+    }
+    .chip-primary { background: var(--c-primary-bg); color: var(--c-primary-on-bg); }
+    .chip-success { background: var(--c-success-bg); color: var(--c-success-on-bg); }
+    .chip-warn { background: var(--c-warn-bg); color: var(--c-warn-on-bg); }
+    .chip-danger { background: var(--c-danger-bg); color: var(--c-danger-on-bg); }
+    .card {
+      background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 0.75rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+    .field {
+      border: 1px solid var(--c-border); border-radius: 0.5rem; background: var(--c-surface-2);
+      padding: 0.75rem; color: var(--c-text);
+    }
+    .mark { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; }
+    .mark-primary { background: var(--c-primary-mark); }
+    .mark-success { background: var(--c-success-mark); }
+    .mark-warn { background: var(--c-warn-mark); }
+    .mark-danger { background: var(--c-danger-mark); }
+
     /* Define a fonte Inter como padrão */
     body {
       font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";

@@ -191,3 +191,38 @@ test('index.html: a data da coleta é o botão de editar; apagar fica dentro do 
   const apagar = html.slice(html.indexOf("querySelector('#delete-lab-entry-btn').addEventListener"));
   assert.ok(/dataset\.editDate/.test(apagar.slice(0, 600)), 'apaga a coleta da data original, não a do campo de data');
 });
+
+// ---- Revisão de UI, Fase 2 ---------------------------------------------------
+
+// Contraste WCAG entre duas cores #rrggbb.
+function contraste(a, b) {
+  const lum = (hex) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+const token = (nome) => (html.match(new RegExp('--c-' + nome + ':\\s*(#[0-9a-f]{6})\\s*;')) || [])[1];
+
+test('tokens de cor: valores do spec 4.1', () => {
+  assert.deepStrictEqual(['primary', 'success', 'warn', 'danger'].map(token), ['#0369a1', '#15803d', '#b45309', '#dc2626']);
+});
+
+test('tokens de cor: cada tom passa no contraste do seu uso', () => {
+  ['primary', 'success', 'warn', 'danger'].forEach((p) => {
+    assert.ok(contraste(token(p), '#ffffff') >= 4.5, p + ': texto, ou fundo com texto branco');
+    assert.ok(contraste(token(p + '-on-bg'), token(p + '-bg')) >= 4.5, p + ': texto do selo sobre o fundo do selo');
+    assert.ok(contraste(token(p + '-mark'), '#ffffff') >= 3, p + ': ícone, bolinha, barra');
+  });
+  assert.ok(contraste(token('text'), token('surface')) >= 4.5);
+  assert.ok(contraste(token('text-muted'), token('surface')) >= 4.5);
+  assert.ok(contraste(token('neutral-on-bg'), token('neutral-bg')) >= 4.5);
+});
+
+test('index.html: classes de componente existem', () => {
+  ['btn', 'btn-primary', 'btn-ghost', 'btn-danger', 'btn-sm', 'chip', 'chip-primary', 'chip-success',
+    'chip-warn', 'chip-danger', 'card', 'field', 'mark', 'mark-primary', 'mark-success', 'mark-warn', 'mark-danger']
+    .forEach((c) => assert.ok(new RegExp('\\.' + c + '\\s*[{,:]').test(html), c));
+});
