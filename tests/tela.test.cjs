@@ -250,3 +250,35 @@ test('index.html: menu ⋯ da lista leva as ações do painel de filtros, na ord
   assert.ok(html.includes('<title>Caderno de Visitas</title>'));
   ['function openSheet(', 'function closeSheet(', 'function closeAllModals(', 'pendingOverlayPop'].forEach((s) => assert.ok(html.includes(s), s));
 });
+
+test('estadoDoSync: legenda e tom de cada estado', () => {
+  const HOJE = '2026-11-16';
+  const em = (p) => Object.assign({ sujo: false, ultimoSync: { dia: HOJE, hora: '09:22' }, erro: false, emCurso: false }, p);
+  const e = (p, hoje) => PainelCore.estadoDoSync(em(p), hoje || HOJE);
+  assert.deepStrictEqual(e({}), { tom: 'neutro', legenda: 'hoje 09:22 ✓' });
+  assert.deepStrictEqual(e({ ultimoSync: { dia: '2026-11-15', hora: '18:40' } }), { tom: 'neutro', legenda: 'ontem 18:40' });
+  assert.deepStrictEqual(e({ ultimoSync: { dia: '2026-11-14', hora: '18:40' } }), { tom: 'neutro', legenda: '14/11 18:40' });
+  assert.deepStrictEqual(e({ sujo: true }), { tom: 'atencao', legenda: 'alterações a enviar' });
+  assert.deepStrictEqual(e({ ultimoSync: null }), { tom: 'atencao', legenda: 'nunca sincronizado' });
+  assert.deepStrictEqual(e({ ultimoSync: null, sujo: true }), { tom: 'atencao', legenda: 'nunca sincronizado' });
+  assert.deepStrictEqual(e({ erro: true }), { tom: 'perigo', legenda: 'falhou' });
+  assert.deepStrictEqual(e({ erro: true, sujo: true }), { tom: 'perigo', legenda: 'falhou' }, 'editar depois da falha não apaga o "falhou"');
+  assert.deepStrictEqual(e({ emCurso: true, erro: true }), { tom: 'neutro', legenda: 'sincronizando…' });
+});
+
+test('estadoDoSync: virada do ano e relógio atrasado', () => {
+  const em = (dia, hora) => ({ sujo: false, ultimoSync: { dia: dia, hora: hora }, erro: false, emCurso: false });
+  assert.strictEqual(PainelCore.estadoDoSync(em('2026-12-31', '23:50'), '2027-01-01').legenda, 'ontem 23:50');
+  assert.strictEqual(PainelCore.estadoDoSync(em('2026-11-17', '08:00'), '2026-11-16').legenda, '17/11 08:00', 'sync "no futuro" mostra o dia');
+});
+
+test('index.html: Sincronizar mantém a palavra e ganha legenda; gravação local não acende o aviso', () => {
+  assert.ok(html.includes('PainelCore.estadoDoSync('));
+  assert.ok(html.includes('id="syncCaption"'));
+  assert.ok(!html.includes('syncDirtyDot'));
+  assert.ok(/id="syncBtn"[\s\S]{0,600}?Sincronizar/.test(html), 'a palavra continua no botão');
+  assert.ok(html.includes('if (!(opts && (opts.fromSync || opts.localOnly))) s.lastModifiedAt'));
+  assert.ok((html.match(/localOnly: true/g) || []).length >= 17);
+  const queda = html.indexOf('function bindQuedaDot(');
+  assert.ok(!html.slice(queda, queda + 400).includes('localOnly'), 'a Queda vai para o banco: não é gravação local');
+});

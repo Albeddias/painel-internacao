@@ -2,6 +2,7 @@
  * abre a tela pedida. `state`, openPatientDetails, openTrackerModal e showScreen são
  * globais do script do app. Telas:
  *   lista | arquivados | tarefas | paciente:N | paciente:N:aberto | modal:controle | aviso | menu
+ *   lista:check (marca o primeiro check) | lista:edicao (edita um problema: "alterações a enviar")
  * Sufixo ":medir" em qualquer tela: etiqueta amarela com a altura do cabeçalho fixo da
  * tela ativa e a largura da janela. */
 (function () {
@@ -25,6 +26,12 @@
   } else if (tela === 'modal' && partes[1] === 'controle') {
     openPatientDetails(0);
     openTrackerModal(0);
+  } else if (tela === 'lista' && partes[1] === 'check') {
+    document.querySelector('#screen-list .dot').click();
+  } else if (tela === 'lista' && partes[1] === 'edicao') {
+    state.beds[0].problems[0].descricao += ' x';
+    saveData(state);
+    renderScreenA();
   } else if (tela === 'menu') {
     openSheet('listMenuSheet');
   } else if (tela === 'aviso') {

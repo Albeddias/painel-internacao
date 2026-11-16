@@ -593,6 +593,24 @@
     return parts.length === 3 ? parts[2] + '/' + parts[1] : '';
   }
 
+  // ---- Regras de tela da lista (revisão de UI, Fase 2) -----------------------
+
+  // Legenda e tom do botão Sincronizar. info = { sujo, ultimoSync: { dia, hora } | null,
+  // erro, emCurso }; dia e hora já em horário local. Precedência: em curso, falha, nunca,
+  // alterações a enviar, em dia. Fora de hoje/ontem (inclusive relógio atrasado), mostra o dia.
+  function estadoDoSync(info, hojeISO) {
+    const i = info || {};
+    if (i.emCurso) return { tom: 'neutro', legenda: 'sincronizando…' };
+    if (i.erro) return { tom: 'perigo', legenda: 'falhou' };
+    if (!i.ultimoSync || !i.ultimoSync.dia) return { tom: 'atencao', legenda: 'nunca sincronizado' };
+    if (i.sujo) return { tom: 'atencao', legenda: 'alterações a enviar' };
+    const n = dayNumber(i.ultimoSync.dia, hojeISO);
+    const hora = i.ultimoSync.hora || '';
+    if (n === 1) return { tom: 'neutro', legenda: 'hoje ' + hora + ' ✓' };
+    if (n === 2) return { tom: 'neutro', legenda: 'ontem ' + hora };
+    return { tom: 'neutro', legenda: (formatDateBR(i.ultimoSync.dia) + ' ' + hora).trim() };
+  }
+
   // ---- Labs: número do resultado e linha da última coleta -------------------
 
   // Extrai o valor numérico de um resultado ("9,5", "12.300", "120k", "<1,0").
@@ -1584,6 +1602,7 @@
     filterSuggestions: filterSuggestions,
     dayNumber: dayNumber,
     formatDateBR: formatDateBR,
+    estadoDoSync: estadoDoSync,
     buildPendencias: buildPendencias,
     labNumber: labNumber,
     buildLabsLine: buildLabsLine,

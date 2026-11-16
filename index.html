@@ -94,6 +94,12 @@
       border-radius: 0.5rem; font-size: 1rem; line-height: 1; color: inherit;
     }
     .btn-icon { width: 44px; padding: 0; }
+    .sync-btn { flex-direction: column; gap: 0; width: 128px; padding: 0.25rem 0.5rem; line-height: 1.15; }
+    .sync-caption { font-size: 11px; font-weight: 400; color: var(--c-text-muted); white-space: nowrap; }
+    .sync-btn[data-tom="atencao"] { border-color: var(--c-warn-mark); }
+    .sync-btn[data-tom="atencao"] .sync-caption { color: var(--c-warn); font-weight: 500; }
+    .sync-btn[data-tom="perigo"] { border-color: var(--c-danger-mark); }
+    .sync-btn[data-tom="perigo"] .sync-caption { color: var(--c-danger); font-weight: 500; }
 
     /* Folha de ações: colada embaixo no celular; centrada como os modais a partir de 640 px. */
     .sheet { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; justify-content: flex-end; }
@@ -251,10 +257,10 @@
             </div>
           </div>
           <div class="flex gap-2">
-            <!-- Botão de Sync (Nuvem): baixa, mescla e envia -->
-            <button id="syncBtn" class="relative p-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-all print:hidden" title="Sincronizar com a nuvem">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" /></svg>
-              <span id="syncDirtyDot" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" title="Alterações locais não sincronizadas"></span>
+            <!-- Sincronizar: baixa, mescla e envia. A legenda diz o estado (PainelCore.estadoDoSync). -->
+            <button type="button" id="syncBtn" class="btn btn-ghost sync-btn print:hidden" data-tom="neutro">
+              <span class="flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path fill-rule="evenodd" d="M5.5 17a4.5 4.5 0 0 1-1.44-8.765 4.5 4.5 0 0 1 8.302-3.046 3.5 3.5 0 0 1 4.504 4.272A4 4 0 0 1 15 17h-3.25v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72V17H5.5Z" clip-rule="evenodd" /></svg> Sincronizar</span>
+              <span id="syncCaption" class="sync-caption"></span>
             </button>
             <button type="button" id="listMenuBtn" class="btn btn-ghost btn-icon print:hidden" aria-label="Mais ações">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true"><path d="M3 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM8.5 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM15.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" /></svg>
@@ -1163,7 +1169,7 @@
     document.getElementById('clearReminderBtn').addEventListener('click', () => {
       if (currentReminderIndex !== null) {
         state.beds[currentReminderIndex].reminderDate = '';
-        saveData(state);
+        saveData(state, { localOnly: true });
         renderScreenB(); 
       }
       hideModal('reminderModal');
@@ -1172,7 +1178,7 @@
     document.getElementById('saveReminderBtn').addEventListener('click', () => {
       if (currentReminderIndex !== null) {
         state.beds[currentReminderIndex].reminderDate = reminderDateInput.value;
-        saveData(state);
+        saveData(state, { localOnly: true });
         renderScreenB(); 
       }
       hideModal('reminderModal');
@@ -1461,7 +1467,9 @@
     let pendingSave = null;
     let saveFailureShown = false; // o aviso fixo de "não foi possível salvar" está na tela
     function saveData(s, opts) {
-      if (!(opts && opts.fromSync)) s.lastModifiedAt = new Date().toISOString();
+      // localOnly: campo que não vai para o banco (visita, checks, flags, tarefas...). Não acende
+      // "alterações a enviar". Na dúvida, grave sem a opção: o erro fica só no aviso aceso à toa.
+      if (!(opts && (opts.fromSync || opts.localOnly))) s.lastModifiedAt = new Date().toISOString();
       updateSyncBadge();
       pendingSave = s;
       clearTimeout(saveTimer);
@@ -1501,12 +1509,22 @@
       if (document.visibilityState === 'hidden') flushSave();
     });
 
-    // Pontinho no botão Sincronizar + aviso quando há edições locais posteriores ao último sync.
+    // Legenda do botão Sincronizar (regra em PainelCore.estadoDoSync). syncError fica até a
+    // próxima sincronização dar certo, mesmo que o médico edite algo depois da falha.
+    let syncError = false;
+    let syncInFlight = false; // sincronização em curso (doSync)
     function updateSyncBadge() {
-      const dot = document.getElementById('syncDirtyDot');
-      if (!dot) return;
+      const btn = document.getElementById('syncBtn');
       const dirty = !!(state.lastModifiedAt && (!state.lastSyncAt || state.lastModifiedAt > state.lastSyncAt));
-      dot.classList.toggle('hidden', !dirty);
+      let ultimoSync = null;
+      const d = state.lastSyncAt ? new Date(state.lastSyncAt) : null;
+      if (d && !isNaN(d.getTime())) {
+        const p2 = (n) => String(n).padStart(2, '0');
+        ultimoSync = { dia: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), hora: p2(d.getHours()) + ':' + p2(d.getMinutes()) };
+      }
+      const e = PainelCore.estadoDoSync({ sujo: dirty, ultimoSync: ultimoSync, erro: syncError, emCurso: syncInFlight || btn.disabled }, todayISO());
+      document.getElementById('syncCaption').textContent = e.legenda;
+      btn.dataset.tom = e.tom;
     }
     function ensureDailyReset() {
       const today = todayISO();
@@ -1519,7 +1537,7 @@
         // NOVO: Reseta tarefas diárias? Por enquanto, não.
         // state.generalTasks = state.generalTasks.filter(t => !t.done); 
         state.lastReset = today;
-        saveData(state);
+        saveData(state, { localOnly: true });
       }
     }
     function allChecksTrue(c) {
@@ -1603,7 +1621,7 @@
         </div>`;
       wrap.querySelector('.pendencias-toggle').addEventListener('click', () => {
         state.isPendenciasMinimized = !state.isPendenciasMinimized;
-        saveData(state);
+        saveData(state, { localOnly: true });
         wrap.querySelector('.pendencias-list').classList.toggle('hidden');
         wrap.querySelector('.pendencias-toggle .toggle-icon').classList.toggle('rotate-90');
       });
@@ -1744,7 +1762,7 @@
               e.stopPropagation(); 
               if (b.patientName && b.patientName.trim() !== '' && !(b.externalDoctor && b.externalDoctor.active)) {
                 b.isVisited = !b.isVisited;
-                saveData(state);
+                saveData(state, { localOnly: true });
                 renderScreenA();
               }
             });
@@ -1759,7 +1777,7 @@
                 const k = e.currentTarget.dataset.checkKey;
                 b.checks = b.checks || { ev: false, p: false, ex: false, tev: false };
                 b.checks[k] = !b.checks[k];
-                saveData(state);
+                saveData(state, { localOnly: true });
                 renderScreenA();
               });
             });
@@ -1929,7 +1947,7 @@
       extNameInput.addEventListener('input', (e) => { 
           const name = e.target.value.trim();
           b.externalDoctor = { active: !!name, name: name };
-          saveData(state);
+          saveData(state, { localOnly: true });
       });
       
       art.querySelector('.add-ext-doc-to-list-btn').addEventListener('click', () => { 
@@ -1937,7 +1955,7 @@
           if (v && !state.commonExtDocs.includes(v)) {
               state.commonExtDocs.push(v);
               state.commonExtDocs.sort();
-              saveData(state);
+              saveData(state, { localOnly: true });
               renderScreenB(); 
           }
       });
@@ -2006,7 +2024,7 @@
           if (b) {
             b.checks = b.checks || { ev: false, p: false, ex: false, tev: false };
             b.checks[k] = !b.checks[k];
-            saveData(state);
+            saveData(state, { localOnly: true });
             renderScreenB(); 
           }
         });
@@ -2105,7 +2123,7 @@
         
         btn.addEventListener('click', () => {
             bed[stateKey] = !bed[stateKey];
-            saveData(state);
+            saveData(state, { localOnly: true });
             content.classList.toggle('hidden');
             icon.classList.toggle('rotate-90');
             if (!bed[stateKey] && renderCallback) {
@@ -3079,7 +3097,7 @@ function renderLabTab(contentEl, bed, bedIdx) {
         if (moveBtn) {
             const visible = [...flowsheetContainer.querySelectorAll('.pin-exam-btn')].map(el => el.dataset.examName);
             state.pinnedExams = PainelCore.movePinnedExam(state.pinnedExams, moveBtn.dataset.examName, Number(moveBtn.dataset.dir), visible);
-            saveData(state);
+            saveData(state, { localOnly: true });
             rerenderFlowsheet();
             return;
         }
@@ -3091,7 +3109,7 @@ function renderLabTab(contentEl, bed, bedIdx) {
             
             // Fixado sai; não fixado entra no topo (sem diferenciar "Hb" de "HB")
             state.pinnedExams = PainelCore.togglePinnedExam(state.pinnedExams, examName);
-            saveData(state);
+            saveData(state, { localOnly: true });
             rerenderFlowsheet(); // Re-renderiza a tabela com a nova ordem
         }
     });
@@ -3436,13 +3454,13 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
 
             checkbox.addEventListener('change', () => {
                 task.done = checkbox.checked;
-                saveData(state);
+                saveData(state, { localOnly: true });
                 renderScreenC(); // Re-renderiza para aplicar estilo
             });
 
             textInput.addEventListener('input', () => {
                 task.text = textInput.value;
-                saveData(state); // Salva a cada tecla
+                saveData(state, { localOnly: true }); // Salva a cada tecla
             });
 
             removeBtn.addEventListener('click', () => {
@@ -3451,7 +3469,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
                 showConfirm(`Remover "${nome}"?`, () => {
                     const i = state.generalTasks.indexOf(task);
                     if (i !== -1) state.generalTasks.splice(i, 1);
-                    saveData(state);
+                    saveData(state, { localOnly: true });
                     renderScreenC(); // Re-renderiza a lista
                 }, 'Remover tarefa', 'bg-red-600', 'Remover');
             });
@@ -3577,7 +3595,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
           }
         });
         state.lastReset = todayISO();
-        saveData(state);
+        saveData(state, { localOnly: true });
         renderScreenA();
       });
     });
@@ -3723,7 +3741,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
                 text: text,
                 done: false
             });
-            saveData(state);
+            saveData(state, { localOnly: true });
             renderScreenC();
             newTaskInput.value = '';
         }
@@ -3942,7 +3960,6 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // tudo em PainelCore.runSync (testado em tests/run-sync.test.cjs). Lança em falha, e
     // nesse caso o estado volta a ser o de antes de tocar no botão: os objetos dos leitos
     // são trocados, por isso quem chama redesenha a tela também quando dá erro.
-    let syncInFlight = false;
     async function doSync() {
       if (syncInFlight) throw new Error('Sincronização já em andamento.');
       syncInFlight = true;
@@ -3950,12 +3967,17 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       try {
         const sb = await getSupabaseClient();
         await PainelCore.runSync(state, syncDb(sb));
+        syncError = false;
+      } catch (e) {
+        syncError = true;
+        throw e;
       } finally {
         // Em sucesso ou falha: os ids dados a leitos/linhas novos têm de ficar gravados.
         saveData(state, { fromSync: true });
         flushSave();
         syncInFlight = false;
         unlockScreen();
+        updateSyncBadge();
       }
     }
 
@@ -3963,7 +3985,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       const btn = document.getElementById('syncBtn');
       if (btn.disabled) return;
       btn.disabled = true;
-      setSyncStatus('Sincronizando...');
+      updateSyncBadge();
       try {
         await doSync();
         setSyncStatus('Sincronizado ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
@@ -3972,6 +3994,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       } finally {
         renderScreenA();
         btn.disabled = false;
+        updateSyncBadge();
       }
     }
 
@@ -4043,15 +4066,18 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         PainelCore.applyPull(state, pulled);
         state.syncBase = PainelCore.buildSyncBase(state);
         state.lastSyncAt = new Date().toISOString();
+        syncError = false;
         saveData(state, { fromSync: true });
         flushSave();
         renderScreenA();
         setSyncStatus('Recebido limpo ✓ ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
       } catch (e) {
+        syncError = true;
         setSyncStatus('Falha ao resetar/receber: ' + e.message, true);
       } finally {
         btn.disabled = false;
         unlockScreen();
+        updateSyncBadge();
       }
     }
 
@@ -4064,11 +4090,6 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         'Suas preferências (templates, exames fixados, condutas comuns) são mantidas. Continuar?',
         resetLocalAndPull, 'Resetar e receber do servidor', 'bg-amber-500', 'Resetar e receber');
     });
-    if (state.lastModifiedAt && (!state.lastSyncAt || state.lastModifiedAt > state.lastSyncAt)) {
-      setSyncStatus('Alterações locais não sincronizadas');
-    } else if (state.lastSyncAt) {
-      setSyncStatus('Último sync: ' + new Date(state.lastSyncAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
-    }
 
     // Reset diário também quando a aba volta ao foco — cobre o app deixado aberto
     // no celular de um dia para o outro (ensureDailyReset só rodava no load).
