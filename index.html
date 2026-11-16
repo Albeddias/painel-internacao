@@ -85,6 +85,16 @@
     .mark-warn { background: var(--c-warn-mark); }
     .mark-danger { background: var(--c-danger-mark); }
 
+    /* Aviso global */
+    #appNotice .card { color: var(--c-text); }
+    #appNotice[data-tom="sucesso"] .card { background: var(--c-success-bg); border-color: var(--c-success-mark); color: var(--c-success-on-bg); }
+    #appNotice[data-tom="perigo"] .card { background: var(--c-danger-bg); border-color: var(--c-danger-mark); color: var(--c-danger-on-bg); }
+    .notice-close {
+      flex-shrink: 0; min-width: 44px; min-height: 44px; margin: -0.75rem -0.75rem -0.75rem 0;
+      border-radius: 0.5rem; font-size: 1rem; line-height: 1; color: inherit;
+    }
+    .notice-close:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+
     /* Define a fonte Inter como padrão */
     body {
       font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -211,7 +221,6 @@
             <div id="progressCounter" class="text-sm font-medium text-slate-600">
               <!-- JS: T: 8 | V: 2 | P: 6 | E: 0 -->
             </div>
-            <div id="syncStatus" class="text-xs text-slate-500"></div>
           </div>
           <div class="flex gap-2">
             <!-- Botão de Sync (Nuvem): baixa, mescla e envia -->
@@ -364,6 +373,14 @@
         <button id="addNewTaskBtn" class="text-sm bg-sky-600 text-white font-medium rounded-lg py-3 px-4 hover:bg-sky-700 transition-all">Add</button>
       </div>
     </footer>
+  </div>
+
+  <!-- Aviso global: logo abaixo do cabeçalho da tela ativa, visível nas três telas. -->
+  <div id="appNotice" class="hidden fixed left-3 right-3 z-30 print:hidden" role="status" aria-live="polite">
+    <div id="appNoticeBox" class="card flex items-start gap-2 p-3 text-sm">
+      <span id="appNoticeMsg" class="flex-1 min-w-0 break-words"></span>
+      <button type="button" id="appNoticeClose" class="notice-close" aria-label="Fechar aviso">✕</button>
+    </div>
   </div>
 
   
@@ -1348,6 +1365,7 @@
     // é sempre a fonte da verdade; o flush garante persistência ao sair/minimizar.
     let saveTimer = null;
     let pendingSave = null;
+    let saveFailureShown = false; // o aviso fixo de "não foi possível salvar" está na tela
     function saveData(s, opts) {
       if (!(opts && opts.fromSync)) s.lastModifiedAt = new Date().toISOString();
       updateSyncBadge();
@@ -1362,10 +1380,12 @@
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingSave));
         pendingSave = null;
+        if (saveFailureShown) { saveFailureShown = false; fecharAviso(); } // voltou a gravar
       } catch (e) {
         // Sem espaço/armazenamento bloqueado: antes falhava em silêncio. Mantém pendingSave
         // para a próxima tentativa e avisa — o que está na tela ainda não foi gravado.
-        setSyncStatus('Não foi possível salvar neste aparelho: ' + e.message, true);
+        avisar('Não foi possível salvar neste aparelho: ' + e.message, { tom: 'perigo', fixo: true });
+        saveFailureShown = true;
       }
     }
 
@@ -1382,6 +1402,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
     window.addEventListener('pagehide', flushSave);
+    document.getElementById('appNoticeClose').addEventListener('click', fecharAviso);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') flushSave();
     });
@@ -3673,9 +3694,29 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     }
 
     function setSyncStatus(msg, isError = false) {
-      const el = document.getElementById('syncStatus');
-      el.textContent = msg;
-      el.className = 'text-xs ' + (isError ? 'text-red-600' : 'text-slate-500');
+      avisar(msg, { tom: isError ? 'perigo' : 'neutro' });
+    }
+
+    // Aviso global (spec 2.0). Mensagem comum some em 4 s; erro (tom 'perigo') e aviso fixo
+    // ficam até o ✕ ou até o próximo avisar.
+    let avisoTimer = null;
+    function avisar(msg, opts) {
+      const tom = (opts && opts.tom) || 'neutro';
+      const fixo = !!(opts && opts.fixo) || tom === 'perigo';
+      const box = document.getElementById('appNotice');
+      document.getElementById('appNoticeMsg').textContent = msg;
+      box.dataset.tom = tom;
+      box.setAttribute('role', tom === 'perigo' ? 'alert' : 'status');
+      box.setAttribute('aria-live', tom === 'perigo' ? 'assertive' : 'polite');
+      const header = document.querySelector('.screen.active header');
+      box.style.top = ((header ? header.offsetHeight : 0) + 8) + 'px';
+      box.classList.remove('hidden');
+      clearTimeout(avisoTimer);
+      if (!fixo) avisoTimer = setTimeout(fecharAviso, 4000);
+    }
+    function fecharAviso() {
+      clearTimeout(avisoTimer);
+      document.getElementById('appNotice').classList.add('hidden');
     }
 
     // supabase-js em versão FIXA e com verificação de integridade: o navegador recusa o
@@ -3959,7 +4000,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // Dado salvo ilegível (ver loadData): o app abriu vazio e está sem gravar. Só volta a
     // gravar depois que o dado bruto for baixado para um arquivo (ou um backup for importado).
     if (loadFailure) {
-      setSyncStatus('Dados deste aparelho ilegíveis — nada será salvo até baixar a cópia', true);
+      avisar('Dados deste aparelho ilegíveis — nada será salvo até baixar a cópia', { tom: 'perigo', fixo: true });
       showConfirm(
         'Não foi possível ler os dados salvos neste aparelho (' + loadFailure.message + '). ' +
         'Nada foi apagado, mas o app abriu vazio e NÃO está salvando. ' +

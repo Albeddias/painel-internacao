@@ -226,3 +226,12 @@ test('index.html: classes de componente existem', () => {
     'chip-warn', 'chip-danger', 'card', 'field', 'mark', 'mark-primary', 'mark-success', 'mark-warn', 'mark-danger']
     .forEach((c) => assert.ok(new RegExp('\\.' + c + '\\s*[{,:]').test(html), c));
 });
+
+test('index.html: aviso global no lugar da linha de status do cabeçalho', () => {
+  ['id="appNotice"', 'id="appNoticeMsg"', 'id="appNoticeClose"'].forEach((s) => assert.ok(html.includes(s), s));
+  assert.ok(html.includes('function avisar(') && html.includes('function fecharAviso('));
+  assert.ok(!html.includes('id="syncStatus"'), 'a linha só existia no cabeçalho da lista');
+  const i = html.indexOf('function setSyncStatus(');
+  assert.ok(html.slice(i, i + 300).includes('avisar('));
+  assert.ok(html.includes("avisar('Não foi possível salvar neste aparelho: ' + e.message, { tom: 'perigo', fixo: true })"));
+});
