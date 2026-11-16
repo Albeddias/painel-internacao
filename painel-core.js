@@ -611,6 +611,49 @@
     return { tom: 'neutro', legenda: (formatDateBR(i.ultimoSync.dia) + ' ' + hora).trim() };
   }
 
+  // Contagem do dia, só leitos não arquivados. Ocupado = nome depois de trim(); externo não
+  // conta como visitado nem como pendente; aVisitar (o denominador) = ocupados − externos.
+  function progressoDoDia(state) {
+    const p = { total: 0, ocupados: 0, aVisitar: 0, visitados: 0, pendentes: 0, externos: 0, vazios: 0, tarefasAbertas: 0 };
+    ((state && state.beds) || []).forEach(function (b) {
+      if (!b || b.isArchived) return;
+      p.total++;
+      if (!String(b.patientName || '').trim()) { p.vazios++; return; }
+      p.ocupados++;
+      if (b.externalDoctor && b.externalDoctor.active) p.externos++;
+      else if (b.isVisited) p.visitados++;
+    });
+    p.aVisitar = p.ocupados - p.externos;
+    p.pendentes = p.aVisitar - p.visitados;
+    p.tarefasAbertas = ((state && state.generalTasks) || []).filter(function (t) { return t && !t.done; }).length;
+    return p;
+  }
+
+  function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
+
+  // Título e detalhe do cabeçalho da lista. fracao null = sem barra.
+  function fraseProgresso(p) {
+    const partes = [];
+    if (p.externos) partes.push(plural(p.externos, 'externo', 'externos'));
+    if (p.vazios) partes.push(plural(p.vazios, 'vazio', 'vazios'));
+    const detalhe = partes.join(' · ');
+    if (!p.total) return { titulo: 'Nenhum leito', detalhe: detalhe, fracao: null };
+    if (!p.aVisitar) return { titulo: 'Nenhum paciente para visitar', detalhe: detalhe, fracao: null };
+    const todos = p.visitados >= p.aVisitar;
+    return {
+      titulo: p.visitados + ' de ' + p.aVisitar + ' visitados' + (todos ? ' ✓' : ''),
+      detalhe: detalhe,
+      fracao: Math.min(1, p.visitados / p.aVisitar),
+    };
+  }
+
+  function fraseArquivados(pessoas, naNuvem) {
+    const partes = [];
+    if (pessoas) partes.push(plural(pessoas, 'paciente', 'pacientes'));
+    if (naNuvem) partes.push(naNuvem + ' na nuvem');
+    return { titulo: 'Arquivados', detalhe: partes.length ? partes.join(' · ') : 'Nenhum paciente arquivado' };
+  }
+
   // ---- Labs: número do resultado e linha da última coleta -------------------
 
   // Extrai o valor numérico de um resultado ("9,5", "12.300", "120k", "<1,0").
@@ -1603,6 +1646,9 @@
     dayNumber: dayNumber,
     formatDateBR: formatDateBR,
     estadoDoSync: estadoDoSync,
+    progressoDoDia: progressoDoDia,
+    fraseProgresso: fraseProgresso,
+    fraseArquivados: fraseArquivados,
     buildPendencias: buildPendencias,
     labNumber: labNumber,
     buildLabsLine: buildLabsLine,

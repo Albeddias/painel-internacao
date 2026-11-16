@@ -282,3 +282,50 @@ test('index.html: Sincronizar mantém a palavra e ganha legenda; gravação loca
   const queda = html.indexOf('function bindQuedaDot(');
   assert.ok(!html.slice(queda, queda + 400).includes('localOnly'), 'a Queda vai para o banco: não é gravação local');
 });
+
+test('progressoDoDia: o denominador é ocupados menos externos', () => {
+  const leito = (p) => Object.assign({ patientName: 'Paciente Exemplo Um', isArchived: false, isVisited: false, externalDoctor: { active: false, name: '' } }, p);
+  const s = {
+    beds: [leito({ isVisited: true }), leito({ isVisited: true }), leito(), leito(),
+      leito({ externalDoctor: { active: true, name: 'Dra. Exemplo' }, isVisited: true }),
+      leito({ patientName: '  ' }), leito({ isArchived: true })],
+    generalTasks: [{ done: false }, { done: true }, { done: false }],
+  };
+  assert.deepStrictEqual(PainelCore.progressoDoDia(s),
+    { total: 6, ocupados: 5, aVisitar: 4, visitados: 2, pendentes: 2, externos: 1, vazios: 1, tarefasAbertas: 2 });
+  assert.deepStrictEqual(PainelCore.progressoDoDia({ beds: [] }),
+    { total: 0, ocupados: 0, aVisitar: 0, visitados: 0, pendentes: 0, externos: 0, vazios: 0, tarefasAbertas: 0 });
+});
+
+test('fraseProgresso: plurais, partes zeradas e casos de borda', () => {
+  const p = (x) => Object.assign({ total: 6, ocupados: 5, aVisitar: 4, visitados: 2, pendentes: 2, externos: 1, vazios: 1, tarefasAbertas: 0 }, x);
+  assert.deepStrictEqual(PainelCore.fraseProgresso(p()), { titulo: '2 de 4 visitados', detalhe: '1 externo · 1 vazio', fracao: 0.5 });
+  assert.strictEqual(PainelCore.fraseProgresso(p({ externos: 2, vazios: 3 })).detalhe, '2 externos · 3 vazios');
+  assert.strictEqual(PainelCore.fraseProgresso(p({ externos: 0 })).detalhe, '1 vazio');
+  assert.strictEqual(PainelCore.fraseProgresso(p({ externos: 0, vazios: 0 })).detalhe, '');
+  assert.deepStrictEqual(PainelCore.fraseProgresso(p({ visitados: 4, pendentes: 0 })), { titulo: '4 de 4 visitados ✓', detalhe: '1 externo · 1 vazio', fracao: 1 });
+  assert.deepStrictEqual(PainelCore.fraseProgresso(p({ total: 2, ocupados: 1, aVisitar: 0, visitados: 0, pendentes: 0 })),
+    { titulo: 'Nenhum paciente para visitar', detalhe: '1 externo · 1 vazio', fracao: null });
+  assert.deepStrictEqual(PainelCore.fraseProgresso(PainelCore.progressoDoDia({ beds: [] })), { titulo: 'Nenhum leito', detalhe: '', fracao: null });
+});
+
+test('fraseArquivados: plural e nuvem', () => {
+  assert.deepStrictEqual(PainelCore.fraseArquivados(12, 3), { titulo: 'Arquivados', detalhe: '12 pacientes · 3 na nuvem' });
+  assert.strictEqual(PainelCore.fraseArquivados(1, 0).detalhe, '1 paciente');
+  assert.strictEqual(PainelCore.fraseArquivados(0, 2).detalhe, '2 na nuvem');
+  assert.strictEqual(PainelCore.fraseArquivados(0, 0).detalhe, 'Nenhum paciente arquivado');
+});
+
+test('index.html: cabeçalho da lista em três linhas, com a frase do progresso como título', () => {
+  const cab = html.slice(html.indexOf('id="listHeader"'), html.indexOf('</header>'));
+  const ordem = ['id="progressTitle"', 'id="progressDetail"', 'id="syncBtn"', 'id="listMenuBtn"', 'id="searchInput"',
+    'id="toggleFiltersBtn"', 'id="viewSegment"', 'id="openTasksBtn"', 'id="tasksCount"', 'id="addBedBtn"', 'id="filtersPanel"', 'id="progressBar"'];
+  const pos = ordem.map((s) => cab.indexOf(s));
+  assert.ok(pos.every((x) => x !== -1), 'falta: ' + ordem[pos.indexOf(-1)]);
+  assert.deepStrictEqual(pos, pos.slice().sort((a, b) => a - b));
+  assert.ok(!html.includes('progressCounter') && !/Caderno <span/.test(html), 'o título "Caderno v11" e o contador T|V|P|E saíram');
+  assert.ok(/id="progressBar"[^>]*role="progressbar"/.test(cab));
+  assert.ok(/id="addBedBtn"[^>]*aria-label="Adicionar leito"/.test(cab));
+  assert.ok(cab.includes('placeholder="Buscar leito, nome ou diagnóstico"'));
+  assert.ok(html.includes('PainelCore.progressoDoDia(state)') && html.includes('PainelCore.fraseProgresso(') && html.includes('PainelCore.fraseArquivados('));
+});
