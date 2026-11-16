@@ -433,3 +433,12 @@ test('index.html: identificação em chips; a previsão de alta mora no cartão'
   assert.ok(tpl.includes('aria-label="Adicionar a conduta e salvar na lista"'));
   assert.ok(/class="clear-discharge-forecast-btn[^"]*"[^>]*aria-label="Limpar previsão de alta"/.test(tpl));
 });
+
+test('index.html: seções do paciente na ordem definida pelo usuário, cada uma com seu atalho', () => {
+  const secoes = [...tpl.matchAll(/data-secao="([a-z]+)" data-atalho="([a-z]+)"/g)].map((m) => [m[1], m[2]]);
+  assert.deepStrictEqual(secoes, [
+    ['problemas', 'problemas'], ['hpp', 'historico'], ['alergias', 'historico'], ['anamnese', 'historico'],
+    ['internacoes', 'historico'], ['controles', 'controles'], ['exames', 'exames'], ['condutas', 'condutas'],
+    ['anotacoes', 'condutas'], ['evolucao', 'evolucao'], ['textos', 'docs'], ['documentos', 'docs'],
+  ]);
+});

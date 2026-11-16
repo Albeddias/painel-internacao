@@ -785,8 +785,23 @@
         </details>
       </div>
 
+      <!-- Seção: Lista de Problemas -->
+      <div data-secao="problemas" data-atalho="problemas" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Lista de Problemas</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <div class="problem-list space-y-1"></div>
+          <div class="flex gap-2 w-full mt-3">
+            <input class="new-problem-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo problema">
+            <button class="add-problem-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Seção: HPP / Comorbidades (lista sobre o campo de texto bed.hpp) -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="hpp" data-atalho="historico" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">HPP <span class="hpp-count text-sm font-medium text-slate-400"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -800,19 +815,8 @@
         </div>
       </div>
 
-      <!-- Seção: Internações anteriores (só aparece quando há outra internação da mesma pessoa neste aparelho) -->
-      <div class="collapsible-section prev-admissions-section hidden bg-white rounded-xl shadow-lg border border-slate-200/50">
-        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900">Internações anteriores <span class="prev-admissions-count text-sm font-medium text-slate-400"></span></span>
-          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
-        </button>
-        <div class="collapsible-content p-4 pt-0">
-          <div class="prev-admissions-list divide-y divide-slate-100"></div>
-        </div>
-      </div>
-
       <!-- Seção: Alergias e Medicações Prévias (painel_patients.alergias / medicacoes_previas) -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="alergias" data-atalho="historico" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">Alergias e Medicações Prévias <span class="alergias-flag hidden text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5 ml-1">ALERGIA</span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -830,7 +834,7 @@
       </div>
 
       <!-- Seção: Anamnese Inicial -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="anamnese" data-atalho="historico" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">Anamnese Inicial</span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -840,23 +844,19 @@
         </div>
       </div>
 
-      <!-- Seção: Lista de Problemas -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <!-- Seção: Internações anteriores (só aparece quando há outra internação da mesma pessoa neste aparelho) -->
+      <div data-secao="internacoes" data-atalho="historico" class="collapsible-section prev-admissions-section hidden bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900">Lista de Problemas</span>
+          <span class="text-base font-bold text-slate-900">Internações anteriores <span class="prev-admissions-count text-sm font-medium text-slate-400"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
-          <div class="problem-list space-y-1"></div>
-          <div class="flex gap-2 w-full mt-3">
-            <input class="new-problem-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo problema">
-            <button class="add-problem-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
-          </div>
+          <div class="prev-admissions-list divide-y divide-slate-100"></div>
         </div>
       </div>
-      
+
       <!-- Seção: Controles e Invasivos (Tracker) -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="controles" data-atalho="controles" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">Controles e Invasivos</span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -867,9 +867,9 @@
           </div>
         </div>
       </div>
-      
-     <!-- Seção: Exames (Laboratoriais e Imagem) -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+
+      <!-- Seção: Exames (Laboratoriais e Imagem) -->
+      <div data-secao="exames" data-atalho="exames" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Exames (Labs e Imagem)
             <span class="labs-last-line hidden block text-xs font-normal text-slate-500 mt-0.5"></span>
@@ -882,19 +882,8 @@
         </div>
       </div>
 
-      <!-- Seção: Anotações -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
-        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900">Anotações / Sinais / Exames</span>
-          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
-        </button>
-        <div class="collapsible-content p-4 pt-0">
-          <textarea class="input-notes-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Sinais vitais, labs, achados..."></textarea>
-        </div>
-      </div>
-      
       <!-- Seção: Condutas -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="condutas" data-atalho="condutas" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">Condutas</span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -915,8 +904,19 @@
         </div>
       </div>
 
+      <!-- Seção: Anotações -->
+      <div data-secao="anotacoes" data-atalho="condutas" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+        <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
+          <span class="text-base font-bold text-slate-900">Anotações / Sinais / Exames</span>
+          <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+        </button>
+        <div class="collapsible-content p-4 pt-0">
+          <textarea class="input-notes-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Sinais vitais, labs, achados..."></textarea>
+        </div>
+      </div>
+
       <!-- Seção: Evolução Tasy (painel_evolucoes: uma linha por dia; renderEvolucaoTasy) -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="evolucao" data-atalho="evolucao" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">Evolução Tasy <span class="evolucao-count text-sm font-medium text-slate-400"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -927,7 +927,7 @@
       </div>
 
       <!-- Seção: Texto do Prontuário -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="textos" data-atalho="docs" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">Texto do Prontuário</span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -950,7 +950,7 @@
       </div>
 
       <!-- Seção: Documentos Gerados -->
-      <div class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="documentos" data-atalho="docs" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900">Documentos Gerados</span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
