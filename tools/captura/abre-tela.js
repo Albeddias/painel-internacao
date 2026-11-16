@@ -11,7 +11,7 @@
   var tela = partes[0] || 'lista';
 
   if (tela === 'arquivados') {
-    document.getElementById('viewArchiveBtn').click();
+    setViewArchived(true);
   } else if (tela === 'tarefas') {
     document.getElementById('openTasksBtn').click();
   } else if (tela === 'paciente') {

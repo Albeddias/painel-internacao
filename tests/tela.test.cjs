@@ -162,3 +162,11 @@ test('index.html: remover tarefa aparece no toque e pede confirmação', () => {
   assert.ok(html.includes("|| 'esta tarefa'"), 'tarefa sem texto não vira Remover ""?');
   assert.ok(html.includes("'Remover tarefa', 'bg-red-600', 'Remover'"));
 });
+
+test('index.html: sair dos Arquivados está sempre à vista', () => {
+  assert.ok(!html.includes('viewArchiveBtn'), 'o botão do painel de filtros saiu');
+  assert.ok(html.includes('id="viewActiveBtn"') && html.includes('id="viewArchivedBtn"'));
+  assert.ok(html.includes('function setViewArchived('));
+  const filtros = html.slice(html.indexOf('id="filtersPanel"'), html.indexOf('</header>'));
+  assert.ok(!filtros.includes('viewSegment'), 'o seletor fica fora do painel recolhível');
+});

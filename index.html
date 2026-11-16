@@ -178,6 +178,13 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 0 1 .628.74v2.288a2.25 2.25 0 0 1-.659 1.59l-4.682 4.683a2.25 2.25 0 0 0-.659 1.59v3.033c0 .676-.43 1.258-1.025 1.498l-1.975.79a.75.75 0 0 1-.975-.743V12.493a2.25 2.25 0 0 0-.659-1.59L4.682 6.22A2.25 2.25 0 0 1 4.024 4.63V2.34a.75.75 0 0 1 .604-.74ZM10 4.5a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 4.5Zm0 3a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 7.5Zm0 3a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 10.5Z" clip-rule="evenodd" /></svg>
           </button>
         </div>
+        <!-- Seletor Ativos | Arquivados: sempre à vista (fora do painel recolhível) -->
+        <div class="flex items-center gap-2 mt-2">
+          <div id="viewSegment" class="inline-flex rounded-lg border border-slate-300 overflow-hidden" role="group" aria-label="Leitos exibidos">
+            <button type="button" id="viewActiveBtn" class="h-9 px-4 text-sm font-medium bg-sky-700 text-white" aria-pressed="true">Ativos</button>
+            <button type="button" id="viewArchivedBtn" class="h-9 px-4 text-sm font-medium bg-white text-slate-700 border-l border-slate-300" aria-pressed="false">Arquivados</button>
+          </div>
+        </div>
         <!-- Linha 3: Painel de Filtros Oculto -->
         <div id="filtersPanel" class="hidden pt-3 space-y-3">
           <!-- Ocultar Concluídos -->
@@ -197,7 +204,6 @@
           <!-- Ações -->
           <div id="filter-actions" class="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
             <button id="resetChecksBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Resetar dia</button>
-            <button id="viewArchiveBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Ver Arquivados</button>
             <button id="exportDataBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all print:hidden">Exportar backup</button>
             <label class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all cursor-pointer print:hidden">Importar backup<input type="file" id="importDataInput" class="hidden" accept=".json"></label>
             <button id="logoutBtn" class="text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-4 hover:bg-slate-50 transition-all">Sair</button>
@@ -863,7 +869,8 @@
     const trackerFormTitle = document.getElementById('tracker-form-title');
     
     // Botões de Filtro
-    const viewArchiveBtn = document.getElementById('viewArchiveBtn');
+    const viewActiveBtn = document.getElementById('viewActiveBtn');
+    const viewArchivedBtn = document.getElementById('viewArchivedBtn');
     const toggleFiltersBtn = document.getElementById('toggleFiltersBtn');
     const filtersPanel = document.getElementById('filtersPanel');
     const filterHideCompleted = document.getElementById('filter-hide-completed');
@@ -3438,17 +3445,23 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     }
     adjustListPadding();
     
-    viewArchiveBtn.addEventListener('click', () => {
-        isViewingArchived = !isViewingArchived;
-        viewArchiveBtn.textContent = isViewingArchived ? "Ver Leitos Ativos" : "Ver Arquivados";
-        if (isViewingArchived) {
-            viewArchiveBtn.classList.add('bg-sky-100', 'text-sky-700');
-        } else {
-            viewArchiveBtn.classList.remove('bg-sky-100', 'text-sky-700');
-        }
-        searchInput.value = ''; 
+    // Única porta de entrada para isViewingArchived: acerta o seletor Ativos | Arquivados e
+    // esconde "Adicionar leito" nos Arquivados.
+    function setViewArchived(v) {
+        isViewingArchived = !!v;
+        [[viewActiveBtn, !isViewingArchived], [viewArchivedBtn, isViewingArchived]].forEach(([btn, sel]) => {
+            btn.setAttribute('aria-pressed', String(sel));
+            btn.classList.toggle('bg-sky-700', sel);
+            btn.classList.toggle('text-white', sel);
+            btn.classList.toggle('bg-white', !sel);
+            btn.classList.toggle('text-slate-700', !sel);
+        });
+        document.getElementById('addBedBtn').classList.toggle('hidden', isViewingArchived);
+        searchInput.value = '';
         renderScreenA();
-    });
+    }
+    viewActiveBtn.addEventListener('click', () => setViewArchived(false));
+    viewArchivedBtn.addEventListener('click', () => setViewArchived(true));
     
     // NOVO: Listener do Botão de Tarefas
     document.getElementById('openTasksBtn').addEventListener('click', () => {
