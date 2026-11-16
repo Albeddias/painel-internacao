@@ -46,10 +46,29 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
 
 ## Convenções de sync (não quebre)
 
-- O app tem um único botão **Sincronizar**: baixa tudo, mescla (three-way: local × banco ×
-  última foto sincronizada, por linha) e grava com delete+insert dos filhos por paciente
-  (`painel_problems`, `painel_antibiotics`, `painel_cultures`, `painel_devices`, `painel_exams`,
-  `painel_condutas`, `painel_raw_texts`).
+- O app tem um único botão **Sincronizar** (`PainelCore.runSync`, `tests/run-sync.test.cjs`):
+  lê tudo, mescla (three-way: local × banco × última foto sincronizada, por linha) e grava SÓ
+  a diferença para o que acabou de ler. São duas chamadas ao banco, cada uma atômica — as
+  funções `painel_sync_pull()` e `painel_sync_push(jsonb)`
+  (`supabase/migrations/010_painel_sync_rpc.sql`, `security invoker`: o RLS continua valendo).
+  O sync não lê nem grava tabela solta; não volte a fazer isso.
+- A gravação é tudo ou nada, e a falha também: se qualquer coisa der errado depois da leitura,
+  `runSync` devolve o estado ao que era antes (mescla desfeita, foto antiga) e a próxima
+  sincronização fecha certo. Por isso `doSync` redesenha a tela também no erro (os objetos
+  dos leitos são trocados) e nada deve gravar "meio sync" por fora.
+- O que vai no push é a diferença (`buildPushDiff`): linhas novas ou com coluna diferente
+  (upsert, linha inteira), ids de linhas-filhas que saíram (`painel_problems`,
+  `painel_antibiotics`, `painel_cultures`, `painel_devices`, `painel_exams`, `painel_condutas`,
+  `painel_raw_texts`) e pacientes apagados no aparelho. Só mexe em filhos de paciente que é
+  leito no aparelho. Linha criada no banco depois da leitura não é apagada (chega na
+  sincronização seguinte). Exame de laboratório não tem identidade por `id`: é data + nome +
+  valor, na mescla e no diff — linha igual fica no banco com o id que já tem.
+- Antes de tirar a foto, o app confere o que o banco devolveu com o que enviou (`verifyPush`).
+  `painel_sync_push` grava só as colunas enviadas (as chaves da linha que existem na tabela):
+  coluna nova não exige mexer na função, mas o app tem de enviá-la E recebê-la de volta igual
+  — valor que o banco transforma (ex.: data fora do formato `AAAA-MM-DD`) faz a conferência
+  falhar.
+- `painel_sync_pull` não traz os filhos de paciente `'nuvem'` (só a linha do paciente).
 - Edições da IA no banco (criar/editar/deletar linhas) são MESCLADAS na próxima sincronização
   do app — podem ser feitas a qualquer momento. Deleções de linhas pela IA propagam aos
   aparelhos; conflito na mesma linha: a versão do aparelho que sincronizar por último vence.
@@ -72,12 +91,12 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
   default do banco.
 - `painel_condutas.ordem` guarda a posição na lista (o push grava 0, 1, 2...; o pull chega
   em ordem de chave primária e é reordenado por ela). Nula = fim da lista.
-- O pull lê cada tabela INTEIRA, em páginas (`pullAllTables` → `PainelCore.fetchAllRows`:
-  ordem por chave primária + contagem exata). A API devolve no máximo ~1000 linhas por
-  requisição sem erro, e uma tabela truncada seria lida pela mescla como deleção remota
-  (o push então apagaria de verdade). Nunca volte a um `select('*')` simples no sync.
+- A leitura vem inteira numa consulta só (`painel_sync_pull`: uma foto só do banco, cada
+  tabela em ordem de chave primária). Lendo tabela direto, a API devolve no máximo ~1000
+  linhas por requisição sem erro, e uma tabela truncada seria lida pela mescla como deleção
+  remota (o push então apagaria de verdade). Nunca volte a um `select('*')` simples no sync.
 - Leito com nome sempre tem `patientId` na hora do sync (`ensurePatientIds`, no início de
-  `mergeStates`): o leito nasce vazio e sem id, e o push pula leito sem id.
+  `runSync` e de `mergeStates`): o leito nasce vazio e sem id, e o push pula leito sem id.
 - O nome completo só existe no aparelho onde foi digitado. Aparelho que recebe o paciente do
   banco mostra as iniciais no lugar do nome (`bed.initialsPlaceholder`) e devolve ao banco as
   MESMAS iniciais (`bedInitials`); nunca recalcule iniciais a partir de `patientName` sem passar
@@ -85,13 +104,15 @@ Receituário não é mais gerado (os já gravados em `painel_generated_docs` con
   se o aparelho tem o nome de verdade, use `knownPatientName` (`tests/iniciais.test.cjs`).
 - `painel_patients.status` inclui `'nuvem'` = paciente guardado só no banco (nenhum aparelho
   tem leito dele). Não mude status para/de `'nuvem'` por conta própria; o app gerencia isso.
+  No aparelho ele vive só no registro `state.cloudArchived` (com o nome completo, que não
+  existe em outro lugar) — tanto na mescla quanto no "Resetar e receber" (`keepInCloudRegistry`).
 
 ## Desenvolvimento
 
 - Testes: `node --test` (sempre rodar após mexer em `painel-core.js`).
 - O app deve continuar funcionando 100% offline em `file://` — não introduza ES modules nem dependências de build. A biblioteca supabase-js é carregada sob demanda (lazy) só quando o usuário sincroniza, em versão fixa e com `integrity` (`SUPABASE_LIB_URL` / `SUPABASE_LIB_SRI` no `index.html`): ao atualizar, troque a versão e o hash juntos, e use o arquivo original do pacote (o `.min.js` do jsDelivr é gerado na hora e não serve para integridade).
 - A lógica de sync é prefix-agnóstica em `painel-core.js` (chaves lógicas `patients`, `problems`, ...); o mapeamento para os nomes físicos `painel_*` é feito no `index.html` via a constante `TABLE_PREFIX`.
-- Schema: `supabase/migrations/`. Mudanças de schema exigem migration nova + atualização de `buildPushPayload`/`applyPull` + testes.
+- Schema: `supabase/migrations/`. Mudanças de schema exigem migration nova + atualização de `buildPushPayload`/`applyPull` + testes. Tabela nova no sync entra também em `painel_sync_pull`, em `painel_sync_push` e no banco de mentira dos testes (`tests/helpers/fake-db.cjs`, que imita as duas funções).
 - Classes Tailwind novas em `index.html` exigem regenerar o CSS: `npx tailwindcss@3 -o styles.css --content ./index.html --minify`. Ao mudar arquivos do app, suba a versão do cache em `sw.js`.
 - Service worker: tudo o que é do próprio app é network-first (o cache é só a reserva offline), para o `index.html` e o `painel-core.js` virem sempre da mesma versão; só CDNs são cache-first. Não volte a servir o JS do app do cache (`tests/sw.test.cjs`).
 - Regra de tela que dá para testar mora no core, não no `index.html`: contagem de dias e datas (`dayNumber`, `formatDateBR`), selo do antibiótico (`atbBadge`), check de Queda (`showsQuedaCheck`) e exames fixados (`pinnedExamIndex` / `sortExamNames` / `togglePinnedExam`, sempre sem diferenciar maiúsculas). Não recrie cópias locais (`tests/tela.test.cjs`).

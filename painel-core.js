@@ -367,26 +367,6 @@
     });
   }
 
-  // Baixa uma tabela INTEIRA, em páginas. A API do Supabase devolve no máximo N linhas
-  // por requisição (padrão 1000) sem erro algum; ler só a primeira página fazia a mescla
-  // entender o resto como "apagado no banco" e o push apagar de verdade.
-  // fetchPage(from) → Promise<{ data, error, count }>: a página que começa na posição
-  // `from` (em ordem estável) e, se o servidor informar, o total de linhas da tabela.
-  // Não presume o tamanho da página: avança pelo que de fato chegou. Qualquer erro
-  // rejeita — nunca devolve tabela parcial.
-  async function fetchAllRows(fetchPage) {
-    const rows = [];
-    for (;;) {
-      const res = await fetchPage(rows.length);
-      if (res.error) throw res.error;
-      const page = res.data || [];
-      for (let i = 0; i < page.length; i++) rows.push(page[i]);
-      if (page.length === 0) break;
-      if (res.count != null && rows.length >= res.count) break;
-    }
-    return rows;
-  }
-
   // Garante patientId em todo leito com paciente. O leito nasce vazio (sem id) e o nome
   // é digitado depois; migrateBed só dá o id na carga do app. Sem isto, um paciente
   // criado e sincronizado na mesma sessão ficava fora do push (que pula leito sem id)
@@ -395,6 +375,21 @@
     (state.beds || []).forEach(function (bed) {
       if (bed && !bed.patientId && String(bed.patientName || '').trim()) bed.patientId = uuid();
     });
+  }
+
+  // Paciente guardado só na nuvem (status 'nuvem'): nunca é leito. Se este aparelho ainda
+  // tinha o leito, ele sai e o nome completo vai para o registro local; se o registro já
+  // existe, o nome guardado nele é preservado (só existe aqui).
+  function keepInCloudRegistry(state, p, bed) {
+    if (bed) {
+      syncNamePlaceholder(bed, p.initials);
+      state.cloudArchived[p.id] = { nome: knownPatientName(bed), iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '', personId: p.person_id || bed.personId || null };
+      state.beds = state.beds.filter(function (b) { return b.patientId !== p.id; });
+    } else if (!state.cloudArchived[p.id]) {
+      state.cloudArchived[p.id] = { nome: '', iniciais: p.initials || '', leito: p.bed_number || '', personId: p.person_id || null };
+    } else {
+      state.cloudArchived[p.id].personId = p.person_id || state.cloudArchived[p.id].personId || null;
+    }
   }
 
   // Mescla three-way do estado inteiro com o que veio do banco.
@@ -455,18 +450,7 @@
 
       // Paciente guardado só na nuvem: nunca vira leito; se este aparelho ainda
       // tinha o leito, move-o para o registro local preservando o nome completo.
-      if (p.status === 'nuvem') {
-        if (bed) {
-          syncNamePlaceholder(bed, p.initials);
-          state.cloudArchived[p.id] = { nome: knownPatientName(bed), iniciais: p.initials || '', leito: p.bed_number || bed.bedNumber || '', personId: p.person_id || bed.personId || null };
-          state.beds = state.beds.filter(function (b) { return b.patientId !== p.id; });
-        } else if (!state.cloudArchived[p.id]) {
-          state.cloudArchived[p.id] = { nome: '', iniciais: p.initials || '', leito: p.bed_number || '', personId: p.person_id || null };
-        } else {
-          state.cloudArchived[p.id].personId = p.person_id || state.cloudArchived[p.id].personId || null;
-        }
-        return;
-      }
+      if (p.status === 'nuvem') { keepInCloudRegistry(state, p, bed); return; }
 
       const remoteRows = {
         problems: problems[p.id] || [], antibiotics: atbs[p.id] || [], cultures: cultures[p.id] || [],
@@ -1326,6 +1310,8 @@
       notes = byPatient(pulled.notes), rawTexts = byPatient(pulled.raw_texts),
       docs = byPatient(pulled.generated_docs), evolucoes = byPatient(pulled.evolucoes);
 
+    state.cloudArchived = state.cloudArchived || {};
+
     // Pull limpo: o banco é a verdade também para as preferências globais.
     const pulledPref = (pulled.prefs || []).find(function (r) { return r.key === 'lab_ranges'; });
     if (pulledPref) state.labRangesText = pulledPref.value;
@@ -1352,6 +1338,9 @@
       // não ressuscita paciente deletado localmente cujo tombstone ainda não foi sincronizado
       if (deletedPending[p.id]) return;
       let bed = (state.beds || []).find(function (b) { return b.patientId === p.id; });
+      // Guardado na nuvem: não vira leito (a leitura nem traz os filhos dele) e o nome
+      // completo que este aparelho guarda no registro fica como está.
+      if (p.status === 'nuvem') { keepInCloudRegistry(state, p, bed); return; }
       if (!bed) {
         // paciente criado direto no banco (raro): cria leito com iniciais como nome provisório
         bed = migrateBed({ patientName: p.initials || '?', bedNumber: p.bed_number || '' });
@@ -1371,9 +1360,191 @@
       });
     });
 
+    // Registro da nuvem: sai quem sumiu do banco. Nunca com leitura vazia (anômala) — os
+    // nomes guardados ali não existem em nenhum outro lugar.
+    if ((pulled.patients || []).length) {
+      Object.keys(state.cloudArchived).forEach(function (id) {
+        if (!pulledIds[id]) delete state.cloudArchived[id];
+      });
+    }
+
     // Verdade do banco após este pull: usado no próximo pull para detectar deleções remotas.
     state.syncedPatientIds = Object.keys(pulledIds);
     return state;
+  }
+
+  // ---- Sincronizar: enviar só o que mudou, numa gravação só ---------------------------
+
+  // Filhas com identidade por id. Antes o push apagava e reinseria TODAS as linhas de TODOS
+  // os pacientes a cada Sincronizar; agora vai só a diferença para o que acabou de ser lido.
+  const PUSH_CHILD_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'exams', 'condutas', 'raw_texts'];
+  // Chave de cada tabela do diff (as demais: id). A evolução é o DIA, não o id.
+  const PUSH_ROW_KEY = {
+    notes: function (r) { return String(r.patient_id); },
+    prefs: function (r) { return String(r.key); },
+    evolucoes: function (r) { return j(r.patient_id, r.data); },
+  };
+  // Colunas enviadas que não entram na comparação (o banco fica com a dele).
+  const PUSH_ROW_IGNORE = { evolucoes: ['id'] };
+  function pushRowKey(t) { return PUSH_ROW_KEY[t] || function (r) { return String(r.id); }; }
+
+  // Valor enviado x valor guardado. Nulo só é igual a nulo ('' é outra coisa: o banco é
+  // corrigido uma vez). Número compara como número: o aparelho pode guardar "7" onde o
+  // banco devolve 7.
+  function sameValue(sent, stored) {
+    if (sent == null || stored == null) return sent == null && stored == null;
+    if (typeof sent === 'number' || typeof stored === 'number') {
+      return sent !== '' && stored !== '' && Number(sent) === Number(stored);
+    }
+    return String(sent) === String(stored);
+  }
+  // Primeira coluna ENVIADA que difere da linha guardada (null = igual). Colunas que só o
+  // banco tem (updated_at) não contam.
+  function differingColumn(sent, stored, ignore) {
+    const keys = Object.keys(sent);
+    for (let i = 0; i < keys.length; i++) {
+      if (ignore && ignore.indexOf(keys[i]) !== -1) continue;
+      if (!sameValue(sent[keys[i]], stored[keys[i]])) return keys[i];
+    }
+    return null;
+  }
+  // Linhas enviadas que o banco não tem, ou tem diferentes.
+  function changedRows(t, sentRows, storedRows) {
+    const keyOf = pushRowKey(t);
+    const stored = {};
+    (storedRows || []).forEach(function (r) { stored[keyOf(r)] = r; });
+    return (sentRows || []).filter(function (row) {
+      const cur = stored[keyOf(row)];
+      return !cur || differingColumn(row, cur, PUSH_ROW_IGNORE[t]) !== null;
+    });
+  }
+  function isLabRow(r) { return r.tipo === 'lab'; }
+  function isNotLabRow(r) { return r.tipo !== 'lab'; }
+  function labRowKey(r) { return j(r.patient_id, r.data, r.nome, r.resultado); }
+
+  // O que falta gravar para o banco (pulled = o que acabou de ser lido) ficar igual ao
+  // aparelho (payload = buildPushPayload):
+  //   upsert[tabela]    linhas novas ou com alguma coluna diferente, inteiras
+  //   remove[tabela]    ids de linhas-filhas que o banco tem e o aparelho não
+  //   deletePatientIds  pacientes apagados no aparelho (o banco apaga os filhos em cascata)
+  // Só mexe em filhos de paciente que o aparelho tem: paciente na nuvem, ou que não é
+  // leito aqui, fica intocado. Paciente só é apagado por tombstone. Evolução nunca é
+  // removida. Linha criada no banco DEPOIS da leitura não está em pulled, então não entra
+  // em remove — o push antigo (apaga tudo e reinsere) a apagava.
+  // Exame de laboratório: a identidade é data + nome + valor (como na mescla), não o id.
+  // Linha igual fica como está no banco, com o id que já tem; valor corrigido = remove a
+  // antiga + insere a nova. Antes todos os labs ganhavam id novo a cada push.
+  function buildPushDiff(payload, pulled) {
+    pulled = pulled || {};
+    const diff = { deletePatientIds: (payload.deletePatientIds || []).slice(), upsert: {}, remove: {} };
+    const owned = {};
+    (payload.patients || []).forEach(function (p) { owned[p.id] = true; });
+
+    diff.upsert.patients = changedRows('patients', payload.patients, pulled.patients);
+
+    PUSH_CHILD_TABLES.forEach(function (t) {
+      let sent = payload[t] || [];
+      let stored = pulled[t] || [];
+      const upsert = [], remove = [];
+      if (t === 'exams') {
+        const pool = {};
+        stored.filter(isLabRow).forEach(function (r) {
+          if (owned[r.patient_id]) (pool[labRowKey(r)] = pool[labRowKey(r)] || []).push(r);
+        });
+        sent.filter(isLabRow).forEach(function (row) {
+          const same = pool[labRowKey(row)];
+          if (same && same.length) same.shift(); else upsert.push(row);
+        });
+        Object.keys(pool).forEach(function (k) { pool[k].forEach(function (r) { remove.push(r.id); }); });
+        sent = sent.filter(isNotLabRow);
+        stored = stored.filter(isNotLabRow);
+      }
+      const sentIds = {};
+      sent.forEach(function (row) { sentIds[row.id] = true; });
+      changedRows(t, sent, stored).forEach(function (row) { upsert.push(row); });
+      stored.forEach(function (r) { if (owned[r.patient_id] && !sentIds[r.id]) remove.push(r.id); });
+      diff.upsert[t] = upsert;
+      diff.remove[t] = remove;
+    });
+
+    ['notes', 'evolucoes', 'prefs'].forEach(function (t) {
+      diff.upsert[t] = changedRows(t, payload[t], pulled[t]);
+    });
+    return diff;
+  }
+
+  // Quantas operações o diff carrega (0 = nada a gravar: nem chama o banco).
+  function pushDiffSize(diff) {
+    let n = (diff.deletePatientIds || []).length;
+    Object.keys(diff.upsert || {}).forEach(function (t) { n += diff.upsert[t].length; });
+    Object.keys(diff.remove || {}).forEach(function (t) { n += diff.remove[t].length; });
+    return n;
+  }
+
+  // Confere o que o banco devolveu (as linhas como ficaram gravadas) com o que foi
+  // enviado. A foto da sincronização é tirada do APARELHO; se o banco tivesse guardado
+  // outra coisa, a mescla seguinte leria a diferença como "editado no banco" e trocaria o
+  // dado do aparelho pelo errado. Lança com tabela.coluna; quem chama desfaz tudo.
+  function verifyPush(diff, stored) {
+    stored = stored || {};
+    Object.keys(diff.upsert || {}).forEach(function (t) {
+      const keyOf = pushRowKey(t);
+      const got = {};
+      (stored[t] || []).forEach(function (r) { got[keyOf(r)] = r; });
+      diff.upsert[t].forEach(function (row) {
+        const cur = got[keyOf(row)];
+        const col = cur ? differingColumn(row, cur, PUSH_ROW_IGNORE[t]) : '';
+        if (col !== null) {
+          throw new Error('a gravação não conferiu com o banco (' + t + (col ? '.' + col : '') +
+            '); este aparelho ficou como estava');
+        }
+      });
+    });
+  }
+
+  // O Sincronizar inteiro: lê tudo (uma chamada, uma foto só do banco), mescla e grava só
+  // a diferença (uma chamada, tudo ou nada).
+  //   db.pull()      → Promise<{ patients: [], problems: [], ... }>
+  //   db.push(diff)  → Promise<{ tabela: [linhas como ficaram gravadas] }>
+  // As duas rejeitam em falha. Se QUALQUER coisa falhar depois da leitura, o estado volta
+  // a ser exatamente o de antes (mescla desfeita, foto antiga): como a gravação é tudo ou
+  // nada, o banco está como foi lido — ou inteiro como o aparelho pediu, se só a resposta
+  // se perdeu —, e nos dois casos a próxima sincronização fecha certo com a foto antiga.
+  // Antes, uma falha no meio deixava o banco pela metade e a foto era zerada: a
+  // sincronização seguinte virava união e as linhas apagadas no aparelho voltavam.
+  // Resolve com { sent }: quantas operações foram enviadas.
+  async function runSync(state, db, opts) {
+    // Ids antes de tudo, e fora do que é desfeito: se a gravação aconteceu e só a
+    // resposta se perdeu, a nova tentativa tem de usar os mesmos ids.
+    ensurePatientIds(state);
+    ensureRowIds(state);
+    const pulled = await db.pull();
+    if (!pulled || !Array.isArray(pulled.patients)) throw new Error('resposta inesperada do banco na leitura');
+    const backup = JSON.stringify(state);
+    try {
+      mergeStates(state, pulled);
+      const newBase = buildSyncBase(state);
+      // Pelo JSON, como vai pela rede: o que é comparado é o que o banco recebe.
+      const payload = JSON.parse(JSON.stringify(buildPushPayload(state)));
+      const diff = buildPushDiff(payload, pulled);
+      const sent = pushDiffSize(diff);
+      if (sent) verifyPush(diff, await db.push(diff));
+
+      state.syncBase = newBase;
+      const synced = {};
+      (state.syncedPatientIds || []).forEach(function (id) { synced[id] = true; });
+      payload.patients.forEach(function (p) { synced[p.id] = true; });
+      diff.deletePatientIds.forEach(function (id) { delete synced[id]; });
+      state.syncedPatientIds = Object.keys(synced);
+      state.deletedPatientIds = [];
+      state.lastSyncAt = (opts && opts.now) || new Date().toISOString();
+      return { sent: sent };
+    } catch (e) {
+      const prev = JSON.parse(backup);
+      Object.keys(state).forEach(function (k) { delete state[k]; });
+      Object.assign(state, prev);
+      throw e;
+    }
   }
 
   return {
@@ -1384,7 +1555,6 @@
     parseHpp: parseHpp,
     joinHpp: joinHpp,
     fillPatientName: fillPatientName,
-    fetchAllRows: fetchAllRows,
     filterSuggestions: filterSuggestions,
     dayNumber: dayNumber,
     formatDateBR: formatDateBR,
@@ -1413,6 +1583,10 @@
     migrateState: migrateState,
     buildPushPayload: buildPushPayload,
     applyPull: applyPull,
+    buildPushDiff: buildPushDiff,
+    pushDiffSize: pushDiffSize,
+    verifyPush: verifyPush,
+    runSync: runSync,
     markPatientDeleted: markPatientDeleted,
     resetLocalSync: resetLocalSync,
     hash8: hash8,

@@ -3555,25 +3555,25 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     const SUPABASE_URL = 'https://kuhymtikommkoupynhkj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1aHltdGlrb21ta291cHluaGtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxOTQwNjEsImV4cCI6MjA4NDc3MDA2MX0.8yCEVzQ6KLBCgRhzDNgV9ar4l_UO1AakNS1VTgrVCLQ';
     const TABLE_PREFIX = 'painel_'; // tabelas convivem com outro app no mesmo projeto
-    const SYNC_CHILD_TABLES = ['problems', 'antibiotics', 'cultures', 'devices', 'exams', 'condutas', 'raw_texts'];
-    // Tudo o que um sync baixa. 'evolucoes' entra na mescla como as filhas, mas é gravada
-    // por upsert em (patient_id, data) — fora de SYNC_CHILD_TABLES, que é delete+insert.
-    const SYNC_PULL_TABLES = ['patients', ...SYNC_CHILD_TABLES, 'evolucoes', 'notes', 'generated_docs', 'prefs'];
-    // Chave primária de cada tabela (as demais usam `id`): dá a ordem estável da paginação.
-    const SYNC_TABLE_PK = { notes: 'patient_id', prefs: 'key' };
-    const SYNC_PAGE_SIZE = 1000;
     let sbClient = null;
 
-    // Baixa todas as tabelas do sync, cada uma INTEIRA. A API devolve no máximo ~1000 linhas
-    // por requisição sem acusar erro; por isso cada tabela é lida em páginas, em ordem de
-    // chave primária e com a contagem total (ver PainelCore.fetchAllRows). Lança em falha.
-    async function pullAllTables(sb) {
-      const lists = await Promise.all(SYNC_PULL_TABLES.map(t => PainelCore.fetchAllRows(from =>
-        sb.from(TABLE_PREFIX + t).select('*', { count: 'exact' })
-          .order(SYNC_TABLE_PK[t] || 'id').range(from, from + SYNC_PAGE_SIZE - 1))));
-      const pulled = {};
-      SYNC_PULL_TABLES.forEach((t, i) => { pulled[t] = lists[i]; });
-      return pulled;
+    // O banco, como o core o enxerga (PainelCore.runSync): duas chamadas, cada uma atômica
+    // no servidor (supabase/migrations/010_painel_sync_rpc.sql).
+    //   pull  = painel_sync_pull: todas as tabelas numa consulta só — uma foto só do banco,
+    //           sem o teto de ~1000 linhas por requisição da leitura direta de tabela.
+    //   push  = painel_sync_push: grava só a diferença, tudo ou nada, e devolve as linhas
+    //           como ficaram gravadas (o core confere antes de tirar a foto).
+    // Nenhuma tabela é lida ou gravada solta no sync. As duas lançam em falha.
+    function syncDb(sb) {
+      const call = async (fn, args) => {
+        const { data, error } = await sb.rpc(TABLE_PREFIX + fn, args);
+        if (error) throw error;
+        return data;
+      };
+      return {
+        pull: () => call('sync_pull'),
+        push: (diff) => call('sync_push', { p: diff }),
+      };
     }
 
     function setSyncStatus(msg, isError = false) {
@@ -3705,87 +3705,22 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // Na carga: se já há sessão salva, libera o app (mesmo offline); senão, mantém o portão.
     if (hasStoredSession()) hideAuthGate();
 
-    // Sincronização completa: baixa tudo, mescla (PainelCore.mergeStates) e grava
-    // o resultado com o push de sempre (delete+insert por paciente). Lança em falha.
+    // Sincronização completa: uma leitura, a mescla e uma gravação só com o que mudou —
+    // tudo em PainelCore.runSync (testado em tests/run-sync.test.cjs). Lança em falha, e
+    // nesse caso o estado volta a ser o de antes de tocar no botão: os objetos dos leitos
+    // são trocados, por isso quem chama redesenha a tela também quando dá erro.
     let syncInFlight = false;
     async function doSync() {
       if (syncInFlight) throw new Error('Sincronização já em andamento.');
       syncInFlight = true;
       lockScreen('Sincronizando...');
-      let merged = false;
       try {
         const sb = await getSupabaseClient();
-        const pulled = await pullAllTables(sb);
-
-        PainelCore.mergeStates(state, pulled);
-        // Foto capturada AGORA (síncrono): edições feitas durante os awaits do push
-        // não entram na foto e sobrevivem à próxima mescla.
-        const newBase = PainelCore.buildSyncBase(state);
-        merged = true;
-
-        const payload = PainelCore.buildPushPayload(state);
-        const delIds = payload.deletePatientIds || [];
-        let res;
-        if (delIds.length) {
-          const delResults = await Promise.all([...SYNC_CHILD_TABLES, 'evolucoes', 'notes', 'generated_docs']
-            .map(t => sb.from(TABLE_PREFIX + t).delete().in('patient_id', delIds)));
-          for (const r of delResults) { if (r.error) throw r.error; }
-          res = await sb.from(TABLE_PREFIX + 'patients').delete().in('id', delIds);
-          if (res.error) throw res.error;
-        }
-        if (payload.patients.length) {
-          res = await sb.from(TABLE_PREFIX + 'patients').upsert(payload.patients);
-          if (res.error) throw res.error;
-          const ids = payload.patients.map(p => p.id);
-          // KNOWN: sem transação no cliente — se a conexão cair entre delete e insert,
-          // os filhos somem do banco até o próximo sync (estado local é a fonte da verdade).
-          // Mitigação: em falha pós-mescla a foto é zerada e o próximo sync degrada para união.
-          await Promise.all([
-            ...SYNC_CHILD_TABLES.map(async (t) => {
-              let r = await sb.from(TABLE_PREFIX + t).delete().in('patient_id', ids);
-              if (r.error) throw r.error;
-              if (payload[t].length) {
-                r = await sb.from(TABLE_PREFIX + t).insert(payload[t]);
-                if (r.error) throw r.error;
-              }
-            }),
-            (async () => {
-              const r = await sb.from(TABLE_PREFIX + 'notes').upsert(payload.notes);
-              if (r.error) throw r.error;
-            })(),
-            // Evoluções: upsert na chave única (patient_id, data) — nunca insert puro,
-            // para o mesmo dia jamais duplicar. Nenhum delete nesta tabela.
-            (async () => {
-              if (!payload.evolucoes.length) return;
-              const r = await sb.from(TABLE_PREFIX + 'evolucoes').upsert(payload.evolucoes, { onConflict: 'patient_id,data' });
-              if (r.error) throw r.error;
-            })(),
-          ]);
-        }
-
-        // Preferências globais (faixas de referência): upsert por chave, mesmo sem pacientes.
-        res = await sb.from(TABLE_PREFIX + 'prefs').upsert(payload.prefs);
-        if (res.error) throw res.error;
-
-        // Gravação confirmada: tira a foto e fecha o bookkeeping.
-        state.syncBase = newBase;
-        const pushedIds = new Set([...(state.syncedPatientIds || []), ...payload.patients.map(p => p.id)]);
-        delIds.forEach(id => pushedIds.delete(id));
-        state.syncedPatientIds = [...pushedIds];
-        state.deletedPatientIds = [];
-        state.lastSyncAt = new Date().toISOString();
+        await PainelCore.runSync(state, syncDb(sb));
+      } finally {
+        // Em sucesso ou falha: os ids dados a leitos/linhas novos têm de ficar gravados.
         saveData(state, { fromSync: true });
         flushSave();
-      } catch (e) {
-        if (merged) {
-          // Push pode ter ficado pela metade: sem foto, a próxima sincronização
-          // faz união (nada é deletado) em vez de ler o buraco como deleção remota.
-          state.syncBase = {};
-          saveData(state, { fromSync: true });
-          flushSave();
-        }
-        throw e;
-      } finally {
         syncInFlight = false;
         unlockScreen();
       }
@@ -3814,13 +3749,14 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       lockScreen('Guardando na nuvem...');
       try {
         beds.forEach(bed => { if (!bed.patientId) bed.patientId = PainelCore.uuid(); });
+        const ids = beds.map(b => b.patientId);
         setSyncStatus('Sincronizando...');
         await doSync();
         const sb = await getSupabaseClient();
-        const ids = beds.map(b => b.patientId);
         const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'nuvem' }).in('id', ids);
         if (r.error) throw r.error;
-        beds.forEach(bed => {
+        // Os leitos como ficaram DEPOIS da sincronização (a mescla pode ter trocado dados).
+        state.beds.filter(b => ids.includes(b.patientId)).forEach(bed => {
           state.cloudArchived[bed.patientId] = {
             // aparelho que só tem as iniciais no lugar do nome não as guarda como "nome"
             nome: PainelCore.knownPatientName(bed),
@@ -3833,9 +3769,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         state.beds = state.beds.filter(b => !ids.includes(b.patientId));
         saveData(state, { fromSync: true });
         flushSave();
-        renderScreenA();
         setSyncStatus('Guardado na nuvem ✓');
       } finally {
+        renderScreenA(); // também na falha: a sincronização desfeita troca os objetos dos leitos
         unlockScreen();
       }
     }
@@ -3848,9 +3784,9 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         const r = await sb.from(TABLE_PREFIX + 'patients').update({ status: 'arquivado' }).in('id', ids);
         if (r.error) throw r.error;
         await doSync(); // a mescla adota os pacientes e reencaixa os nomes do registro local
-        renderScreenA();
         setSyncStatus('Trazido da nuvem ✓');
       } finally {
+        renderScreenA(); // também na falha: a sincronização desfeita troca os objetos dos leitos
         unlockScreen();
       }
     }
@@ -3866,9 +3802,10 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       lockScreen('Recebendo do servidor...');
       try {
         const sb = await getSupabaseClient();
-        // Baixa TUDO primeiro (selects em paralelo); só zeramos o local depois que o servidor
-        // respondeu com sucesso, para nunca deixar o app vazio se estiver offline / a conexão cair.
-        const pulled = await pullAllTables(sb);
+        // Baixa TUDO primeiro; só zeramos o local depois que o servidor respondeu com
+        // sucesso, para nunca deixar o app vazio se estiver offline / a conexão cair.
+        const pulled = await syncDb(sb).pull();
+        if (!pulled || !Array.isArray(pulled.patients)) throw new Error('resposta inesperada do banco na leitura');
         PainelCore.resetLocalSync(state);   // limpa leitos + bookkeeping, mantém preferências locais
         PainelCore.applyPull(state, pulled);
         state.syncBase = PainelCore.buildSyncBase(state);

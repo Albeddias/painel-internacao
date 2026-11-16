@@ -5,7 +5,7 @@
  * rodar HTML novo com core antigo. CDNs (supabase-js em versão fixa, fontes) seguem
  * cache-first com atualização em segundo plano.
  * Ao mudar arquivos do app, subir a versão do cache abaixo força a limpeza dos antigos. */
-const CACHE = 'caderno-v8';
+const CACHE = 'caderno-v9';
 const APP_SHELL = ['./', './index.html', './styles.css', './painel-core.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {
