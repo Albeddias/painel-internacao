@@ -122,7 +122,8 @@ test('index.html: leito e nome mantêm o tamanho no celular; campo-linha sem alt
   assert.ok(/\.inline-bed\s*\{\s*font-size:\s*1\.5rem\s*!important/.test(html));
   assert.ok(/\.inline-name\s*\{\s*font-size:\s*1\.125rem\s*!important/.test(html));
   assert.ok(/input\.campo-linha\s*\{[^}]*min-height:\s*0/.test(html));
-  ['inline-age', 'problem-plan'].forEach((c) => assert.ok(juntas(c, 'campo-linha'), c));
+  ['inline-age'].forEach((c) => assert.ok(juntas(c, 'campo-linha'), c));
+  assert.ok(/\.grow-wrap\.campo-linha > textarea/.test(html));
 });
 
 test('DAILY_CHECKS: quatro checks, siglas distintas e nome por extenso', () => {
@@ -511,4 +512,22 @@ test('index.html: resumo no título de cada seção fechada', () => {
   assert.ok(html.includes('PainelCore.resumoSecao(') && html.includes('function refreshSectionSummary('));
   assert.ok(!html.includes('const GENDOC_LABEL') && html.includes('PainelCore.GENDOC_LABEL'));
   assert.ok(juntas('labs-last-line', 'line-clamp-2'));
+});
+
+test('umaLinha: quebra de linha vira um espaço', () => {
+  assert.strictEqual(PainelCore.umaLinha('Pneumonia\ncomunitária\r\ngrave'), 'Pneumonia comunitária grave');
+  assert.strictEqual(PainelCore.umaLinha('a \n\n b'), 'a b');
+  assert.strictEqual(PainelCore.umaLinha('sem quebra'), 'sem quebra');
+  assert.strictEqual(PainelCore.umaLinha(null), '');
+});
+
+test('index.html: campos de lista quebram linha sem inserir quebra; status por seletor', () => {
+  // Marcação escrita literalmente (não por growFieldHtml): tests/html-refs.test.cjs só enxerga classes em class="…".
+  assert.ok(html.includes('<div class="grow-wrap') && html.includes('function bindGrowField(') && html.includes('PainelCore.umaLinha('));
+  ['problem-desc', 'problem-plan', 'hpp-desc', 'conduta-text', 'task-text'].forEach((c) => {
+    assert.ok(!new RegExp('<input[^>]*class="[^"]*\\b' + c + '\\b').test(html), c + ' não é mais <input>');
+    assert.ok(html.includes(c), c);
+  });
+  assert.ok(/\.grow-wrap::after\s*\{[^}]*content:\s*attr\(data-espelho\)/.test(html));
+  assert.ok(html.includes('problem-status-select') && !html.includes('PROBLEM_STATUS_NEXT'));
 });

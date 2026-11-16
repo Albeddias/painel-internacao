@@ -193,6 +193,18 @@
     /* Chip com um campo nativo transparente por cima (spec 3.1): o chip mostra o texto do app,
        o toque cai no campo e abre o seletor do sistema. Fonte de 16 px: sem zoom no iOS. */
     .chip-nativo { position: relative; min-height: 36px; }
+    /* Campo de lista que cresce com o texto (spec 3.5): o texto é espelhado num pseudo-elemento
+       invisível na mesma célula da grade, que empurra a altura já no primeiro desenho. */
+    .grow-wrap { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1; min-width: 0; }
+    .grow-wrap::after { content: attr(data-espelho) " "; white-space: pre-wrap; visibility: hidden; }
+    .grow-wrap > textarea { resize: none; overflow: hidden; background: transparent; width: 100%; }
+    .grow-wrap > textarea, .grow-wrap::after {
+      grid-area: 1 / 1 / 2 / 2; font: inherit; padding: 0.625rem 0.5rem; min-height: 44px;
+      border: 1px solid transparent; border-radius: 0.375rem; overflow-wrap: anywhere;
+    }
+    .grow-wrap.campo-linha > textarea, .grow-wrap.campo-linha::after { padding: 0.25rem 0.5rem; min-height: 0; }
+    @media (max-width: 640px) { .grow-wrap::after { font-size: 16px; } }
+    .grow-wrap > textarea.problem-plan:placeholder-shown { border-style: dashed; border-color: var(--c-border); }
     /* Controles (spec 3.6): barra lateral de 3 px na cor do tipo */
     .tracker-item { border-left: 3px solid var(--c-border); }
     .tracker-item[data-tipo="atb"] { border-left-color: #0284c7; }
@@ -757,7 +769,7 @@
   <template id="taskItemTpl">
     <div class="task-item flex gap-2 items-center group bg-white rounded-lg p-3 border border-slate-200">
         <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-        <input type="text" class="task-text flex-1 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50">
+        <div class="grow-wrap text-sm"><textarea rows="1" class="task-text focus:border-slate-300 focus:bg-slate-50" placeholder="Tarefa"></textarea></div>
         <button type="button" class="remove-task min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-red-600 opacity-60 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all print:hidden" title="Remover tarefa" aria-label="Remover tarefa">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
         </button>
@@ -1612,13 +1624,18 @@
       return `background-color: ${pair.bg}; color: ${pair.text};`;
     }
 
+    // Mede na hora quando o campo já está na página; senão marca, e renderScreenB mede os
+    // marcados assim que insere o conteúdo (a página não muda de altura depois do desenho e a
+    // rolagem não pula). O setTimeout fica como reserva para quem insere por conta própria.
+    function resizeNow(el) {
+      el.style.height = 'auto';
+      el.style.height = (el.scrollHeight) + 'px';
+    }
     function autoResizeTextarea(el) {
-      if (el) {
-        setTimeout(() => {
-          el.style.height = 'auto';
-          el.style.height = (el.scrollHeight) + 'px';
-        }, 0);
-      }
+      if (!el) return;
+      if (el.isConnected) { resizeNow(el); return; }
+      el.dataset.autoResize = '1';
+      setTimeout(() => { if (el.isConnected) resizeNow(el); }, 0);
     }
     
     function loadData() {
@@ -2287,6 +2304,7 @@
       refreshIdChips(art, b);
 
       patientDetailContent.appendChild(node);
+      patientDetailContent.querySelectorAll('textarea[data-auto-resize]').forEach(resizeNow);
       observeSections();
 
       if (!b.isNotesMinimized) autoResizeTextarea(notesInput);
@@ -2502,17 +2520,16 @@
       const commit = () => { bed.hpp = PainelCore.joinHpp(items); saveData(state); };
       items.forEach((txt, i) => {
         const it = document.createElement('div');
-        it.className = 'hpp-item flex gap-2 items-center group py-0.5 border-b border-slate-100 last:border-b-0';
+        it.className = 'hpp-item flex gap-2 items-start group py-0.5 border-b border-slate-100 last:border-b-0';
         it.dataset.hppIndex = i;
         it.innerHTML = `
           ${dragHandleHtml}
-          <input type="text" class="hpp-desc flex-1 min-w-0 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Diagnóstico">
+          <div class="grow-wrap text-sm"><textarea rows="1" class="hpp-desc focus:border-slate-300 focus:bg-slate-50" placeholder="Diagnóstico"></textarea></div>
           <button class="remove-hpp flex-shrink-0 text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
           </button>
         `;
-        it.querySelector('.hpp-desc').value = txt;
-        it.querySelector('.hpp-desc').addEventListener('input', (e) => { items[i] = e.target.value; commit(); });
+        bindGrowField(it.querySelector('.hpp-desc'), txt, (v) => { items[i] = v; commit(); });
         it.querySelector('.remove-hpp').addEventListener('click', () => {
           const name = (items[i] || '').trim() || 'este diagnóstico';
           showConfirm(`Remover "${name}"?`, () => {
@@ -2553,13 +2570,28 @@
       }
     }
 
-    const PROBLEM_STATUS_NEXT = { ativo: 'resolvido', resolvido: 'cronico', cronico: 'ativo' };
-    const PROBLEM_STATUS_STYLE = {
-      ativo: 'bg-amber-100 text-amber-800',
-      resolvido: 'bg-green-100 text-green-800',
-      cronico: 'bg-slate-200 text-slate-700',
-    };
     const PROBLEM_STATUS_LABEL = { ativo: 'Ativo', resolvido: 'Resolvido', cronico: 'Crônico' };
+    const PROBLEM_STATUS_CHIP = { ativo: 'chip-primary', cronico: '', resolvido: 'chip-success' };
+
+    // Campo de lista de uma linha lógica que quebra na tela (spec 3.5), escrito literalmente:
+    // <div class="grow-wrap text-sm"><textarea rows="1" class="…">. Fonte e cor vão no invólucro
+    // (valem para o campo e para o espelho que dá a altura).
+    // Enter sai do campo; quebra de linha colada vira espaço (descrição com quebra bagunçaria o
+    // "Copiar resumo" e, no HPP, separaria o item em dois).
+    function bindGrowField(textarea, valor, aoMudar) {
+      const wrap = textarea.parentElement;
+      textarea.value = valor || '';
+      wrap.dataset.espelho = textarea.value;
+      textarea.addEventListener('input', () => {
+        const texto = PainelCore.umaLinha(textarea.value);
+        if (texto !== textarea.value.trim() || /[\r\n]/.test(textarea.value)) textarea.value = texto;
+        wrap.dataset.espelho = textarea.value;
+        aoMudar(textarea.value);
+      });
+      textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); textarea.blur(); }
+      });
+    }
 
     function renderProblemList(listElement, bed, bedIdx) {
       listElement.innerHTML = '';
@@ -2573,23 +2605,31 @@
         it.innerHTML = `
           <div class="flex gap-2 items-center">
             ${dragHandleHtml}
-            <button class="problem-status-chip flex-shrink-0 text-xs font-medium rounded-full px-2 py-1 ${PROBLEM_STATUS_STYLE[p.status] || PROBLEM_STATUS_STYLE.ativo}">${PROBLEM_STATUS_LABEL[p.status] || 'Ativo'}</button>
-            <input type="text" class="problem-desc flex-1 min-w-0 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${p.status === 'resolvido' ? 'line-through text-slate-500' : ''}" placeholder="Descreva o problema">
+            <label class="problem-status chip chip-nativo flex-shrink-0 ${p.status in PROBLEM_STATUS_CHIP ? PROBLEM_STATUS_CHIP[p.status] : PROBLEM_STATUS_CHIP.ativo}">
+              <span class="problem-status-text">${PROBLEM_STATUS_LABEL[p.status] || 'Ativo'} ▾</span>
+              <select class="problem-status-select" aria-label="Status do problema">
+                <option value="ativo">Ativo</option><option value="cronico">Crônico</option><option value="resolvido">Resolvido</option>
+              </select>
+            </label>
+<div class="grow-wrap text-sm"><textarea rows="1" class="problem-desc focus:border-slate-300 focus:bg-slate-50 ${p.status === 'resolvido' ? 'line-through text-slate-500' : ''}" placeholder="Descreva o problema"></textarea></div>
             <button class="remove-problem flex-shrink-0 text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
             </button>
           </div>
-          <input type="text" class="problem-plan campo-linha w-full text-xs p-1.5 pl-12 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 text-slate-600" placeholder="Plano (opcional)...">
+          <div class="flex items-start gap-1 pl-7">
+            <span class="txt-muted text-xs pt-1" aria-hidden="true">↳</span>
+            <div class="grow-wrap campo-linha text-xs text-slate-600"><textarea rows="1" class="problem-plan focus:border-slate-300 focus:bg-slate-50" placeholder="Plano (opcional)..."></textarea></div>
+          </div>
         `;
-        it.querySelector('.problem-desc').value = p.descricao || '';
-        it.querySelector('.problem-plan').value = p.plano || '';
-        it.querySelector('.problem-status-chip').addEventListener('click', () => {
-          p.status = PROBLEM_STATUS_NEXT[p.status] || 'ativo';
+        const statusSel = it.querySelector('.problem-status-select');
+        statusSel.value = PROBLEM_STATUS_LABEL[p.status] ? p.status : 'ativo';
+        statusSel.addEventListener('change', () => {
+          p.status = statusSel.value;
           saveData(state);
           renderScreenB();
         });
-        it.querySelector('.problem-desc').addEventListener('input', (e) => { p.descricao = e.target.value; saveData(state); });
-        it.querySelector('.problem-plan').addEventListener('input', (e) => { p.plano = e.target.value; saveData(state); });
+        bindGrowField(it.querySelector('.problem-desc'), p.descricao, (v) => { p.descricao = v; saveData(state); });
+        bindGrowField(it.querySelector('.problem-plan'), p.plano, (v) => { p.plano = v; saveData(state); });
         it.querySelector('.remove-problem').addEventListener('click', () => {
           const pName = (p.descricao || '').trim() || 'este problema';
           showConfirm(`Remover "${pName}"?`, () => {
@@ -2944,19 +2984,17 @@
           it.className = 'conduta flex gap-2 items-center group';
           it.innerHTML = `
             <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500" ${c.done ? 'checked' : ''}>
-            <input type="text" class="flex-1 text-sm p-2 rounded-md border border-transparent focus:border-slate-300 focus:bg-slate-50 ${c.done ? 'line-through text-slate-500' : ''}" value="${escapeHtml(c.text || '')}" placeholder="Descreva a conduta">
+            <div class="grow-wrap text-sm"><textarea rows="1" class="conduta-text focus:border-slate-300 focus:bg-slate-50 ${c.done ? 'line-through text-slate-500' : ''}" placeholder="Descreva a conduta"></textarea></div>
             <button class="remove-conduta text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden" data-conduta-index="${ci}">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
             </button>
           `;
           it.querySelector('input[type=checkbox]').addEventListener('change', (e) => {
             updateConduta(bedIdx, ci, { done: e.target.checked });
-            it.querySelector('input[type=text]').classList.toggle('line-through', e.target.checked);
-            it.querySelector('input[type=text]').classList.toggle('text-slate-500', e.target.checked);
+            it.querySelector('.conduta-text').classList.toggle('line-through', e.target.checked);
+            it.querySelector('.conduta-text').classList.toggle('text-slate-500', e.target.checked);
           });
-          it.querySelector('input[type=text]').addEventListener('input', (e) => {
-            updateConduta(bedIdx, ci, { text: e.target.value });
-          });
+          bindGrowField(it.querySelector('.conduta-text'), c.text, (v) => updateConduta(bedIdx, ci, { text: v }));
           it.querySelector('.remove-conduta').addEventListener('click', () => {
             const cName = (c.text || '').trim() || 'esta conduta';
             showConfirm(`Remover "${cName}"?`, () => {
@@ -3622,7 +3660,10 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             const removeBtn = node.querySelector('.remove-task');
 
             checkbox.checked = task.done;
-            textInput.value = task.text;
+            bindGrowField(textInput, task.text, (v) => {
+                task.text = v;
+                saveData(state, { localOnly: true }); // Salva a cada tecla
+            });
             if (task.done) {
                 textInput.classList.add('line-through', 'text-slate-500');
             }
@@ -3631,11 +3672,6 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
                 task.done = checkbox.checked;
                 saveData(state, { localOnly: true });
                 renderScreenC(); // Re-renderiza para aplicar estilo
-            });
-
-            textInput.addEventListener('input', () => {
-                task.text = textInput.value;
-                saveData(state, { localOnly: true }); // Salva a cada tecla
             });
 
             removeBtn.addEventListener('click', () => {

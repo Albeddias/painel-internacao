@@ -1944,6 +1944,7 @@
     linhaControle: linhaControle,
     fimPrevistoAtb: fimPrevistoAtb,
     resumoSecao: resumoSecao,
+    umaLinha: umaLinha,
     GENDOC_LABEL: GENDOC_LABEL,
     showsQuedaCheck: showsQuedaCheck,
     DAILY_CHECKS: DAILY_CHECKS,
