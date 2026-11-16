@@ -1035,7 +1035,7 @@
   <script>
     // Nova chave de storage
     const STORAGE_KEY = 'wardBookData_v16';
-    const APP_VERSION = '12'; // = número do cache em sw.js (tests/sw.test.cjs confere)
+    const APP_VERSION = '13'; // = número do cache em sw.js (tests/sw.test.cjs confere)
     const OLD_STORAGE_KEY = 'wardBookData_v14_tasks';
     // Preenchido por loadData quando o dado salvo existe mas não pôde ser lido: { raw, message }.
     // Enquanto estiver preenchido, flushSave não grava — o dado original fica intacto.
@@ -1265,8 +1265,7 @@
       sheetTrigger = trigger || null;
       const sheet = document.getElementById(id);
       const foot = sheet.querySelector('.sheet-foot');
-      // A largura fica no rodapé só durante a revisão de UI (a Fase 4 a retira).
-      if (foot) foot.textContent = `Caderno de Visitas · versão ${APP_VERSION} · ${window.innerWidth} px`;
+      if (foot) foot.textContent = `Caderno de Visitas · versão ${APP_VERSION}`;
       sheet.classList.remove('hidden');
       history.pushState({ screen: currentScreenName(), overlay: id }, '');
       const primeiro = [...sheet.querySelectorAll('.sheet-item')].find((el) => !el.classList.contains('hidden'));
