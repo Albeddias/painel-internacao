@@ -659,3 +659,37 @@ test('index.html: setas de tendência dos labs em cinza', () => {
   assert.ok(!/text-red-500|text-sky-500/.test(corpo), 'subir ou descer não é alerta; a cor fica para o valor fora da faixa');
   assert.ok(corpo.includes("'text-red-600 font-semibold'"), 'valor alto continua vermelho');
 });
+
+test('index.html: todo botão com title tem aria-label', () => {
+  const sem = [...html.matchAll(/<button(?![^>]*aria-label=)[^>]*\btitle="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(sem, []);
+});
+
+test('index.html: os seis modais são diálogos de verdade', () => {
+  const modais = [...html.matchAll(/<div id="(\w+Modal)" class="hidden[^"]*"([^>]*)>/g)];
+  assert.deepStrictEqual(modais.map((m) => m[1]).sort(), ['addBedModal', 'confirmModal', 'imageExamModal', 'readmitModal', 'reminderModal', 'trackerModal']);
+  modais.forEach((m) => assert.ok(/role="dialog"/.test(m[2]) && /aria-modal="true"/.test(m[2]) && /aria-label(ledby)?="/.test(m[2]), m[1]));
+});
+
+test('index.html: botão escondido até o hover não depende da largura da tela; estado não usa opacidade', () => {
+  assert.strictEqual(html.split('sm:opacity-0').length - 1, 0);
+  assert.ok(!/\? 'opacity-60'/.test(html));
+});
+
+test('index.html: alvos de toque das listas e alça de arrasto', () => {
+  ['remove-problem', 'remove-hpp', 'remove-conduta', 'remove-rawtext', 'edit-image-btn', 'remove-image-btn']
+    .forEach((c) => assert.ok(juntas(c, 'min-w-[44px]') && juntas(c, 'min-h-[44px]'), c));
+  assert.ok(juntas('drag-handle', 'w-8') && juntas('drag-handle', 'self-stretch'));
+});
+
+test('index.html: foco visível, movimento reduzido, área segura e impressão', () => {
+  assert.ok(/button:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--c-primary\)/.test(html));
+  assert.ok(/@media \(prefers-reduced-motion: reduce\)/.test(html));
+  assert.ok((html.match(/env\(safe-area-inset-bottom\)/g) || []).length >= 2);
+  ['id="listHeader"', 'id="sectionNav"', 'id="appNotice"', 'id="listMenuSheet"', 'id="patientMenuSheet"'].forEach((id) => {
+    const i = html.indexOf(id);
+    const tag = html.slice(html.lastIndexOf('<', i), html.indexOf('>', i));
+    assert.ok(tag.includes('print:hidden'), id);
+  });
+  assert.strictEqual((html.match(/<footer class="[^"]*print:hidden/g) || []).length, 2);
+});
