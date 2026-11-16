@@ -164,7 +164,7 @@ test('index.html: remover tarefa aparece no toque e pede confirmação', () => {
   assert.ok(/class="remove-task [^"]*\bmin-w-\[44px\] min-h-\[44px\]/.test(tpl));
   assert.ok(/class="remove-task [^"]*"[^>]*aria-label="Remover tarefa"/.test(tpl));
   assert.ok(html.includes("|| 'esta tarefa'"), 'tarefa sem texto não vira Remover ""?');
-  assert.ok(html.includes("'Remover tarefa', 'bg-red-600', 'Remover'"));
+  assert.ok(html.includes("'Remover tarefa', 'perigo', 'Remover'"));
 });
 
 test('index.html: sair dos Arquivados está sempre à vista', () => {
@@ -620,4 +620,42 @@ test('index.html: destaque do atalho não rola a página e acende o chip tocado'
   assert.ok(!corpo.includes('scrollIntoView'), 'scrollIntoView no chip pode interromper a rolagem suave da página');
   const go = html.slice(html.indexOf('function goToSection('), html.indexOf('function marcarAtalho('));
   assert.ok(go.includes('marcarAtalho(atalho)'), 'o chip tocado acende na hora');
+});
+
+// ---- Revisão de UI, Fase 4 ---------------------------------------------------
+
+test('corDoMedico: paleta sem matiz de estado, com contraste, estável por nome', () => {
+  assert.strictEqual(PainelCore.CORES_MEDICO.length, 6);
+  const proibidas = ['#fecaca', '#fed7aa', '#bbf7d0', '#d1fae5']; // vermelho, laranja e verdes da paleta antiga
+  PainelCore.CORES_MEDICO.forEach((p) => {
+    assert.ok(!proibidas.includes(p.bg), p.bg);
+    assert.ok(contraste(p.bg, p.text) >= 4.5, p.bg + ' / ' + p.text);
+  });
+  const cor = PainelCore.corDoMedico('Dra. Exemplo Externa');
+  assert.deepStrictEqual(cor, PainelCore.corDoMedico('Dra. Exemplo Externa'));
+  assert.ok(PainelCore.CORES_MEDICO.some((p) => p.bg === cor.bg && p.text === cor.text));
+  assert.deepStrictEqual(PainelCore.corDoMedico(''), { bg: '#e5e7eb', text: '#374151' });
+});
+
+test('index.html: nenhuma cor reprovada no contraste, nem cor de botão fora dos papéis', () => {
+  ['shadow-lg', 'bg-indigo-', 'text-indigo-', 'bg-purple-', 'text-purple-', 'bg-sky-600', 'bg-sky-500', 'bg-green-500',
+    'bg-green-600', 'bg-amber-500', 'bg-amber-600', 'text-slate-400', 'text-slate-300', 'text-sky-600', 'text-sky-500',
+    'text-green-600', 'text-amber-600', 'ring-sky-500', 'doctorColorPairs']
+    .forEach((c) => assert.strictEqual(html.split(c).length - 1, 0, c));
+  assert.ok(html.includes('PainelCore.corDoMedico('));
+});
+
+test('index.html: a confirmação recebe um tom, e os textos continuam os mesmos', () => {
+  assert.ok(!/, 'bg-[a-z]+-\d{3}', '/.test(html), 'showConfirm não recebe mais classe do Tailwind');
+  assert.ok(/function showConfirm\(message, onConfirm, title = "Ação Irreversível", tom = 'perigo', btnText = 'Confirmar'\)/.test(html));
+  ['Dar alta no paciente do leito', 'Arquivar o leito', 'Deletar PERMANENTEMENTE o leito', 'Isso substituirá TODOS os dados atuais. Continuar?',
+    'Isso vai APAGAR todos os leitos deste dispositivo', 'Deletar todos os exames da coleta do dia', 'Resetar todos os checks de visita',
+    'Sair? Para entrar de novo é preciso internet.'].forEach((t) => assert.ok(html.includes(t), t));
+});
+
+test('index.html: setas de tendência dos labs em cinza', () => {
+  const ini = html.indexOf('function renderLabFlowsheet(');
+  const corpo = html.slice(ini, html.indexOf('function renderImageTab('));
+  assert.ok(!/text-red-500|text-sky-500/.test(corpo), 'subir ou descer não é alerta; a cor fica para o valor fora da faixa');
+  assert.ok(corpo.includes("'text-red-600 font-semibold'"), 'valor alto continua vermelho');
 });

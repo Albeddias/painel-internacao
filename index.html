@@ -58,9 +58,12 @@
     }
     .btn:focus-visible, .chip:focus-visible, .sheet-item:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
     .btn:disabled { opacity: 0.6; cursor: default; }
+    @media (hover: hover) { .btn:not(:disabled):hover { filter: brightness(0.94); } }
     .btn-primary { background: var(--c-primary); color: #ffffff; }
     .btn-ghost { background: var(--c-surface); color: var(--c-text); border-color: var(--c-border); }
     .btn-danger { background: var(--c-danger-bg); color: var(--c-danger-on-bg); }
+    .btn-solid-danger { background: var(--c-danger); color: #ffffff; }
+    .btn-solid-neutral { background: var(--c-neutral-on-bg); color: #ffffff; }
     .btn-sm { min-height: 36px; font-size: 0.75rem; line-height: 1rem; padding: 0 0.5rem; }
     .chip {
       display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem;
@@ -165,11 +168,7 @@
     
     .hidden { display: none; }
     
-    .sort-btn.active {
-      background-color: #0ea5e9;
-      color: white;
-      border-color: #0ea5e9;
-    }
+    .sort-btn.active { background: var(--c-primary); color: #ffffff; border-color: var(--c-primary); }
     .reminder-active {
       border-left-width: 4px;
       border-left-color: #3b82f6;
@@ -294,11 +293,11 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
       <h1 class="text-xl font-bold text-slate-900">Caderno de Visitas</h1>
       <p class="text-sm text-slate-600 mt-1">Entre com sua conta para acessar o painel.</p>
-      <input id="authEmail" type="email" placeholder="E-mail" autocomplete="username" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
-      <input id="authPassword" type="password" placeholder="Senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <input id="authEmail" type="email" placeholder="E-mail" autocomplete="username" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-600">
+      <input id="authPassword" type="password" placeholder="Senha" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-3 focus:outline-none focus:ring-2 focus:ring-sky-600">
       <p id="authError" class="text-sm text-red-600 mt-2 hidden"></p>
-      <button id="authLoginBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 mt-4 hover:bg-sky-700 transition-all">Entrar</button>
-      <p class="text-xs text-slate-400 mt-3">Após o primeiro login, o app abre offline neste aparelho.</p>
+      <button id="authLoginBtn" class="btn btn-primary w-full mt-4">Entrar</button>
+      <p class="text-xs text-slate-500 mt-3">Após o primeiro login, o app abre offline neste aparelho.</p>
     </div>
   </div>
 
@@ -327,8 +326,8 @@
         <!-- Linha 2: busca e filtros -->
         <div class="flex gap-2 items-center mt-1.5">
           <div class="flex-1 min-w-0 relative">
-            <input id="searchInput" type="search" placeholder="Buscar leito, nome ou diagnóstico" aria-label="Buscar leito, nome ou diagnóstico" class="w-full h-11 text-sm border border-slate-300 rounded-lg pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
-            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+            <input id="searchInput" type="search" placeholder="Buscar leito, nome ou diagnóstico" aria-label="Buscar leito, nome ou diagnóstico" class="w-full h-11 text-sm border border-slate-300 rounded-lg pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-sky-600">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 absolute left-2.5 top-2.5 text-slate-500 pointer-events-none"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
           </div>
           <button type="button" id="toggleFiltersBtn" class="btn btn-ghost" aria-expanded="false" aria-controls="filtersPanel">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 0 1 .628.74v2.288a2.25 2.25 0 0 1-.659 1.59l-4.682 4.683a2.25 2.25 0 0 0-.659 1.59v3.033c0 .676-.43 1.258-1.025 1.498l-1.975.79a.75.75 0 0 1-.975-.743V12.493a2.25 2.25 0 0 0-.659-1.59L4.682 6.22A2.25 2.25 0 0 1 4.024 4.63V2.34a.75.75 0 0 1 .604-.74ZM10 4.5a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 4.5Zm0 3a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 7.5Zm0 3a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01A.75.75 0 0 1 10 10.5Z" clip-rule="evenodd" /></svg>
@@ -358,9 +357,9 @@
           <!-- Ordenar por -->
           <div id="filter-sort" class="flex flex-wrap gap-2">
             <span class="text-sm font-medium text-slate-700 flex items-center">Ordenar:</span>
-            <button class="sort-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-1 px-3 hover:bg-slate-50 transition-all active" data-sort-key="bedNumber">Leito</button>
-            <button class="sort-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-1 px-3 hover:bg-slate-50 transition-all" data-sort-key="admitDate">Admissão</button>
-            <button class="sort-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-1 px-3 hover:bg-slate-50 transition-all" data-sort-key="patientName">Nome (A-Z)</button>
+            <button class="sort-btn btn btn-ghost btn-sm active" data-sort-key="bedNumber">Leito</button>
+            <button class="sort-btn btn btn-ghost btn-sm" data-sort-key="admitDate">Admissão</button>
+            <button class="sort-btn btn btn-ghost btn-sm" data-sort-key="patientName">Nome (A-Z)</button>
           </div>
         </div>
       </div>
@@ -382,7 +381,7 @@
     <!-- CABEÇALHO FIXO (TELA B) -->
     <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
       <div class="container mx-auto max-w-7xl flex justify-between items-center gap-2">
-        <button id="backToListBtn" class="flex-shrink-0 flex items-center gap-1 text-sky-600 font-medium rounded-lg py-1 pr-3 min-h-[44px]">
+        <button id="backToListBtn" class="flex-shrink-0 flex items-center gap-1 text-sky-700 font-medium rounded-lg py-1 pr-3 min-h-[44px]">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
           Voltar
         </button>
@@ -458,7 +457,7 @@
     <!-- CABEÇALHO FIXO (TELA C) -->
     <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
       <div class="container mx-auto max-w-7xl flex justify-between items-center">
-        <button id="backToListFromTasksBtn" class="flex items-center gap-1 text-sky-600 font-medium rounded-lg py-1 pr-3">
+        <button id="backToListFromTasksBtn" class="flex items-center gap-1 text-sky-700 font-medium rounded-lg py-1 pr-3">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
           Voltar
         </button>
@@ -476,8 +475,8 @@
     <!-- RODAPÉ FIXO (TELA C) -->
     <footer class="bg-white border-t border-slate-200 p-3 fixed bottom-0 left-0 right-0 z-20">
       <div class="container mx-auto max-w-7xl flex gap-2 w-full">
-        <input id="newTaskInput" class="text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nova tarefa...">
-        <button id="addNewTaskBtn" class="text-sm bg-sky-600 text-white font-medium rounded-lg py-3 px-4 hover:bg-sky-700 transition-all">Add</button>
+        <input id="newTaskInput" class="text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 flex-1" placeholder="Nova tarefa...">
+        <button id="addNewTaskBtn" class="btn btn-primary">Add</button>
       </div>
     </footer>
   </div>
@@ -529,10 +528,10 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
       <h3 class="text-lg font-bold text-slate-900">Adicionar Novo Leito</h3>
       <p class="text-sm text-slate-600 mt-1">Insira o número ou identificador do leito.</p>
-      <input id="newBedNumberInput" type="text" placeholder="Ex: 1012-A" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <input id="newBedNumberInput" type="text" placeholder="Ex: 1012-A" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-600">
       <div class="flex gap-3 mt-5">
         <button id="cancelAddBedBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
-        <button id="saveAddBedBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+        <button id="saveAddBedBtn" class="btn btn-primary w-full">Salvar</button>
       </div>
     </div>
   </div>
@@ -542,14 +541,14 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
       <h3 class="text-lg font-bold text-slate-900">Reinternar</h3>
       <p id="readmitModalWho" class="text-sm text-slate-600 mt-1"></p>
-      <p class="text-xs font-semibold text-slate-400 uppercase mt-4 mb-1">Leitos vazios</p>
+      <p class="text-xs font-semibold text-slate-500 uppercase mt-4 mb-1">Leitos vazios</p>
       <div id="readmitEmptyBeds" class="flex flex-wrap gap-2"></div>
-      <p class="text-xs font-semibold text-slate-400 uppercase mt-4 mb-1">Ou um leito novo</p>
-      <input id="readmitBedNumberInput" type="text" placeholder="Ex: 1012-A" class="w-full border border-slate-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <p class="text-xs font-semibold text-slate-500 uppercase mt-4 mb-1">Ou um leito novo</p>
+      <input id="readmitBedNumberInput" type="text" placeholder="Ex: 1012-A" class="w-full border border-slate-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-sky-600">
       <p id="readmitError" class="hidden text-sm text-red-600 mt-2"></p>
       <div class="flex gap-3 mt-5">
         <button id="cancelReadmitBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
-        <button id="saveReadmitBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Reinternar</button>
+        <button id="saveReadmitBtn" class="btn btn-primary w-full">Reinternar</button>
       </div>
     </div>
   </div>
@@ -570,10 +569,10 @@
   <div id="reminderModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
       <h3 class="text-lg font-bold text-slate-900">Definir Lembrete</h3>
-      <input id="reminderDateInput" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <input id="reminderDateInput" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-4 focus:outline-none focus:ring-2 focus:ring-sky-600">
       <div class="flex gap-3 mt-5">
         <button id="clearReminderBtn" class="w-full bg-red-100 text-red-700 font-medium rounded-lg py-3 hover:bg-red-200 transition-all">Limpar</button>
-        <button id="saveReminderBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+        <button id="saveReminderBtn" class="btn btn-primary w-full">Salvar</button>
       </div>
       <button id="cancelReminderBtn" class="w-full text-sm text-slate-600 mt-3 text-center hover:text-slate-800">Cancelar</button>
     </div>
@@ -602,22 +601,22 @@
         <div id="tracker-form-atb" class="tracker-form active space-y-3 mt-4">
           <div>
             <label class="text-sm font-medium text-slate-700">Nome do Antibiótico</label>
-            <input id="tracker-atb-name" type="text" placeholder="Ex: Piperacilina" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <input id="tracker-atb-name" type="text" placeholder="Ex: Piperacilina" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="text-sm font-medium text-slate-700">Data D1</label>
-              <input id="tracker-atb-start" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input id="tracker-atb-start" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
             </div>
             <div>
               <label class="text-sm font-medium text-slate-700">Duração (dias)</label>
-              <input id="tracker-atb-duration" type="number" placeholder="Ex: 7" min="1" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input id="tracker-atb-duration" type="number" placeholder="Ex: 7" min="1" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
             </div>
           </div>
           <div>
             <label class="text-sm font-medium text-slate-700">Fim / Suspenso em (opcional)</label>
             <div class="flex gap-2 mt-1">
-              <input id="tracker-atb-end" type="date" class="flex-1 border border-slate-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input id="tracker-atb-end" type="date" class="flex-1 border border-slate-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-sky-600">
               <button id="tracker-atb-end-today" type="button" class="flex-shrink-0 text-sm bg-slate-100 text-slate-700 font-medium rounded-lg px-3 hover:bg-slate-200 transition-all">Hoje</button>
             </div>
           </div>
@@ -626,15 +625,15 @@
         <div id="tracker-form-culture" class="tracker-form space-y-3 mt-4">
           <div>
             <label class="text-sm font-medium text-slate-700">Tipo de Cultura</label>
-            <input id="tracker-culture-name" type="text" placeholder="Ex: Hemocultura" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <input id="tracker-culture-name" type="text" placeholder="Ex: Hemocultura" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
           </div>
           <div>
             <label class="text-sm font-medium text-slate-700">Data da Coleta</label>
-            <input id="tracker-culture-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <input id="tracker-culture-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
           </div>
           <div>
             <label class="text-sm font-medium text-slate-700">Resultado</label>
-            <input id="tracker-culture-result" type="text" placeholder="Ex: Aguardando" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <input id="tracker-culture-result" type="text" placeholder="Ex: Aguardando" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
             <div class="flex flex-wrap gap-1.5 mt-2">
               <button type="button" class="culture-result-chip text-xs bg-slate-100 text-slate-700 rounded-full px-2.5 py-1 hover:bg-slate-200 transition-all" data-result="Aguardando">Aguardando</button>
               <button type="button" class="culture-result-chip text-xs bg-slate-100 text-slate-700 rounded-full px-2.5 py-1 hover:bg-slate-200 transition-all" data-result="Negativa parcial">Negativa parcial</button>
@@ -647,16 +646,16 @@
         <div id="tracker-form-device" class="tracker-form space-y-3 mt-4">
           <div>
             <label class="text-sm font-medium text-slate-700">Nome do Dispositivo</label>
-            <input id="tracker-device-name" type="text" placeholder="Ex: CVC Subclávia D" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <input id="tracker-device-name" type="text" placeholder="Ex: CVC Subclávia D" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="text-sm font-medium text-slate-700">Instalação</label>
-              <input id="tracker-device-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input id="tracker-device-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
             </div>
             <div>
               <label class="text-sm font-medium text-slate-700">Retirada (opcional)</label>
-              <input id="tracker-device-removal" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+              <input id="tracker-device-removal" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
             </div>
           </div>
         </div>
@@ -664,18 +663,18 @@
         <div id="tracker-form-proc" class="tracker-form space-y-3 mt-4">
           <div>
             <label class="text-sm font-medium text-slate-700">Nome do Procedimento</label>
-            <input id="tracker-proc-name" type="text" placeholder="Ex: Laparotomia exploradora" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <input id="tracker-proc-name" type="text" placeholder="Ex: Laparotomia exploradora" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
           </div>
           <div>
             <label class="text-sm font-medium text-slate-700">Data do Procedimento</label>
-            <input id="tracker-proc-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <input id="tracker-proc-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
           </div>
           <p class="text-xs text-slate-500">Conta o pós-operatório ("PO D5") e não gera alerta de tempo prolongado.</p>
         </div>
         
         <div class="flex gap-3 mt-5">
           <button id="trackerBackBtn" class="w-1/3 bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Voltar</button>
-          <button id="saveTrackerBtn" class="w-2/3 bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+          <button id="saveTrackerBtn" class="btn btn-primary w-2/3">Salvar</button>
         </div>
       </div>
 
@@ -690,20 +689,20 @@
       <div class="space-y-3 mt-4">
         <div>
           <label class="text-sm font-medium text-slate-700">Data do Exame</label>
-          <input id="image-exam-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          <input id="image-exam-date" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
         </div>
         <div>
           <label class="text-sm font-medium text-slate-700">Nome do Exame</label>
-          <input id="image-exam-name" type="text" placeholder="Ex: TC Tórax" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          <input id="image-exam-name" type="text" placeholder="Ex: TC Tórax" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
         </div>
         <div>
           <label class="text-sm font-medium text-slate-700">Resumo / Laudo</label>
-          <textarea id="image-exam-summary" placeholder="Resumo dos achados..." class="w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" rows="3"></textarea>
+          <textarea id="image-exam-summary" placeholder="Resumo dos achados..." class="w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden" rows="3"></textarea>
         </div>
       </div>
       <div class="flex gap-3 mt-5">
         <button id="cancelImageExamBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
-        <button id="saveImageExamBtn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">Salvar</button>
+        <button id="saveImageExamBtn" class="btn btn-primary w-full">Salvar</button>
       </div>
     </div>
   </div>
@@ -756,7 +755,7 @@
 
   <!-- === TEMPLATE DO LEITO ARQUIVADO (TELA A) === -->
   <template id="archivedBedTpl">
-    <div class="list-card bg-white rounded-xl shadow-lg border border-slate-200/50 p-3 transition-all cursor-pointer hover:border-slate-300">
+    <div class="list-card card p-3 transition-all cursor-pointer hover:border-slate-300">
         <!-- Em tela estreita os botões descem; nome + "Alta em dd/mm" quebram linha em vez de truncar -->
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
             <div class="min-w-0 flex-1">
@@ -764,10 +763,10 @@
                 <div class="bed-name text-sm text-slate-600 break-words sm:truncate"></div>
             </div>
             <div class="flex flex-wrap justify-end gap-2 flex-shrink-0">
-                <button class="readmit-bed-btn text-sm bg-sky-100 text-sky-800 font-medium rounded-lg py-2 px-3 hover:bg-sky-200 transition-all" title="Nova internação da mesma pessoa">Reinternar</button>
-                <button class="restore-bed-btn text-sm bg-green-100 text-green-800 font-medium rounded-lg py-2 px-3 hover:bg-green-200 transition-all">Restaurar</button>
-                <button class="cloud-archive-btn text-sm bg-indigo-100 text-indigo-800 font-medium rounded-lg py-2 px-3 hover:bg-indigo-200 transition-all" title="Guardar só na nuvem">Nuvem</button>
-                <button class="delete-bed-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
+                <button class="readmit-bed-btn btn btn-ghost" title="Nova internação da mesma pessoa">Reinternar</button>
+                <button class="restore-bed-btn btn btn-ghost">Restaurar</button>
+                <button class="cloud-archive-btn btn btn-ghost" title="Guardar só na nuvem">Nuvem</button>
+                <button class="delete-bed-btn btn btn-danger">Deletar</button>
             </div>
         </div>
     </div>
@@ -776,9 +775,9 @@
   <!-- === TEMPLATE DA TAREFA (TELA C) === -->
   <template id="taskItemTpl">
     <div class="task-item flex gap-2 items-center group bg-white rounded-lg p-3 border border-slate-200">
-        <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+        <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-700 focus:ring-sky-600">
         <div class="grow-wrap text-sm"><textarea rows="1" class="task-text focus:border-slate-300 focus:bg-slate-50" placeholder="Tarefa"></textarea></div>
-        <button type="button" class="remove-task min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-red-600 opacity-60 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all print:hidden" title="Remover tarefa" aria-label="Remover tarefa">
+        <button type="button" class="remove-task min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 hover:text-red-600 opacity-60 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all print:hidden" title="Remover tarefa" aria-label="Remover tarefa">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
         </button>
     </div>
@@ -795,11 +794,11 @@
       <div class="alergias-banner hidden bg-red-50 border-2 border-red-300 text-red-800 text-sm font-semibold rounded-lg px-3 py-2 whitespace-pre-wrap"></div>
 
       <!-- Cabeçalho (Nome, Idade, Admissão) -->
-      <div class="bg-white rounded-xl shadow-lg border border-slate-200/50 p-4">
+      <div class="card p-4">
         <!-- Em tela estreita os botões ficam numa linha própria ACIMA do leito/nome; em tela larga, à direita -->
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
           <div class="flex-shrink-0 flex flex-wrap justify-end gap-2 sm:order-2">
-              <button class="reminder-btn text-slate-400 hover:text-blue-500 rounded-lg p-2" title="Definir lembrete">
+              <button class="reminder-btn text-slate-500 hover:text-blue-500 rounded-lg p-2" title="Definir lembrete">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 0013.484 0 .75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zM8.05 16.09A.75.75 0 018.8 15h2.4a.75.75 0 01.75.75 1.5 1.5 0 01-3 0z" clip-rule="evenodd" /></svg>
               </button>
             <button class="copy-summary-btn text-sm bg-sky-100 text-sky-800 font-medium rounded-lg py-2 px-3 hover:bg-sky-200 transition-all" title="Copiar resumo do dia para a evolução">Copiar resumo</button>
@@ -827,9 +826,9 @@
           <summary class="text-sm text-slate-700 min-h-[44px] flex items-center gap-1"><span class="font-medium">Médico externo:</span> <span class="ext-doc-summary truncate">—</span> <span class="ext-doc-caret inline-block transition-transform txt-muted" aria-hidden="true">▸</span></summary>
           <div>
             <div class="flex gap-2 w-full">
-              <input class="inline-ext-name text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nome do médico">
+              <input class="inline-ext-name text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 flex-1" placeholder="Nome do médico">
               <datalist class="common-ext-docs-list"></datalist>
-              <button type="button" class="add-ext-doc-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Salvar médico na lista de sugestões" aria-label="Salvar médico na lista de sugestões">
+              <button type="button" class="add-ext-doc-to-list-btn btn btn-ghost btn-icon txt-muted print:hidden" title="Salvar médico na lista de sugestões" aria-label="Salvar médico na lista de sugestões">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 0 0 1.075.676L10 15.082l5.925 2.844A.75.75 0 0 0 17 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0 0 10 2Z" clip-rule="evenodd" /></svg>
               </button>
             </div>
@@ -838,7 +837,7 @@
       </div>
 
       <!-- Seção: Lista de Problemas -->
-      <div data-secao="problemas" data-atalho="problemas" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="problemas" data-atalho="problemas" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Lista de Problemas<span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -846,29 +845,29 @@
         <div class="collapsible-content p-4 pt-0">
           <div class="problem-list space-y-1"></div>
           <div class="flex gap-2 w-full mt-3">
-            <input class="new-problem-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo problema">
-            <button class="add-problem-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
+            <input class="new-problem-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 flex-1" placeholder="Novo problema">
+            <button class="add-problem-btn btn btn-ghost print:hidden">Add</button>
           </div>
         </div>
       </div>
 
       <!-- Seção: HPP / Comorbidades (lista sobre o campo de texto bed.hpp) -->
-      <div data-secao="hpp" data-atalho="historico" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="hpp" data-atalho="historico" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900 min-w-0 flex-1">HPP <span class="hpp-count text-sm font-medium text-slate-400"></span><span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
+          <span class="text-base font-bold text-slate-900 min-w-0 flex-1">HPP <span class="hpp-count text-sm font-medium text-slate-500"></span><span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
           <div class="hpp-list space-y-1"></div>
           <div class="flex gap-2 w-full mt-3">
-            <input class="new-hpp-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Novo diagnóstico (HAS, DM2...)">
-            <button class="add-hpp-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden">Add</button>
+            <input class="new-hpp-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 flex-1" placeholder="Novo diagnóstico (HAS, DM2...)">
+            <button class="add-hpp-btn btn btn-ghost print:hidden">Add</button>
           </div>
         </div>
       </div>
 
       <!-- Seção: Alergias e Medicações Prévias (painel_patients.alergias / medicacoes_previas) -->
-      <div data-secao="alergias" data-atalho="historico" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="alergias" data-atalho="historico" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Alergias e Medicações Prévias <span class="alergias-flag hidden text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5 ml-1">ALERGIA</span><span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -876,30 +875,30 @@
         <div class="collapsible-content alergias-content p-4 pt-0 space-y-3">
           <div>
             <label class="text-sm font-semibold text-slate-900 mb-1 block">Alergias</label>
-            <textarea class="input-alergias-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Alergias e reações (vazio = nenhuma registrada)..." rows="2"></textarea>
+            <textarea class="input-alergias-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden" placeholder="Alergias e reações (vazio = nenhuma registrada)..." rows="2"></textarea>
           </div>
           <div>
             <label class="text-sm font-semibold text-slate-900 mb-1 block">Medicações prévias</label>
-            <textarea class="input-medprev-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Medicações em uso antes da internação..." rows="3"></textarea>
+            <textarea class="input-medprev-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden" placeholder="Medicações em uso antes da internação..." rows="3"></textarea>
           </div>
         </div>
       </div>
 
       <!-- Seção: Anamnese Inicial -->
-      <div data-secao="anamnese" data-atalho="historico" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="anamnese" data-atalho="historico" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Anamnese Inicial<span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
-          <textarea class="input-anamnese-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="História da admissão (escrita uma vez)..." rows="3"></textarea>
+          <textarea class="input-anamnese-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden" placeholder="História da admissão (escrita uma vez)..." rows="3"></textarea>
         </div>
       </div>
 
       <!-- Seção: Internações anteriores (só aparece quando há outra internação da mesma pessoa neste aparelho) -->
-      <div data-secao="internacoes" data-atalho="historico" class="collapsible-section prev-admissions-section hidden bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="internacoes" data-atalho="historico" class="collapsible-section prev-admissions-section hidden card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Internações anteriores <span class="prev-admissions-count text-sm font-medium text-slate-400"></span><span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
+          <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Internações anteriores <span class="prev-admissions-count text-sm font-medium text-slate-500"></span><span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
@@ -908,7 +907,7 @@
       </div>
 
       <!-- Seção: Controles e Invasivos (Tracker) -->
-      <div data-secao="controles" data-atalho="controles" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="controles" data-atalho="controles" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Controles e Invasivos<span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -921,7 +920,7 @@
       </div>
 
       <!-- Seção: Exames (Laboratoriais e Imagem) -->
-      <div data-secao="exames" data-atalho="exames" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="exames" data-atalho="exames" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Exames (Labs e Imagem)
             <span class="labs-last-line hidden block line-clamp-2 text-xs font-normal text-slate-500 mt-0.5"></span>
@@ -935,7 +934,7 @@
       </div>
 
       <!-- Seção: Condutas -->
-      <div data-secao="condutas" data-atalho="condutas" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="condutas" data-atalho="condutas" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Condutas<span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -944,11 +943,11 @@
           <!-- Sugestões inline (substitui o <datalist> nativo, que cobria o teclado no Android) -->
           <div class="conduta-suggestions flex gap-2 overflow-x-auto mb-2" style="display:none"></div>
           <div class="flex gap-2 w-full mb-3">
-            <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1 min-w-0" placeholder="Nova conduta" autocomplete="off">
-            <button type="button" class="add-conduta-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar a conduta e salvar na lista" aria-label="Adicionar a conduta e salvar na lista">
+            <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 flex-1 min-w-0" placeholder="Nova conduta" autocomplete="off">
+            <button type="button" class="add-conduta-to-list-btn btn btn-ghost btn-icon txt-muted print:hidden" title="Adicionar a conduta e salvar na lista" aria-label="Adicionar a conduta e salvar na lista">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 0 0 1.075.676L10 15.082l5.925 2.844A.75.75 0 0 0 17 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0 0 10 2Z" clip-rule="evenodd" /></svg>
             </button>
-            <button class="add-conduta-btn text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-3 px-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar">Add</button>
+            <button class="add-conduta-btn btn btn-ghost print:hidden" title="Adicionar">Add</button>
           </div>
           <div class="condutas conduta-list space-y-1">
             <!-- Condutas são renderizadas aqui -->
@@ -957,20 +956,20 @@
       </div>
 
       <!-- Seção: Anotações -->
-      <div data-secao="anotacoes" data-atalho="condutas" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="anotacoes" data-atalho="condutas" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Anotações / Sinais / Exames<span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
-          <textarea class="input-notes-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" placeholder="Sinais vitais, labs, achados..."></textarea>
+          <textarea class="input-notes-inline w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden" placeholder="Sinais vitais, labs, achados..."></textarea>
         </div>
       </div>
 
       <!-- Seção: Evolução Tasy (painel_evolucoes: uma linha por dia; renderEvolucaoTasy) -->
-      <div data-secao="evolucao" data-atalho="evolucao" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="evolucao" data-atalho="evolucao" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
-          <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Evolução Tasy <span class="evolucao-count text-sm font-medium text-slate-400"></span><span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
+          <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Evolução Tasy <span class="evolucao-count text-sm font-medium text-slate-500"></span><span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
         </button>
         <div class="collapsible-content p-4 pt-0">
@@ -979,7 +978,7 @@
       </div>
 
       <!-- Seção: Texto do Prontuário -->
-      <div data-secao="textos" data-atalho="docs" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="textos" data-atalho="docs" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Texto do Prontuário<span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -988,21 +987,21 @@
           <div class="rawtext-list space-y-2"></div>
           <div class="mt-3 space-y-2">
             <div class="flex gap-2">
-              <select class="new-rawtext-tipo text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1">
+              <select class="new-rawtext-tipo text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 flex-1">
                 <option value="evolucao">Evolução</option>
                 <option value="prescricao">Prescrição</option>
                 <option value="admissao">Admissão</option>
               </select>
-              <input class="new-rawtext-date text-sm p-2 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" type="date">
+              <input class="new-rawtext-date text-sm p-2 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600" type="date">
             </div>
-            <textarea class="new-rawtext-textarea w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" rows="4" placeholder="Cole aqui o texto cru do prontuário..."></textarea>
+            <textarea class="new-rawtext-textarea w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden" rows="4" placeholder="Cole aqui o texto cru do prontuário..."></textarea>
             <button class="add-rawtext-btn w-full text-sm bg-sky-50 text-sky-700 font-medium rounded-lg py-2 px-4 hover:bg-sky-100 transition-all print:hidden">Salvar texto</button>
           </div>
         </div>
       </div>
 
       <!-- Seção: Documentos Gerados -->
-      <div data-secao="documentos" data-atalho="docs" class="collapsible-section bg-white rounded-xl shadow-lg border border-slate-200/50">
+      <div data-secao="documentos" data-atalho="docs" class="collapsible-section card">
         <button class="collapsible-toggle-btn flex justify-between items-center w-full p-4 text-left">
           <span class="text-base font-bold text-slate-900 min-w-0 flex-1">Documentos Gerados<span class="section-summary hidden block text-xs font-normal truncate txt-muted"></span></span>
           <svg class="toggle-icon w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
@@ -1265,7 +1264,7 @@
         Object.assign(b, PainelCore.migrateBed({ bedNumber: b.bedNumber }));
         saveData(state);
         closePatientDetails();
-      }, "Dar Alta", 'bg-amber-600', 'Dar Alta');
+      }, "Dar Alta", 'primaria', 'Dar Alta');
     });
     onPatientMenu('pmArchive', (b) => {
       showConfirm(`Arquivar o leito ${b.bedNumber}? Ele sairá da lista principal, mas poderá ser restaurado.`, () => {
@@ -1273,7 +1272,7 @@
         b.archiveReason = 'arquivado';
         saveData(state);
         closePatientDetails();
-      }, "Arquivar Leito", 'bg-slate-600', 'Arquivar');
+      }, "Arquivar Leito", 'neutro', 'Arquivar');
     });
     onPatientMenu('pmRestore', (b) => {
       b.isArchived = false;
@@ -1290,7 +1289,7 @@
         if (i !== -1) state.beds.splice(i, 1);
         saveData(state);
         closePatientDetails();
-      }, 'Deletar paciente', 'bg-red-600', 'Deletar');
+      }, 'Deletar paciente', 'perigo', 'Deletar');
     });
     // O selo do cabeçalho leva até a faixa de alergia, no topo do conteúdo.
     document.getElementById('patientAllergyFlag').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -1375,12 +1374,13 @@
     });
     document.addEventListener('focusout', () => document.body.classList.remove('digitando'));
 
-    function showConfirm(message, onConfirm, title = "Ação Irreversível", btnClass = 'bg-red-600', btnText = 'Confirmar') {
+    // tom: 'perigo' (apaga ou substitui dados, erro), 'primaria' (ação comum, aviso), 'neutro'.
+    const CONFIRM_TOM_CLASS = { perigo: 'btn-solid-danger', primaria: 'btn-primary', neutro: 'btn-solid-neutral' };
+    function showConfirm(message, onConfirm, title = "Ação Irreversível", tom = 'perigo', btnText = 'Confirmar') {
       confirmModalTitle.textContent = title;
       confirmModalMessage.textContent = message;
       confirmActionBtn.textContent = btnText;
-      confirmActionBtn.className = "w-full text-white font-medium rounded-lg py-3 transition-all";
-      confirmActionBtn.classList.add(btnClass);
+      confirmActionBtn.className = 'btn w-full ' + (CONFIRM_TOM_CLASS[tom] || CONFIRM_TOM_CLASS.perigo);
       confirmCallback = onConfirm;
       showModal('confirmModal');
     }
@@ -1597,7 +1597,7 @@
             hideModal('trackerModal');
             resetTrackerModal();
         } catch (err) {
-            showConfirm(err.message, () => showModal('trackerModal'), "Erro de Validação", 'bg-red-600', 'Entendi');
+            showConfirm(err.message, () => showModal('trackerModal'), "Erro de Validação", 'perigo', 'Entendi');
         }
     });
 
@@ -1621,14 +1621,6 @@
 
     // Retorna: null | 'overdue' | 'today' | 'soon' | 'future'
 
-    const doctorColorPairs = [
-      { bg: '#fecaca', text: '#991b1b' }, { bg: '#fed7aa', text: '#9a3412' },
-      { bg: '#bbf7d0', text: '#166534' }, { bg: '#bfdbfe', text: '#1e40af' },
-      { bg: '#c7d2fe', text: '#4338ca' }, { bg: '#e9d5ff', text: '#581c87' },
-      { bg: '#fbcfe8', text: '#9d174d' }, { bg: '#d1fae5', text: '#065f46' },
-      { bg: '#cffafe', text: '#0e7490' },
-    ];
-
     // Escapa texto livre do usuário antes de inseri-lo via innerHTML (evita quebra de markup /
     // perda de dados na tela quando o texto contém < > " & — ex.: exame "Cr<2", conduta com aspas).
     function escapeHtml(s) {
@@ -1638,13 +1630,7 @@
     }
 
     function getDoctorColorClasses(name) {
-      if (!name) return 'background-color: #e5e7eb; color: #374151;'; // cinza
-      let hash = 0;
-      for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const index = Math.abs(hash) % doctorColorPairs.length;
-      const pair = doctorColorPairs[index];
+      const pair = PainelCore.corDoMedico(name);
       return `background-color: ${pair.bg}; color: ${pair.text};`;
     }
 
@@ -2109,7 +2095,7 @@
                 showConfirm(msg, async () => {
                     try { await archiveBedsToCloud(beds); }
                     catch (err) { setSyncStatus('Falha ao guardar na nuvem: ' + err.message, true); }
-                  }, 'Guardar só na nuvem', 'bg-indigo-600', 'Guardar');
+                  }, 'Guardar só na nuvem', 'primaria', 'Guardar');
             });
 
             node.querySelector('.delete-bed-btn').addEventListener('click', (e) => {
@@ -2129,7 +2115,7 @@
           const cloudGroups = PainelCore.groupCloudArchived(state.cloudArchived || {});
           if (cloudGroups.length) {
             const header = document.createElement('p');
-            header.className = 'text-xs font-semibold text-slate-400 uppercase mt-4 mb-2 px-1';
+            header.className = 'text-xs font-semibold text-slate-500 uppercase mt-4 mb-2 px-1';
             header.textContent = 'Na nuvem (fora deste aparelho)';
             bedsListArea.appendChild(header);
             cloudGroups.forEach(cg => {
@@ -2140,7 +2126,7 @@
               label.className = 'text-sm text-slate-600';
               label.textContent = `${reg.leito || '—'} · ${reg.nome || reg.iniciais || '?'}` + (cg.count > 1 ? ` · ${cg.count} internações` : '');
               const btn = document.createElement('button');
-              btn.className = 'text-sm font-medium text-indigo-600 hover:underline';
+              btn.className = 'btn btn-ghost btn-sm';
               btn.textContent = 'Trazer de volta';
               btn.addEventListener('click', async () => {
                 btn.disabled = true;
@@ -2410,7 +2396,7 @@
 
     // Alça de arrasto (reordenação manual; nos trackers e problemas a ordem
     // sincroniza via coluna "ordem"; no HPP é a ordem do próprio texto)
-    const dragHandleHtml = `<span class="drag-handle flex-shrink-0 text-slate-300 p-1 -ml-1 mr-1" title="Arraste para reordenar">
+    const dragHandleHtml = `<span class="drag-handle flex-shrink-0 text-slate-500 p-1 -ml-1 mr-1" title="Arraste para reordenar">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><circle cx="7" cy="4" r="1.6"/><circle cx="7" cy="10" r="1.6"/><circle cx="7" cy="16" r="1.6"/><circle cx="13" cy="4" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="13" cy="16" r="1.6"/></svg>
         </span>`;
 
@@ -2439,7 +2425,7 @@
                     </div>
                     <div class="flex items-center gap-1">
                         <span class="tracker-line flex-1 min-w-0 text-xs txt-muted">${escapeHtml(PainelCore.linhaControle(t, hoje))}</span>
-                        <button type="button" class="edit-tracker-btn flex-shrink-0 min-w-[44px] min-h-[44px] -my-2 flex items-center justify-center text-slate-500 hover:text-sky-600 print:hidden" data-tracker-id="${t.id}" title="Editar" aria-label="Editar">
+                        <button type="button" class="edit-tracker-btn flex-shrink-0 min-w-[44px] min-h-[44px] -my-2 flex items-center justify-center text-slate-500 hover:text-sky-700 print:hidden" data-tracker-id="${t.id}" title="Editar" aria-label="Editar">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                         </button>
                         <button type="button" class="remove-tracker-btn flex-shrink-0 min-w-[44px] min-h-[44px] -my-2 flex items-center justify-center text-slate-500 hover:text-red-600 print:hidden" data-tracker-id="${t.id}" title="Remover" aria-label="Remover">
@@ -2477,7 +2463,7 @@
                         bed.trackers.splice(trackerIndex, 1);
                         saveData(state);
                         renderScreenB();
-                    }, 'Remover item', 'bg-red-600', 'Remover');
+                    }, 'Remover item', 'perigo', 'Remover');
                 }
             });
         });
@@ -2562,7 +2548,7 @@
         it.innerHTML = `
           ${dragHandleHtml}
           <div class="grow-wrap text-sm"><textarea rows="1" class="hpp-desc focus:border-slate-300 focus:bg-slate-50" placeholder="Diagnóstico"></textarea></div>
-          <button class="remove-hpp flex-shrink-0 text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
+          <button class="remove-hpp flex-shrink-0 text-slate-500 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
           </button>
         `;
@@ -2573,7 +2559,7 @@
             items.splice(i, 1);
             commit();
             renderScreenB();
-          }, 'Remover diagnóstico', 'bg-red-600', 'Remover');
+          }, 'Remover diagnóstico', 'perigo', 'Remover');
         });
         listElement.appendChild(it);
       });
@@ -2649,7 +2635,7 @@
               </select>
             </label>
 <div class="grow-wrap text-sm"><textarea rows="1" class="problem-desc focus:border-slate-300 focus:bg-slate-50 ${p.status === 'resolvido' ? 'line-through text-slate-500' : ''}" placeholder="Descreva o problema"></textarea></div>
-            <button class="remove-problem flex-shrink-0 text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
+            <button class="remove-problem flex-shrink-0 text-slate-500 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden p-1" title="Remover">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
             </button>
           </div>
@@ -2674,7 +2660,7 @@
             if (i !== -1) bed.problems.splice(i, 1);
             saveData(state);
             renderScreenB();
-          }, 'Remover problema', 'bg-red-600', 'Remover');
+          }, 'Remover problema', 'perigo', 'Remover');
         });
         listElement.appendChild(it);
       });
@@ -2796,7 +2782,7 @@
       bar.className = 'flex flex-wrap gap-2 items-center';
       if (rows.length) {
         const sel = document.createElement('select');
-        sel.className = 'evolucao-date text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1 min-w-0';
+        sel.className = 'evolucao-date text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 flex-1 min-w-0';
         sel.title = 'Data da evolução';
         rows.forEach((r) => {
           const opt = document.createElement('option');
@@ -2862,10 +2848,10 @@
         label.className = 'text-sm font-semibold text-slate-900';
         label.textContent = EVOLUCAO_LABEL[field];
         const copyBtn = document.createElement('button');
-        copyBtn.className = 'copy-evolucao-field flex-shrink-0 text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden disabled:opacity-40 disabled:cursor-not-allowed';
+        copyBtn.className = 'copy-evolucao-field btn btn-primary btn-sm flex-shrink-0 print:hidden';
         copyBtn.textContent = 'Copiar';
         const ta = document.createElement('textarea');
-        ta.className = 'w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden';
+        ta.className = 'w-full text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden';
         ta.rows = 2;
         ta.value = row[field] || '';
         copyBtn.disabled = ta.value.trim() === '';
@@ -2922,7 +2908,7 @@
         summary.className = 'cursor-pointer flex justify-between items-center gap-2';
         summary.innerHTML = `
           <span class="rawtext-label font-medium text-slate-700"></span>
-          <button class="remove-rawtext text-slate-400 hover:text-red-600 p-1 print:hidden" title="Remover">
+          <button class="remove-rawtext text-slate-500 hover:text-red-600 p-1 print:hidden" title="Remover">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
           </button>
         `;
@@ -2999,7 +2985,7 @@
       head.appendChild(title);
       if (!blk.conferir) {
         const btn = document.createElement('button');
-        btn.className = 'copy-doc-block flex-shrink-0 text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden disabled:opacity-40 disabled:cursor-not-allowed';
+        btn.className = 'copy-doc-block btn btn-primary btn-sm flex-shrink-0 print:hidden';
         btn.textContent = 'Copiar';
         btn.disabled = blk.content.trim() === '';
         const mark = copiadoMarkEl();
@@ -3040,7 +3026,7 @@
         summary.className = 'cursor-pointer flex justify-between items-center gap-2';
         summary.innerHTML = `
           <span class="gendoc-label font-medium text-slate-700"></span>
-          <button class="copy-gendoc text-xs bg-sky-600 text-white font-medium rounded-lg py-1.5 px-3 hover:bg-sky-700 transition-all print:hidden">Copiar</button>
+          <button class="copy-gendoc btn btn-primary btn-sm print:hidden">Copiar</button>
         `;
         summary.querySelector('.gendoc-label').textContent = `${PainelCore.GENDOC_LABEL[doc.tipo] || doc.tipo} ${createdStr}`.trim();
         const fullText = PainelCore.fillPatientName(doc.conteudo || '', bed.patientName);
@@ -3082,9 +3068,9 @@
           it.setAttribute('data-conduta-id', c.id);
           it.innerHTML = `
             ${dragHandleHtml}
-            <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500" ${c.done ? 'checked' : ''}>
+            <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-700 focus:ring-sky-600" ${c.done ? 'checked' : ''}>
             <div class="grow-wrap text-sm"><textarea rows="1" class="conduta-text focus:border-slate-300 focus:bg-slate-50 ${c.done ? 'line-through text-slate-500' : ''}" placeholder="Descreva a conduta"></textarea></div>
-            <button class="remove-conduta text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden" data-conduta-index="${ci}">
+            <button class="remove-conduta text-slate-500 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden" data-conduta-index="${ci}">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
             </button>
           `;
@@ -3100,7 +3086,7 @@
               bed.condutas.splice(ci, 1);
               saveData(state);
               renderScreenB();
-            }, 'Remover conduta', 'bg-red-600', 'Remover');
+            }, 'Remover conduta', 'perigo', 'Remover');
           });
           listElement.appendChild(it);
         });
@@ -3189,7 +3175,7 @@ function renderExamsSection(wrapperElement, bed, bedIdx) {
     wrapperElement.innerHTML = `
         <div class="border-b border-slate-200">
             <nav class="-mb-px flex space-x-4" aria-label="Tabs">
-                <button class="exam-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-sky-500 text-sky-600" data-tab="labs">
+                <button class="exam-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-sky-500 text-sky-700" data-tab="labs">
                     Laboratoriais
                 </button>
                 <button class="exam-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300" data-tab="images">
@@ -3213,7 +3199,7 @@ function renderExamsSection(wrapperElement, bed, bedIdx) {
         tabs.forEach(t => {
             const isActive = t.dataset.tab === tabName;
             t.classList.toggle('border-sky-500', isActive);
-            t.classList.toggle('text-sky-600', isActive);
+            t.classList.toggle('text-sky-700', isActive);
             t.classList.toggle('border-transparent', !isActive);
             t.classList.toggle('text-slate-500', !isActive);
             t.classList.toggle('hover:text-slate-700', !isActive);
@@ -3254,17 +3240,17 @@ function renderLabTab(contentEl, bed, bedIdx) {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-sm font-medium text-slate-700">Data da Coleta</label>
-                    <input id="lab-entry-date" type="date" value="${todayISO()}" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <input id="lab-entry-date" type="date" value="${todayISO()}" class="w-full border border-slate-300 rounded-lg px-3 py-3 mt-1 focus:outline-none focus:ring-2 focus:ring-sky-600">
                 </div>
             </div>
             <div>
                 <label class="text-sm font-medium text-slate-700">Resultados (Ex: Hb: 9.5)</label>
-                <textarea id="lab-entry-textarea" placeholder="Hb: 9.5\nPlaq: 120k\nUr: 28\nCr: 1.1" class="w-full text-sm p-3 rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 overflow-hidden" rows="4"></textarea>
+                <textarea id="lab-entry-textarea" placeholder="Hb: 9.5\nPlaq: 120k\nUr: 28\nCr: 1.1" class="w-full text-sm p-3 rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-sky-600 overflow-hidden" rows="4"></textarea>
             </div>
-            <button id="save-lab-entry-btn" class="w-full bg-sky-600 text-white font-medium rounded-lg py-3 hover:bg-sky-700 transition-all">
+            <button id="save-lab-entry-btn" class="btn btn-primary w-full">
                 Salvar Coleta
             </button>
-            <button type="button" id="delete-lab-entry-btn" class="hidden w-full text-sm bg-red-100 text-red-800 font-medium rounded-lg py-3">Apagar coleta</button>
+            <button type="button" id="delete-lab-entry-btn" class="hidden btn btn-danger w-full">Apagar coleta</button>
         </div>
 
         <button type="button" id="lab-filter-summary-btn" class="text-sm text-slate-600 hover:text-sky-700 min-h-[44px] mb-1" aria-expanded="false"></button>
@@ -3272,27 +3258,27 @@ function renderLabTab(contentEl, bed, bedIdx) {
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="text-xs font-medium text-slate-600">De:</label>
-                    <input id="lab-filter-start" type="date" value="${defaultStartDate}" class="w-full text-sm border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                    <input id="lab-filter-start" type="date" value="${defaultStartDate}" class="w-full text-sm border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-sky-600">
                 </div>
                 <div>
                     <label class="text-xs font-medium text-slate-600">Até:</label>
-                    <input id="lab-filter-end" type="date" value="${defaultEndDate}" class="w-full text-sm border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                    <input id="lab-filter-end" type="date" value="${defaultEndDate}" class="w-full text-sm border border-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-sky-600">
                 </div>
             </div>
             <div>
                 <label class="text-xs font-medium text-slate-600">Filtrar Exame (ex: Hb, FAN):</label>
-                <input id="lab-filter-name" type="search" placeholder="Buscar por nome..." class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                <input id="lab-filter-name" type="search" placeholder="Buscar por nome..." class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-sky-600">
             </div>
         </div>
 
         <div class="flex items-center justify-between gap-2 mb-3">
-            <button id="toggle-lab-ranges-btn" class="text-xs text-slate-500 hover:text-sky-600 min-h-[44px] transition-all">Faixas de referência ▸</button>
+            <button id="toggle-lab-ranges-btn" class="text-xs text-slate-500 hover:text-sky-700 min-h-[44px] transition-all">Faixas de referência ▸</button>
             <button type="button" id="toggle-pin-edit-btn" class="btn btn-ghost btn-sm" aria-pressed="false">Editar fixados</button>
         </div>
         <div id="lab-ranges-form" class="hidden space-y-2 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
             <label class="text-xs font-medium text-slate-600">Uma por linha, no formato "Nome: min-max". Valores fora da faixa aparecem coloridos na tabela (alto em vermelho, baixo em azul).</label>
-            <textarea id="lab-ranges-textarea" rows="6" class="w-full text-sm p-3 rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
-            <button id="save-lab-ranges-btn" class="w-full bg-sky-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-sky-700 transition-all">Salvar faixas</button>
+            <textarea id="lab-ranges-textarea" rows="6" class="w-full text-sm p-3 rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-sky-600"></textarea>
+            <button id="save-lab-ranges-btn" class="btn btn-primary w-full">Salvar faixas</button>
         </div>
 
         <div id="exam-flowsheet-container" class="w-full overflow-x-auto">
@@ -3396,11 +3382,11 @@ function renderLabTab(contentEl, bed, bedIdx) {
             const motivo = !date ? 'Escolha a data da coleta.'
               : !text.trim() ? 'Digite ao menos um resultado.'
               : 'Nenhuma linha foi reconhecida. Use o formato "Nome: valor" (ex.: Hb: 9.5), um exame por linha.';
-            showConfirm(motivo, () => {}, 'Nada foi salvo', 'bg-amber-600', 'Entendi');
+            showConfirm(motivo, () => {}, 'Nada foi salvo', 'primaria', 'Entendi');
             return;
         }
         if (result.ignored.length > 0) {
-            showConfirm(`Coleta salva, mas ${result.ignored.length} linha(s) não foram reconhecidas e ficaram de fora:\n\n${result.ignored.join('\n')}`, () => {}, 'Linhas ignoradas', 'bg-amber-600', 'Entendi');
+            showConfirm(`Coleta salva, mas ${result.ignored.length} linha(s) não foram reconhecidas e ficaram de fora:\n\n${result.ignored.join('\n')}`, () => {}, 'Linhas ignoradas', 'primaria', 'Entendi');
         }
         // Re-renderiza toda a aba de laboratório
         renderLabTab(contentEl, bed, bedIdx);
@@ -3499,7 +3485,7 @@ function sparklineSvg(nums) {
         const y = max === min ? h / 2 : pad + (h - 2 * pad) * (1 - (v - min) / (max - min));
         return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="flex-shrink-0 text-slate-400" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="flex-shrink-0 text-slate-500" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
 /**
@@ -3581,7 +3567,7 @@ function renderLabFlowsheet(container, bed, filters) {
             <th class="p-0 text-center font-medium text-slate-600 whitespace-nowrap">
                 <button type="button" class="edit-collection-btn w-full min-h-[44px] px-3 flex items-center justify-center gap-1 font-medium text-slate-600 hover:text-sky-700 hover:bg-slate-100 transition-all" data-date="${date}" aria-label="Editar coleta de ${PainelCore.formatDateBR(date)}">
                     <span>${PainelCore.formatDateBR(date)}</span>
-                    <svg class="w-3.5 h-3.5 text-slate-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                    <svg class="w-3.5 h-3.5 text-slate-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                 </button>
             </th>
         `;
@@ -3595,7 +3581,7 @@ function renderLabFlowsheet(container, bed, filters) {
     filteredExamNames = PainelCore.sortExamNames(filteredExamNames, state.pinnedExams);
 
     const visiblePinned = filteredExamNames.filter(isPinnedName);
-    const arrowBtn = (name, dir, enabled) => `<button type="button" class="pin-move-btn text-xs leading-none px-1 py-0.5 rounded ${enabled ? 'text-slate-400 hover:text-sky-600 hover:bg-sky-50' : 'invisible'}" data-exam-name="${escapeHtml(name)}" data-dir="${dir}" title="${dir < 0 ? 'Subir' : 'Descer'}" aria-label="${dir < 0 ? 'Subir' : 'Descer'} ${escapeHtml(name)}">${dir < 0 ? '▲' : '▼'}</button>`;
+    const arrowBtn = (name, dir, enabled) => `<button type="button" class="pin-move-btn text-xs leading-none px-1 py-0.5 rounded ${enabled ? 'text-slate-500 hover:text-sky-700 hover:bg-sky-50' : 'invisible'}" data-exam-name="${escapeHtml(name)}" data-dir="${dir}" title="${dir < 0 ? 'Subir' : 'Descer'}" aria-label="${dir < 0 ? 'Subir' : 'Descer'} ${escapeHtml(name)}">${dir < 0 ? '▲' : '▼'}</button>`;
 
     tableHtml += '<tbody class="divide-y divide-slate-100 bg-white">';
     filteredExamNames.forEach(examName => {
@@ -3605,8 +3591,8 @@ function renderLabFlowsheet(container, bed, filters) {
         // (que se confundiriam com as setas de tendência). No modo, alfinete de toque de 44 px.
         const pinIcon = `<svg class="w-3.5 h-3.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.868 2.884c-.521-.26-1.115-.26-1.636 0l-7 3.5A.75.75 0 002 7.22v4.574c0 .89.223 1.756.65 2.553l.004.008.018.038.004.008.058.115.008.013.012.02l.033.055.004.005.01.016.03.045.015.021.042.056.022.028.02.023.01.01a.75.75 0 001.072 0l.01-.01.02-.023.022-.028.042-.056.015-.021.03-.045.01-.016.004-.005.033-.055.012-.02.008-.013.058-.115.004-.008.018-.038.004-.008A5.965 5.965 0 0018 11.794V7.22a.75.75 0 00-.368-.656l-7-3.5zM10 5.113L16.22 8.5 10 11.887 3.78 8.5 10 5.113zM15.5 10.165v1.629a4.465 4.465 0 01-1.123 2.98l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5A4.465 4.465 0 014.5 11.794v-1.629L10 13.18l5.5-3.015z" clip-rule="evenodd" /></svg>`;
         const pinCell = pinEditMode
-          ? `<button type="button" class="pin-exam-btn min-w-[44px] min-h-[44px] -my-2 -ml-3 flex items-center justify-center ${isPinned ? 'text-sky-600' : 'text-slate-300'} hover:text-sky-500" data-exam-name="${escapeHtml(examName)}" aria-pressed="${isPinned}" aria-label="Fixar ${escapeHtml(examName)}">${pinIcon}</button>`
-          : (isPinned ? `<span class="pin-mark text-sky-600" title="Fixado">${pinIcon}</span>` : '');
+          ? `<button type="button" class="pin-exam-btn min-w-[44px] min-h-[44px] -my-2 -ml-3 flex items-center justify-center ${isPinned ? 'text-sky-700' : 'text-slate-500'} hover:text-sky-700" data-exam-name="${escapeHtml(examName)}" aria-pressed="${isPinned}" aria-label="Fixar ${escapeHtml(examName)}">${pinIcon}</button>`
+          : (isPinned ? `<span class="pin-mark text-sky-700" title="Fixado">${pinIcon}</span>` : '');
         const arrows = pinEditMode && isPinned && visiblePinned.length > 1
           ? `<span class="flex flex-col ml-auto">${arrowBtn(examName, -1, pinPos > 0)}${arrowBtn(examName, 1, pinPos < visiblePinned.length - 1)}</span>`
           : '';
@@ -3634,11 +3620,11 @@ function renderLabFlowsheet(container, bed, filters) {
             const raw = rawValues[di];
             const value = (raw == null || raw === '') ? '—' : raw;
             const trend = trends[di] === '▲'
-              ? ' <span class="text-red-500" title="subiu">▲</span>'
-              : trends[di] === '▼' ? ' <span class="text-sky-500" title="caiu">▼</span>' : '';
+              ? ' <span class="text-slate-500" title="subiu">▲</span>'
+              : trends[di] === '▼' ? ' <span class="text-slate-500" title="caiu">▼</span>' : '';
             // Fora da faixa de referência: alto em vermelho, baixo em azul.
             const cls = PainelCore.classifyLab(examName, value, labRanges);
-            const valueClass = cls === 'high' ? 'text-red-600 font-semibold' : cls === 'low' ? 'text-sky-600 font-semibold' : 'text-slate-600';
+            const valueClass = cls === 'high' ? 'text-red-600 font-semibold' : cls === 'low' ? 'text-sky-700 font-semibold' : 'text-slate-600';
             tableHtml += `<td class="px-3 py-2 text-center ${valueClass} whitespace-nowrap">${escapeHtml(value)}${trend}</td>`;
         });
         tableHtml += '</tr>';
@@ -3683,10 +3669,10 @@ function renderImageTab(contentEl, bed, bedIdx) {
             </div>
             <p class="text-slate-600 whitespace-pre-wrap">${escapeHtml(exam.summary || 'Sem resumo.')}</p>
             <div class="text-right -mt-2">
-                <button class="edit-image-btn text-slate-400 hover:text-sky-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Editar">
+                <button class="edit-image-btn text-slate-500 hover:text-sky-700 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Editar">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                 </button>
-                <button class="remove-image-btn text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Remover">
+                <button class="remove-image-btn text-slate-500 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all p-1" data-exam-id="${exam.id}" title="Remover">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.707-9.293a1 1 0 0 0-1.414-1.414L10 8.586 8.707 7.293a1 1 0 0 0-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 1 0 1.414 1.414L10 11.414l1.293 1.293a1 1 0 0 0 1.414-1.414L11.414 10l1.293-1.293Z" clip-rule="evenodd" /></svg>
                 </button>
             </div>
@@ -3760,7 +3746,7 @@ document.getElementById('saveImageExamBtn').addEventListener('click', () => {
     };
 
     if (!examData.date || !examData.name) {
-        showConfirm("Data e Nome do Exame são obrigatórios.", () => showModal('imageExamModal'), "Erro", 'bg-red-600', 'Entendi');
+        showConfirm("Data e Nome do Exame são obrigatórios.", () => showModal('imageExamModal'), "Erro", 'perigo', 'Entendi');
         return;
     }
 
@@ -3828,7 +3814,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
                     if (i !== -1) state.generalTasks.splice(i, 1);
                     saveData(state, { localOnly: true });
                     renderScreenC(); // Re-renderiza a lista
-                }, 'Remover tarefa', 'bg-red-600', 'Remover');
+                }, 'Remover tarefa', 'perigo', 'Remover');
             });
 
             tasksListArea.appendChild(node);
@@ -3896,11 +3882,11 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       box.innerHTML = '';
       const empties = state.beds.filter(b => !b.isArchived && !b.patientId && !(b.patientName || '').trim());
       if (!empties.length) {
-        box.innerHTML = '<span class="text-sm text-slate-400">Nenhum leito vazio.</span>';
+        box.innerHTML = '<span class="text-sm text-slate-500">Nenhum leito vazio.</span>';
       }
       empties.forEach(b => {
         const btn = document.createElement('button');
-        btn.className = 'text-sm bg-white border border-slate-300 text-slate-700 font-medium rounded-lg py-2 px-3 hover:bg-sky-50';
+        btn.className = 'btn btn-ghost btn-sm';
         btn.textContent = b.bedNumber || '—';
         btn.addEventListener('click', () => doReadmit(prevBed, b, null));
         box.appendChild(btn);
@@ -3980,7 +3966,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     const hideCompletedSpan = hideCompletedBtn.querySelector('span');
     function applyHideCompletedUI() {
         hideCompletedBtn.setAttribute('aria-checked', hideCompleted);
-        hideCompletedBtn.classList.toggle('bg-sky-600', hideCompleted);
+        hideCompletedBtn.classList.toggle('bg-sky-700', hideCompleted);
         hideCompletedBtn.classList.toggle('bg-slate-200', !hideCompleted);
         hideCompletedSpan.classList.toggle('translate-x-5', hideCompleted);
         hideCompletedSpan.classList.toggle('translate-x-0', !hideCompleted);
@@ -4140,7 +4126,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     document.getElementById('exportDataBtn').addEventListener('click', () => {
       try {
         downloadTextFile(`backup_caderno_visitas_${todayISO()}.json`, JSON.stringify(state, null, 2));
-      } catch (e) { showConfirm(`Erro ao exportar: ${e.message}`, () => {}, "Erro", 'bg-red-600', 'Entendi'); }
+      } catch (e) { showConfirm(`Erro ao exportar: ${e.message}`, () => {}, "Erro", 'perigo', 'Entendi'); }
     });
     document.getElementById('importDataInput').addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -4156,8 +4142,8 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
             loadFailure = null; // o backup importado substitui de propósito o dado ilegível
             saveData(state);
             renderScreenA();
-          }, "Importar Backup?", 'bg-green-600', 'Importar');
-        } catch (err) { showConfirm(`Falha ao ler o arquivo: ${err.message}`, () => {}, "Erro", 'bg-red-600', 'Entendi'); } 
+          }, "Importar Backup?", 'perigo', 'Importar');
+        } catch (err) { showConfirm(`Falha ao ler o arquivo: ${err.message}`, () => {}, "Erro", 'perigo', 'Entendi'); } 
         finally { e.target.value = null; }
       };
       reader.readAsText(file);
@@ -4350,7 +4336,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         } catch (e) { /* offline ou lib indisponível: limpamos o token manualmente abaixo */ }
         clearStoredSessionKeys();
         showAuthGate();
-      }, 'Sair', 'bg-slate-600', 'Sair');
+      }, 'Sair', 'neutro', 'Sair');
     });
 
     // Na carga: se já há sessão salva, libera o app (mesmo offline); senão, mantém o portão.
@@ -4488,7 +4474,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
         'Use quando este aparelho estiver com dados desatualizados. ' +
         'Se houver mudanças locais que você ainda não sincronizou, sincronize antes — elas serão perdidas. ' +
         'Suas preferências (templates, exames fixados, condutas comuns) são mantidas. Continuar?',
-        resetLocalAndPull, 'Resetar e receber do servidor', 'bg-amber-500', 'Resetar e receber');
+        resetLocalAndPull, 'Resetar e receber do servidor', 'perigo', 'Resetar e receber');
     });
 
     // Reset diário também quando a aba volta ao foco — cobre o app deixado aberto
@@ -4534,7 +4520,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
           saveData(state);
           flushSave();
           setSyncStatus('Cópia baixada. O app voltou a salvar neste aparelho.');
-        }, 'Dados locais ilegíveis', 'bg-amber-600', 'Baixar cópia');
+        }, 'Dados locais ilegíveis', 'primaria', 'Baixar cópia');
     }
   </script>
 </body>

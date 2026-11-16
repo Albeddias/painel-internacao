@@ -928,6 +928,21 @@
     return out;
   }
 
+  // ---- Chip do médico externo -------------------------------------------------
+  // Cor sorteada pelo nome, só entre matizes que não são estado (azul, índigo, roxo, rosa,
+  // ciano, teal): vermelho, laranja e verde ficam para perigo, atenção e sucesso.
+  const CORES_MEDICO = [
+    { bg: '#bfdbfe', text: '#1e40af' }, { bg: '#c7d2fe', text: '#3730a3' }, { bg: '#e9d5ff', text: '#6b21a8' },
+    { bg: '#fbcfe8', text: '#9d174d' }, { bg: '#cffafe', text: '#155e75' }, { bg: '#ccfbf1', text: '#115e59' },
+  ];
+  function corDoMedico(nome) {
+    if (!nome) return { bg: '#e5e7eb', text: '#374151' };
+    let hash = 0;
+    for (let i = 0; i < nome.length; i++) hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+    const par = CORES_MEDICO[Math.abs(hash) % CORES_MEDICO.length];
+    return { bg: par.bg, text: par.text };
+  }
+
   // ---- Selo do antibiótico na lista de trackers -------------------------------
   // { label, tone }. tone: 'ended' (suspenso, contagem congelada) | 'scheduled' (D1 futuro) |
   // 'due' (último dia ou prazo vencido) | 'long' (sem duração e D8+) | 'normal'.
@@ -1971,6 +1986,8 @@
     buildPendencias: buildPendencias,
     agruparPendencias: agruparPendencias,
     LIMIARES: LIMIARES,
+    CORES_MEDICO: CORES_MEDICO,
+    corDoMedico: corDoMedico,
     labNumber: labNumber,
     buildLabsLine: buildLabsLine,
     tendenciasLab: tendenciasLab,
