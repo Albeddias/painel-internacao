@@ -693,3 +693,9 @@ test('index.html: foco visível, movimento reduzido, área segura e impressão',
   });
   assert.strictEqual((html.match(/<footer class="[^"]*print:hidden/g) || []).length, 2);
 });
+
+test('index.html: tela do paciente com largura de leitura no computador', () => {
+  const tela = html.slice(html.indexOf('id="screen-details"'), html.indexOf('id="screen-tasks"'));
+  assert.ok(!tela.includes('max-w-7xl'));
+  assert.strictEqual((tela.match(/\bmax-w-3xl\b/g) || []).length, 4, 'cabeçalho, barra de atalhos, conteúdo e rodapé');
+});
