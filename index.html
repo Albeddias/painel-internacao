@@ -1076,6 +1076,7 @@
         screenList.classList.add('active');
         currentPatientIndex = null;
       }
+      posicionarAviso();
     }
 
     // Aba de exames ativa ('labs' | 'images') — preservada entre re-renders do mesmo paciente,
@@ -1477,7 +1478,7 @@
     // é sempre a fonte da verdade; o flush garante persistência ao sair/minimizar.
     let saveTimer = null;
     let pendingSave = null;
-    let saveFailureShown = false; // o aviso fixo de "não foi possível salvar" está na tela
+    let saveFailureMsg = null; // falha ao salvar em curso: o texto do aviso fixo (null = gravando)
     function saveData(s, opts) {
       // localOnly: campo que não vai para o banco (visita, checks, flags, tarefas...). Não acende
       // "alterações a enviar". Na dúvida, grave sem a opção: o erro fica só no aviso aceso à toa.
@@ -1494,12 +1495,16 @@
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingSave));
         pendingSave = null;
-        if (saveFailureShown) { saveFailureShown = false; fecharAviso(); } // voltou a gravar
+        if (saveFailureMsg) { // voltou a gravar: fecha só o próprio aviso de falha
+          const era = saveFailureMsg;
+          saveFailureMsg = null;
+          if (avisoAtual === era) fecharAviso();
+        }
       } catch (e) {
         // Sem espaço/armazenamento bloqueado: antes falhava em silêncio. Mantém pendingSave
         // para a próxima tentativa e avisa — o que está na tela ainda não foi gravado.
+        saveFailureMsg = 'Não foi possível salvar neste aparelho: ' + e.message;
         avisar('Não foi possível salvar neste aparelho: ' + e.message, { tom: 'perigo', fixo: true });
-        saveFailureShown = true;
       }
     }
 
@@ -3685,6 +3690,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     function adjustListPadding() {
         if (!listHeader) return;
         bedsListArea.style.paddingTop = (listHeader.offsetHeight + 12) + 'px';
+        posicionarAviso();
     }
 
     toggleFiltersBtn.addEventListener('click', (e) => {
@@ -3863,8 +3869,21 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     }
 
     // Aviso global (spec 2.0). Mensagem comum some em 4 s; erro (tom 'perigo') e aviso fixo
-    // ficam até o ✕ ou até o próximo avisar.
+    // ficam até o ✕ ou até o próximo avisar. Falha ao salvar e dados ilegíveis duram enquanto
+    // durar o problema: outra mensagem que some ou é fechada devolve esse aviso.
     let avisoTimer = null;
+    let avisoAtual = null; // texto na faixa agora (null = escondida)
+    const MSG_ILEGIVEL = 'Dados deste aparelho ilegíveis — nada será salvo até baixar a cópia';
+    function condicaoPersistente() {
+      if (loadFailure) return MSG_ILEGIVEL;
+      return saveFailureMsg;
+    }
+    // Logo abaixo do cabeçalho da tela ativa; refeito ao trocar de tela e quando o cabeçalho
+    // da lista muda de altura (filtros abertos).
+    function posicionarAviso() {
+      const header = document.querySelector('.screen.active header');
+      document.getElementById('appNotice').style.top = ((header ? header.offsetHeight : 0) + 8) + 'px';
+    }
     function avisar(msg, opts) {
       const tom = (opts && opts.tom) || 'neutro';
       const fixo = !!(opts && opts.fixo) || tom === 'perigo';
@@ -3873,14 +3892,17 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       box.dataset.tom = tom;
       box.setAttribute('role', tom === 'perigo' ? 'alert' : 'status');
       box.setAttribute('aria-live', tom === 'perigo' ? 'assertive' : 'polite');
-      const header = document.querySelector('.screen.active header');
-      box.style.top = ((header ? header.offsetHeight : 0) + 8) + 'px';
+      avisoAtual = msg;
+      posicionarAviso();
       box.classList.remove('hidden');
       clearTimeout(avisoTimer);
       if (!fixo) avisoTimer = setTimeout(fecharAviso, 4000);
     }
     function fecharAviso() {
       clearTimeout(avisoTimer);
+      const p = condicaoPersistente();
+      if (p && avisoAtual !== p) { avisar(p, { tom: 'perigo', fixo: true }); return; }
+      avisoAtual = null;
       document.getElementById('appNotice').classList.add('hidden');
     }
 
@@ -4170,7 +4192,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // Dado salvo ilegível (ver loadData): o app abriu vazio e está sem gravar. Só volta a
     // gravar depois que o dado bruto for baixado para um arquivo (ou um backup for importado).
     if (loadFailure) {
-      avisar('Dados deste aparelho ilegíveis — nada será salvo até baixar a cópia', { tom: 'perigo', fixo: true });
+      avisar(MSG_ILEGIVEL, { tom: 'perigo', fixo: true });
       showConfirm(
         'Não foi possível ler os dados salvos neste aparelho (' + loadFailure.message + '). ' +
         'Nada foi apagado, mas o app abriu vazio e NÃO está salvando. ' +

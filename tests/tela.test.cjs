@@ -236,6 +236,16 @@ test('index.html: aviso global no lugar da linha de status do cabeçalho', () =>
   assert.ok(html.includes("avisar('Não foi possível salvar neste aparelho: ' + e.message, { tom: 'perigo', fixo: true })"));
 });
 
+test('aviso global: falha ao salvar e dados ilegíveis voltam depois de outra mensagem; a faixa segue a tela', () => {
+  const corpo = (nome) => { const i = html.indexOf('function ' + nome + '('); assert.ok(i !== -1, nome); return html.slice(i, html.indexOf('\n    }\n', i)); };
+  const cond = corpo('condicaoPersistente');
+  assert.ok(cond.includes('loadFailure') && cond.includes('saveFailureMsg'), 'as duas condições que duram');
+  assert.ok(corpo('fecharAviso').includes('condicaoPersistente()'), 'mensagem que some devolve o aviso que dura');
+  assert.ok(!html.includes('saveFailureShown'), 'gravar de novo só fecha o próprio aviso de falha');
+  assert.ok(corpo('showScreen').includes('posicionarAviso()') && corpo('adjustListPadding').includes('posicionarAviso()'),
+    'o top da faixa acompanha o cabeçalho da tela ativa');
+});
+
 test('index.html: menu ⋯ da lista leva as ações do painel de filtros, na ordem do spec', () => {
   const ordem = ['id="listMenuSheet"', 'id="resetChecksBtn"', 'id="exportDataBtn"', 'id="importDataInput"',
     'id="logoutBtn"', 'id="resetLocalBtn"', 'class="sheet-item sheet-cancel"', 'id="appVersionLine"'];
