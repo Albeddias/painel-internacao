@@ -647,6 +647,41 @@
     };
   }
 
+  // Selo de alta prevista do cartão: atrasada = perigo, hoje = primária, em 1 ou 2 dias =
+  // atenção, depois = neutro. null sem data válida.
+  function statusAltaPrevista(dataISO, hojeISO) {
+    if (!dataISO || !/^\d{4}-\d{2}-\d{2}$/.test(String(dataISO))) return null;
+    const d = parseISODate(dataISO), hoje = parseISODate(hojeISO);
+    if (!d || !hoje) return null;
+    const diff = Math.round((d.getTime() - hoje.getTime()) / 86400000);
+    const dia = formatDateBR(dataISO);
+    if (diff < 0) return { status: 'atrasada', rotulo: 'Alta ' + dia + ' ⚠', tom: 'perigo' };
+    if (diff === 0) return { status: 'hoje', rotulo: 'Alta hoje', tom: 'primaria' };
+    if (diff <= 2) return { status: 'breve', rotulo: 'Alta ' + dia, tom: 'atencao' };
+    return { status: 'futura', rotulo: 'Alta ' + dia, tom: 'neutro' };
+  }
+
+  // Estado do leito na lista: vazio, depois externo, depois visita + os quatro checks.
+  // "Ocultar concluídos" esconde tudo o que não é 'pendente'.
+  function estadoDoLeito(bed) {
+    const b = bed || {};
+    if (!String(b.patientName || '').trim()) return 'vazio';
+    if (b.externalDoctor && b.externalDoctor.active) return 'externo';
+    const c = b.checks || {};
+    const todos = DAILY_CHECKS.every(function (k) { return !!c[k.key]; });
+    return b.isVisited && todos ? 'concluido' : 'pendente';
+  }
+
+  // Selos de pendência do cartão: sem alta e lembrete (o selo de alta e o sino já dizem isso),
+  // por gravidade (estável), no máximo `max`; `resto` vira o "+N".
+  function selosDoCartao(itens, max) {
+    const elegiveis = porGravidade((itens || []).filter(function (i) { return i.tipo !== 'alta' && i.tipo !== 'lembrete'; }));
+    return {
+      selos: elegiveis.slice(0, max).map(function (i) { return { curto: i.curto, gravidade: i.gravidade }; }),
+      resto: Math.max(0, elegiveis.length - max),
+    };
+  }
+
   function fraseArquivados(pessoas, naNuvem) {
     const partes = [];
     if (pessoas) partes.push(plural(pessoas, 'paciente', 'pacientes'));
@@ -1684,6 +1719,9 @@
     progressoDoDia: progressoDoDia,
     fraseProgresso: fraseProgresso,
     fraseArquivados: fraseArquivados,
+    statusAltaPrevista: statusAltaPrevista,
+    estadoDoLeito: estadoDoLeito,
+    selosDoCartao: selosDoCartao,
     buildPendencias: buildPendencias,
     agruparPendencias: agruparPendencias,
     LIMIARES: LIMIARES,

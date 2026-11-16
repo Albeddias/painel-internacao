@@ -336,3 +336,44 @@ test('LIMIARES: os limiares de alerta vivem num lugar só', () => {
   assert.ok(html.includes('PainelCore.agruparPendencias('));
   assert.ok(!html.includes('PENDENCIA_COLORS'), 'a bolinha segue a gravidade, não o tipo');
 });
+
+test('statusAltaPrevista: rótulo curto e tom pelo estado', () => {
+  const T = '2026-08-27';
+  assert.deepStrictEqual(PainelCore.statusAltaPrevista('2026-08-25', T), { status: 'atrasada', rotulo: 'Alta 25/08 ⚠', tom: 'perigo' });
+  assert.deepStrictEqual(PainelCore.statusAltaPrevista('2026-08-27', T), { status: 'hoje', rotulo: 'Alta hoje', tom: 'primaria' });
+  assert.deepStrictEqual(PainelCore.statusAltaPrevista('2026-08-28', T), { status: 'breve', rotulo: 'Alta 28/08', tom: 'atencao' });
+  assert.strictEqual(PainelCore.statusAltaPrevista('2026-08-29', T).status, 'breve');
+  assert.deepStrictEqual(PainelCore.statusAltaPrevista('2026-08-30', T), { status: 'futura', rotulo: 'Alta 30/08', tom: 'neutro' });
+  ['', null, undefined, 'lixo'].forEach((d) => assert.strictEqual(PainelCore.statusAltaPrevista(d, T), null));
+});
+
+test('estadoDoLeito: vazio, externo, concluído e pendente', () => {
+  const b = (p) => Object.assign({ patientName: 'Paciente Exemplo Um', isVisited: true, checks: { ev: true, p: true, ex: true, tev: true }, externalDoctor: { active: false, name: '' } }, p);
+  assert.strictEqual(PainelCore.estadoDoLeito(b()), 'concluido');
+  assert.strictEqual(PainelCore.estadoDoLeito(b({ checks: { ev: true, p: true, ex: true, tev: false } })), 'pendente');
+  assert.strictEqual(PainelCore.estadoDoLeito(b({ isVisited: false })), 'pendente');
+  assert.strictEqual(PainelCore.estadoDoLeito(b({ checks: undefined })), 'pendente');
+  assert.strictEqual(PainelCore.estadoDoLeito(b({ externalDoctor: { active: true, name: 'Dra. Exemplo' } })), 'externo');
+  assert.strictEqual(PainelCore.estadoDoLeito(b({ patientName: '  ', externalDoctor: { active: true, name: 'Dra. Exemplo' } })), 'vazio', 'vazio vem antes de externo');
+  assert.strictEqual(PainelCore.estadoDoLeito({}), 'vazio');
+});
+
+test('selosDoCartao: até N pendências, por gravidade, sem alta nem lembrete', () => {
+  const it = (tipo, gravidade, curto) => ({ tipo: tipo, gravidade: gravidade, curto: curto });
+  const itens = [it('cultura', 'atencao', 'Cultura D4'), it('atb', 'alerta', 'ATB D8/7'), it('atb', 'alerta', 'ATB D9/7'),
+    it('dispositivo', 'atencao', 'CVC D9'), it('alta', 'alerta', 'Alta atrasada'), it('lembrete', 'atencao', 'Lembrete')];
+  assert.deepStrictEqual(PainelCore.selosDoCartao(itens, 2),
+    { selos: [{ curto: 'ATB D8/7', gravidade: 'alerta' }, { curto: 'ATB D9/7', gravidade: 'alerta' }], resto: 2 });
+  assert.deepStrictEqual(PainelCore.selosDoCartao([it('alta', 'alerta', 'Alta atrasada'), it('lembrete', 'atencao', 'Lembrete')], 2), { selos: [], resto: 0 });
+  assert.deepStrictEqual(PainelCore.selosDoCartao([], 2), { selos: [], resto: 0 });
+});
+
+test('index.html: o cartão usa as regras do core e não usa opacidade para estado', () => {
+  ['PainelCore.estadoDoLeito(', 'PainelCore.statusAltaPrevista(', 'PainelCore.selosDoCartao('].forEach((s) => assert.ok(html.includes(s), s));
+  assert.ok(!html.includes('function isBedCompleted(') && !html.includes('function getDischargeStatus('));
+  assert.ok(!html.includes("card.classList.add('opacity-60')"));
+  assert.ok(!html.includes('reminder-list-active'));
+  assert.ok(html.includes('id="emptyBedTpl"') && html.includes('Vazio — toque para admitir'));
+  assert.ok(html.includes('Nenhum leito neste aparelho. Toque em ＋ para adicionar ou em Sincronizar para receber do banco.'));
+  assert.ok(html.includes('class="add-bed-row'));
+});

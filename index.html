@@ -95,6 +95,14 @@
     }
     .btn-icon { width: 44px; padding: 0; }
     .txt-muted { color: var(--c-text-muted); }
+    /* Cartão do leito */
+    .card.card-done { background: #f0fdf4; border-color: #bbf7d0; }
+    .visit-check-circle { background: var(--c-surface-2); border-color: var(--c-border); color: var(--c-text-muted); cursor: pointer; }
+    .visit-check-circle[aria-pressed="true"] { background: var(--c-success-mark); border-color: var(--c-success-mark); color: #ffffff; }
+    .visit-check-circle:disabled { background: var(--c-neutral-bg); border-color: var(--c-border); color: var(--c-neutral-on-bg); cursor: default; font-weight: 600; }
+    .visit-check-circle:focus-visible, .list-card:focus-visible, .add-bed-row:focus-visible, .pendencia-item:focus-visible, .pendencias-toggle:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+    .add-bed-row { border: 2px dashed var(--c-border); color: var(--c-primary); background: transparent; }
+    .add-bed-row:hover { background: var(--c-surface); }
     /* O piso de 16 px do celular vale para o texto digitado (zoom do iOS); o placeholder pode ser menor. */
     #searchInput::placeholder { font-size: 0.875rem; }
     .btn-ghost[aria-expanded="true"] { background: var(--c-neutral-bg); }
@@ -165,9 +173,6 @@
     .reminder-active {
       border-left-width: 4px;
       border-left-color: #3b82f6;
-    }
-    .reminder-list-active {
-      background-color: #eff6ff; /* bg-blue-50 */
     }
     .reminder-btn.active svg { color: #3b82f6; }
     
@@ -629,35 +634,43 @@
 
   <!-- === TEMPLATE DO CARD DA LISTA (TELA A) === -->
   <template id="patientListTpl">
-    <div class="list-card bg-white rounded-xl shadow-lg border border-slate-200/50 p-3 transition-all">
-      <div class="flex justify-between items-start">
-        <!-- Lado Esquerdo: Visita, Leito, Nome -->
-        <div class="flex-1 flex gap-3 items-center min-w-0">
-          <div class="visit-check-circle flex-shrink-0 w-10 h-10 rounded-full border-2 flex items-center justify-center cursor-pointer">
-            <!-- JS: ✓ -->
+    <div class="list-card card p-3 cursor-pointer">
+      <div class="flex gap-3">
+        <!-- Visita: 44 px, ocupa as linhas 1 e 2 -->
+        <button type="button" class="visit-check-circle flex-shrink-0 w-11 h-11 rounded-full border-2 flex items-center justify-center" aria-label="Visita" aria-pressed="false"></button>
+        <div class="flex-1 min-w-0">
+          <!-- Linha 1: leito, sino, médico externo e "D10" à direita -->
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="bed-id font-bold text-xl truncate" style="color: var(--c-text)"></span>
+            <span class="reminder-tag hidden flex-shrink-0" style="color: var(--c-primary-mark)" title="Lembrete ativo" aria-label="Lembrete ativo">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8 2a5 5 0 0 0-5 5c0 1.57-.378 3.054-1.048 4.36A.75.75 0 0 0 2.5 12.5h11a.75.75 0 0 0 .548-1.14C13.378 10.055 13 8.57 13 7a5 5 0 0 0-5-5Zm-2.375 11.25a.75.75 0 0 1 .75-.75h3.25a.75.75 0 0 1 0 1.5h-3.25a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" /></svg>
+            </span>
+            <span class="ext-tag doc-tag hidden" title=""></span>
+            <span class="inline-los chip chip-primary ml-auto flex-shrink-0">D-</span>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="bed-id font-bold text-xl text-slate-800"></span>
-              <span class="reminder-tag hidden text-blue-500" title="Lembrete ativo!">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M8 2a5 5 0 0 0-5 5c0 1.57-.378 3.054-1.048 4.36A.75.75 0 0 0 2.5 12.5h11a.75.75 0 0 0 .548-1.14C13.378 10.055 13 8.57 13 7a5 5 0 0 0-5-5Zm-2.375 11.25a.75.75 0 0 1 .75-.75h3.25a.75.75 0 0 1 0 1.5h-3.25a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd" /></svg>
-              </span>
-              <span class="ext-tag doc-tag hidden" title=""></span>
-            </div>
-            <div class="bed-name text-sm text-slate-600 truncate"></div>
-          </div>
-        </div>
-        <!-- Lado Direito: LOS + Previsão de Alta -->
-        <div class="flex-shrink-0 ml-2 flex flex-col items-end gap-1">
-          <span class="inline-los font-medium text-sky-700 bg-sky-100 rounded-full px-2 py-0.5 text-xs">D-</span>
-          <span class="discharge-tag hidden rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap"></span>
+          <!-- Linha 2: nome, com a largura inteira -->
+          <div class="bed-name text-sm truncate txt-muted"></div>
         </div>
       </div>
-      <!-- Linha de Baixo: Checks -->
-      <div class="checks flex gap-1 justify-end mt-3">
-        <!-- JS: 4 checks diários + check de Queda renderizados aqui -->
+      <!-- Linha 3: selos à esquerda, checks à direita; os checks descem quando os selos não cabem -->
+      <div class="card-foot flex flex-wrap items-center gap-2 mt-2">
+        <span class="discharge-tag chip hidden"></span>
+        <span class="card-selos contents"></span>
+        <div class="checks flex gap-1 ml-auto">
+          <!-- JS: 4 checks diários + check de Queda renderizados aqui -->
+        </div>
       </div>
     </div>
+  </template>
+
+  <template id="addBedRowTpl">
+    <button type="button" class="add-bed-row w-full min-h-[48px] rounded-xl text-sm font-medium">+ Adicionar leito</button>
+  </template>
+
+  <template id="emptyBedTpl">
+    <button type="button" class="list-card empty-bed card w-full text-left px-3 min-h-[48px] flex items-center text-sm">
+      <span class="bed-id font-bold" style="color: var(--c-text)"></span><span class="txt-muted">&nbsp;· Vazio — toque para admitir</span>
+    </button>
   </template>
 
   <!-- === TEMPLATE DO LEITO ARQUIVADO (TELA A) === -->
@@ -1401,15 +1414,6 @@
     }
 
     // Retorna: null | 'overdue' | 'today' | 'soon' | 'future'
-    function getDischargeStatus(dateStr) {
-      if (!dateStr) return null;
-      const diff = daysBetween(todayISO(), dateStr);
-      if (diff === null) return null;
-      if (diff < 0) return 'overdue';
-      if (diff === 0) return 'today';
-      if (diff === 1 || diff === 2) return 'soon';
-      return 'future';
-    }
 
     const doctorColorPairs = [
       { bg: '#fecaca', text: '#991b1b' }, { bg: '#fed7aa', text: '#9a3412' },
@@ -1548,9 +1552,6 @@
         saveData(state, { localOnly: true });
       }
     }
-    function allChecksTrue(c) {
-      return c && c.ev && c.p && c.ex && c.tev;
-    }
 
     // Check "Queda": termo de ciência do risco de queda, aplicado uma vez por internação.
     // Diferente dos quatro checks diários (bed.checks), vive em bed.quedaOrientada: não zera
@@ -1593,13 +1594,6 @@
       });
     }
     
-    function isBedCompleted(bed) {
-      const isEmpty = !bed.patientName || bed.patientName.trim() === '';
-      if (isEmpty) return true; 
-      if (bed.externalDoctor && bed.externalDoctor.active) return true; 
-      const allTaskChecks = allChecksTrue(bed.checks);
-      return bed.isVisited && allTaskChecks;
-    }
 
     // --- Funções de Renderização (TELA A) ---
 
@@ -1607,8 +1601,7 @@
     // Gravidade da pendência → tom (spec 2.3; o "info" usa a primária). Também usado pelos selos do cartão.
     const TOM_GRAVIDADE = { alerta: 'danger', atencao: 'warn', info: 'primary' };
     // Painel de pendências: uma linha por leito, bolinha na cor da gravidade máxima.
-    function renderPendenciasPanel() {
-      const pend = PainelCore.buildPendencias(state, todayISO());
+    function renderPendenciasPanel(pend) {
       if (pend.length === 0) return;
       const grupos = PainelCore.agruparPendencias(pend);
       const open = !state.isPendenciasMinimized;
@@ -1681,7 +1674,8 @@
 
       // Renderiza Leitos ATIVOS
       if (!isViewingArchived) {
-          renderPendenciasPanel();
+          const pendAll = PainelCore.buildPendencias(state, today);
+          renderPendenciasPanel(pendAll);
           const activeBeds = state.beds.filter(b => !b.isArchived);
           
       
@@ -1689,7 +1683,7 @@
             .map((bed, index) => ({ bed, originalIndex: index }))
             .filter(({ bed }) => {
               if (bed.isArchived) return false; 
-              if (hideCompleted && isBedCompleted(bed)) return false; 
+              if (hideCompleted && PainelCore.estadoDoLeito(bed) !== 'pendente') return false;
               if (!searchTerm) return true;
               const name = (bed.patientName || '').toLowerCase();
               const num = (bed.bedNumber || '').toLowerCase();
@@ -1710,93 +1704,124 @@
           if (bedsToRender.length === 0) {
             // appendChild (e não innerHTML=) para não apagar o painel de pendências já renderizado
             const p = document.createElement('p');
-            p.className = 'text-sm text-slate-500 text-center py-4';
-            p.textContent = `Nenhum leito${state.beds.length > 0 ? ' visível' : ' adicionado'}.`;
-            bedsListArea.appendChild(p);
+            p.className = 'text-sm text-center py-4 txt-muted';
+            if (activeBeds.length === 0) {
+              p.textContent = 'Nenhum leito neste aparelho. Toque em ＋ para adicionar ou em Sincronizar para receber do banco.';
+              bedsListArea.appendChild(p);
+              bedsListArea.appendChild(addBedRow());
+            } else {
+              p.textContent = 'Nenhum leito com esse filtro.';
+              bedsListArea.appendChild(p);
+              const temBusca = !!searchInput.value;
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'btn btn-ghost';
+              btn.textContent = temBusca ? 'Limpar busca' : 'Mostrar todos';
+              btn.addEventListener('click', () => {
+                if (temBusca) { searchInput.value = ''; }
+                else { hideCompleted = false; applyHideCompletedUI(); savePrefs(); }
+                renderScreenA();
+              });
+              const centro = document.createElement('div');
+              centro.className = 'text-center';
+              centro.appendChild(btn);
+              bedsListArea.appendChild(centro);
+            }
             return;
           }
 
-          // Renderiza Leitos ATIVOS
+          // Renderiza Leitos ATIVOS: o estado (PainelCore.estadoDoLeito) decide o desenho.
           bedsToRender.forEach(({ bed: b, originalIndex: idx }) => {
-            renderedBedIndexes.push(idx); 
-            const tpl = document.getElementById('patientListTpl');
-            const node = tpl.content.cloneNode(true);
+            renderedBedIndexes.push(idx);
+            const estado = PainelCore.estadoDoLeito(b);
+
+            if (estado === 'vazio') {
+              const node = document.getElementById('emptyBedTpl').content.cloneNode(true);
+              node.querySelector('.bed-id').textContent = b.bedNumber || '—';
+              node.querySelector('.list-card').addEventListener('click', () => openPatientAndFocusName(idx));
+              bedsListArea.appendChild(node);
+              return;
+            }
+
+            const node = document.getElementById('patientListTpl').content.cloneNode(true);
             const card = node.querySelector('.list-card');
             const visitCheck = node.querySelector('.visit-check-circle');
-            
-            const isReminderActive = b.reminderDate && b.reminderDate <= today;
-            if (isReminderActive) {
-              card.classList.add('reminder-list-active');
-              node.querySelector('.reminder-tag').classList.remove('hidden');
-            }
-            
+            if (estado === 'concluido') card.classList.add('card-done');
+
+            if (b.reminderDate && b.reminderDate <= today) node.querySelector('.reminder-tag').classList.remove('hidden');
+
             const extTag = node.querySelector('.ext-tag');
-            if (b.externalDoctor && b.externalDoctor.active && b.externalDoctor.name) {
+            if (estado === 'externo' && b.externalDoctor.name) {
               extTag.classList.remove('hidden');
-              const firstName = b.externalDoctor.name.split(' ')[0]; 
-              extTag.textContent = firstName;
+              extTag.textContent = b.externalDoctor.name.split(' ')[0];
               extTag.title = b.externalDoctor.name;
               extTag.style = getDoctorColorClasses(b.externalDoctor.name);
             }
 
-            if (isBedCompleted(b)) {
-              card.classList.add('opacity-60');
-            }
-
             node.querySelector('.bed-id').textContent = b.bedNumber || '—';
-            node.querySelector('.bed-name').textContent = b.patientName || 'Vazio';
+            node.querySelector('.bed-name').textContent = b.patientName;
             node.querySelector('.inline-los').textContent = calculateDaysSince(b.admitDate);
 
-            const dischargeTag = node.querySelector('.discharge-tag');
-            const isOccupied = b.patientName && b.patientName.trim() !== '';
-            const dStatus = getDischargeStatus(b.dischargeForecast);
-            if (isOccupied && dStatus) {
+            // Linha 3: selo de alta, até 2 selos de pendência (+N) e os checks
+            let temSelo = false;
+            const alta = PainelCore.statusAltaPrevista(b.dischargeForecast, today);
+            if (alta) {
+              const dischargeTag = node.querySelector('.discharge-tag');
+              dischargeTag.textContent = alta.rotulo;
+              const cls = { perigo: 'chip-danger', primaria: 'chip-primary', atencao: 'chip-warn' }[alta.tom];
+              if (cls) dischargeTag.classList.add(cls);
               dischargeTag.classList.remove('hidden');
-              const dStr = PainelCore.formatDateBR(b.dischargeForecast);
-              if (dStatus === 'today') {
-                dischargeTag.textContent = 'Alta hoje';
-                dischargeTag.classList.add('bg-green-100', 'text-green-800');
-              } else if (dStatus === 'overdue') {
-                dischargeTag.textContent = `Alta: ${dStr} (atrasado)`;
-                dischargeTag.classList.add('bg-red-100', 'text-red-700');
-              } else if (dStatus === 'soon') {
-                dischargeTag.textContent = `Alta: ${dStr}`;
-                dischargeTag.classList.add('bg-amber-100', 'text-amber-800');
-              } else { // future
-                dischargeTag.textContent = `Alta: ${dStr}`;
-                dischargeTag.classList.add('bg-slate-100', 'text-slate-600');
-              }
+              temSelo = true;
             }
+            const selos = PainelCore.selosDoCartao(pendAll.filter(p => p.bedIndex === idx), 2);
+            const selosArea = node.querySelector('.card-selos');
+            selos.selos.forEach(s => {
+              const el = document.createElement('span');
+              el.className = 'chip chip-' + TOM_GRAVIDADE[s.gravidade];
+              el.textContent = s.curto;
+              selosArea.appendChild(el);
+            });
+            if (selos.resto) {
+              const el = document.createElement('span');
+              el.className = 'chip';
+              el.textContent = '+' + selos.resto;
+              el.title = selos.resto + (selos.resto === 1 ? ' pendência a mais' : ' pendências a mais');
+              selosArea.appendChild(el);
+            }
+            temSelo = temSelo || selos.selos.length > 0;
 
-            if (b.isVisited) {
-              visitCheck.classList.add('bg-green-500', 'border-green-500', 'text-white');
-              visitCheck.innerHTML = checkIconSvg('w-5 h-5');
+            const checksArea = node.querySelector('.checks');
+            if (estado === 'externo') {
+              // Médico externo: sem checks; a visita vira um marcador neutro que não responde.
+              checksArea.classList.add('hidden');
+              visitCheck.disabled = true;
+              visitCheck.textContent = '–';
+              visitCheck.setAttribute('aria-label', 'Acompanhado por médico externo');
+              visitCheck.removeAttribute('aria-pressed');
+              if (!temSelo) node.querySelector('.card-foot').classList.add('hidden');
             } else {
-              visitCheck.classList.add('bg-slate-100', 'border-slate-200', 'text-slate-400');
-            }
-            visitCheck.addEventListener('click', (e) => {
-              e.stopPropagation(); 
-              if (b.patientName && b.patientName.trim() !== '' && !(b.externalDoctor && b.externalDoctor.active)) {
+              visitCheck.setAttribute('aria-pressed', String(!!b.isVisited));
+              if (b.isVisited) visitCheck.innerHTML = checkIconSvg('w-5 h-5');
+              visitCheck.addEventListener('click', (e) => {
+                e.stopPropagation();
                 b.isVisited = !b.isVisited;
                 saveData(state, { localOnly: true });
                 renderScreenA();
-              }
-            });
-            
-            const checksArea = node.querySelector('.checks');
-            checksArea.innerHTML = checkDotsHtml(b);
-            bindQuedaDot(checksArea, b, renderScreenA);
-
-            checksArea.querySelectorAll('.dot').forEach(dot => {
-              dot.addEventListener('click', (e) => {
-                e.stopPropagation(); 
-                const k = e.currentTarget.dataset.checkKey;
-                b.checks = b.checks || { ev: false, p: false, ex: false, tev: false };
-                b.checks[k] = !b.checks[k];
-                saveData(state, { localOnly: true });
-                renderScreenA();
               });
-            });
+
+              checksArea.innerHTML = checkDotsHtml(b);
+              bindQuedaDot(checksArea, b, renderScreenA);
+              checksArea.querySelectorAll('.dot').forEach(dot => {
+                dot.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  const k = e.currentTarget.dataset.checkKey;
+                  b.checks = b.checks || { ev: false, p: false, ex: false, tev: false };
+                  b.checks[k] = !b.checks[k];
+                  saveData(state, { localOnly: true });
+                  renderScreenA();
+                });
+              });
+            }
 
             card.addEventListener('click', () => {
                 openPatientDetails(idx);
@@ -1804,6 +1829,7 @@
 
             bedsListArea.appendChild(node);
           });
+          bedsListArea.appendChild(addBedRow());
       } else {
           // Renderiza Leitos ARQUIVADOS
           // Uma linha por pessoa (internação arquivada mais recente); busca bate em qualquer internação dela
@@ -3514,6 +3540,23 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       saveData(state);
     }
     
+    function openAddBedModal() {
+      showModal('addBedModal');
+      newBedNumberInput.focus();
+    }
+    // Abre o paciente com o foco no nome: leito recém-criado e toque no leito vazio.
+    function openPatientAndFocusName(bedIndex) {
+      openPatientDetails(bedIndex);
+      const nameInput = document.getElementById('patientDetailContent').querySelector('.inline-name');
+      if (nameInput) nameInput.focus();
+    }
+    // Linha tracejada "+ Adicionar leito" no fim da lista de ativos (mesmo handler do ＋).
+    function addBedRow() {
+      const node = document.getElementById('addBedRowTpl').content.cloneNode(true);
+      node.querySelector('.add-bed-row').addEventListener('click', openAddBedModal);
+      return node;
+    }
+
     function handleAddNewBed() {
       const v = newBedNumberInput.value.trim();
       if (!v) return;
@@ -3525,11 +3568,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
       hideModal('addBedModal');
       newBedNumberInput.value = '';
 
-      setTimeout(() => {
-          openPatientDetails(newIdx);
-          const nameInput = document.getElementById('patientDetailContent').querySelector('.inline-name');
-          if(nameInput) nameInput.focus();
-      }, 100);
+      setTimeout(() => openPatientAndFocusName(newIdx), 100);
     }
 
     // --- Reinternar: nova internação da mesma pessoa num leito vazio ou novo ---
@@ -3596,10 +3635,7 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // --- Inicialização e Eventos Globais ---
     
     // Navegação Tela A
-    document.getElementById('addBedBtn').addEventListener('click', () => {
-      showModal('addBedModal');
-      newBedNumberInput.focus();
-    });
+    document.getElementById('addBedBtn').addEventListener('click', openAddBedModal);
     document.getElementById('saveAddBedBtn').addEventListener('click', handleAddNewBed);
     newBedNumberInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') handleAddNewBed(); });
     document.getElementById('resetChecksBtn').addEventListener('click', () => {

@@ -3,6 +3,7 @@
  * globais do script do app. Telas:
  *   lista | arquivados | tarefas | paciente:N | paciente:N:aberto | modal:controle | aviso | menu
  *   lista:check (marca o primeiro check) | lista:edicao (edita um problema: "alterações a enviar")
+ *   lista:vazia (sem leitos) | lista:filtro (busca sem resultado)
  * Sufixo ":medir" em qualquer tela: etiqueta amarela com a altura do cabeçalho fixo da
  * tela ativa e a largura da janela. */
 (function () {
@@ -28,6 +29,12 @@
     openTrackerModal(0);
   } else if (tela === 'lista' && partes[1] === 'check') {
     document.querySelector('#screen-list .dot').click();
+  } else if (tela === 'lista' && partes[1] === 'vazia') {
+    state.beds = [];
+    renderScreenA();
+  } else if (tela === 'lista' && partes[1] === 'filtro') {
+    document.getElementById('searchInput').value = 'zzz';
+    renderScreenA();
   } else if (tela === 'lista' && partes[1] === 'edicao') {
     state.beds[0].problems[0].descricao += ' x';
     saveData(state);
