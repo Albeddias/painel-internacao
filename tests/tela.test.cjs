@@ -170,3 +170,12 @@ test('index.html: sair dos Arquivados está sempre à vista', () => {
   const filtros = html.slice(html.indexOf('id="filtersPanel"'), html.indexOf('</header>'));
   assert.ok(!filtros.includes('viewSegment'), 'o seletor fica fora do painel recolhível');
 });
+
+test('index.html: rodapé do paciente cabe numa linha', () => {
+  const rodape = html.slice(html.indexOf('<!-- RODAPÉ FIXO (TELA B) -->'), html.indexOf('id="screen-tasks"'));
+  ['+ Conduta', '+ Nota', '+ Controle'].forEach((t) => assert.ok(!rodape.includes(t), t));
+  ['Conduta', 'Nota', 'Controle'].forEach((t) => assert.ok(new RegExp('<span[^>]*>' + t + '</span>').test(rodape), t));
+  assert.strictEqual((rodape.match(/\bw-14\b/g) || []).length, 2, '‹ e › com 56 px');
+  assert.ok(/id="prevPatientBtn"[^>]*aria-label="Paciente anterior"/.test(rodape));
+  assert.ok(/id="nextPatientBtn"[^>]*aria-label="Próximo paciente"/.test(rodape));
+});
