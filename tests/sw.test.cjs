@@ -124,3 +124,11 @@ test('API do Supabase nunca é interceptada', async () => {
   assert.strictEqual(out.intercepted, false);
   assert.strictEqual(sw.fetchCalls.length, 0);
 });
+
+test('versão do app: APP_VERSION do index.html é o número do cache do sw.js', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const app = (html.match(/const APP_VERSION = '(\d+)';/) || [])[1];
+  const cache = (SW_SRC.match(/const CACHE = 'caderno-v(\d+)';/) || [])[1];
+  assert.ok(app, 'APP_VERSION não encontrado no index.html');
+  assert.strictEqual(app, cache);
+});

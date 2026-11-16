@@ -1,7 +1,7 @@
 /* Injetado no fim da página capturada (tools/captura/capturar.cjs). Lê location.hash e
  * abre a tela pedida. `state`, openPatientDetails, openTrackerModal e showScreen são
  * globais do script do app. Telas:
- *   lista | arquivados | tarefas | paciente:N | paciente:N:aberto | modal:controle | aviso
+ *   lista | arquivados | tarefas | paciente:N | paciente:N:aberto | modal:controle | aviso | menu
  * Sufixo ":medir" em qualquer tela: etiqueta amarela com a altura do cabeçalho fixo da
  * tela ativa e a largura da janela. */
 (function () {
@@ -25,6 +25,8 @@
   } else if (tela === 'modal' && partes[1] === 'controle') {
     openPatientDetails(0);
     openTrackerModal(0);
+  } else if (tela === 'menu') {
+    openSheet('listMenuSheet');
   } else if (tela === 'aviso') {
     openPatientDetails(0);
     avisar('Não foi possível salvar neste aparelho: QuotaExceededError', { tom: 'perigo', fixo: true });

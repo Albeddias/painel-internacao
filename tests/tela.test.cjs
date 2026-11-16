@@ -235,3 +235,18 @@ test('index.html: aviso global no lugar da linha de status do cabeçalho', () =>
   assert.ok(html.slice(i, i + 300).includes('avisar('));
   assert.ok(html.includes("avisar('Não foi possível salvar neste aparelho: ' + e.message, { tom: 'perigo', fixo: true })"));
 });
+
+test('index.html: menu ⋯ da lista leva as ações do painel de filtros, na ordem do spec', () => {
+  const ordem = ['id="listMenuSheet"', 'id="resetChecksBtn"', 'id="exportDataBtn"', 'id="importDataInput"',
+    'id="logoutBtn"', 'id="resetLocalBtn"', 'class="sheet-item sheet-cancel"', 'id="appVersionLine"'];
+  const pos = ordem.map((s) => html.indexOf(s));
+  assert.ok(pos.every((p) => p !== -1), 'falta: ' + ordem[pos.indexOf(-1)]);
+  assert.deepStrictEqual(pos, pos.slice().sort((a, b) => a - b));
+  assert.ok(/id="listMenuSheet"[^>]*role="dialog"[^>]*aria-modal="true"/.test(html));
+  assert.ok(/id="resetLocalBtn"[^>]*class="sheet-item sheet-item-danger"/.test(html) || /class="sheet-item sheet-item-danger"[^>]*id="resetLocalBtn"/.test(html));
+  assert.ok(/id="listMenuBtn"[^>]*aria-label="Mais ações"/.test(html));
+  assert.ok(!html.includes('id="filter-actions"'));
+  assert.ok(html.includes("'Sair? Para entrar de novo é preciso internet.'"));
+  assert.ok(html.includes('<title>Caderno de Visitas</title>'));
+  ['function openSheet(', 'function closeSheet(', 'function closeAllModals(', 'pendingOverlayPop'].forEach((s) => assert.ok(html.includes(s), s));
+});
