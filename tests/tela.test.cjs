@@ -591,3 +591,9 @@ test('index.html: marca de copiado na Evolução Tasy e nos blocos do sumário',
   assert.ok(html.includes('PainelCore.avisoIniciais('));
   assert.ok(html.includes('✓ copiado') && html.includes('evolucao-copy-count'));
 });
+
+test('index.html: condutas têm alça de arrasto, como as outras listas', () => {
+  assert.ok(html.includes("enableListDrag(listElement, '.conduta',"));
+  assert.ok(/\.conduta\.dragging/.test(html));
+  assert.ok(html.includes('data-conduta-id'));
+});

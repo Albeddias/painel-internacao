@@ -260,7 +260,8 @@
     }
     .tracker-item.dragging,
     .problem-item.dragging,
-    .hpp-item.dragging {
+    .hpp-item.dragging,
+    .conduta.dragging {
       opacity: 0.75;
       background-color: #e0f2fe; /* sky-100 */
       box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
@@ -938,7 +939,7 @@
           <!-- Sugestões inline (substitui o <datalist> nativo, que cobria o teclado no Android) -->
           <div class="conduta-suggestions flex gap-2 overflow-x-auto mb-2" style="display:none"></div>
           <div class="flex gap-2 w-full mb-3">
-            <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1" placeholder="Nova conduta" autocomplete="off">
+            <input class="new-conduta-input text-sm p-3 rounded-md border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 flex-1 min-w-0" placeholder="Nova conduta" autocomplete="off">
             <button type="button" class="add-conduta-to-list-btn text-sm bg-white border border-slate-300 text-slate-500 font-medium rounded-lg p-3 hover:bg-slate-50 transition-all print:hidden" title="Adicionar a conduta e salvar na lista" aria-label="Adicionar a conduta e salvar na lista">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true"><path fill-rule="evenodd" d="M10 2c-1.716 0-3.408.106-5.07.31C3.806 2.45 3 3.414 3 4.517V17.25a.75.75 0 0 0 1.075.676L10 15.082l5.925 2.844A.75.75 0 0 0 17 17.25V4.517c0-1.103-.806-2.068-1.93-2.207A41.403 41.403 0 0 0 10 2Z" clip-rule="evenodd" /></svg>
             </button>
@@ -3055,7 +3056,9 @@
         (bed.condutas || []).forEach((c, ci) => {
           const it = document.createElement('div');
           it.className = 'conduta flex gap-2 items-center group';
+          it.setAttribute('data-conduta-id', c.id);
           it.innerHTML = `
+            ${dragHandleHtml}
             <input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500" ${c.done ? 'checked' : ''}>
             <div class="grow-wrap text-sm"><textarea rows="1" class="conduta-text focus:border-slate-300 focus:bg-slate-50 ${c.done ? 'line-through text-slate-500' : ''}" placeholder="Descreva a conduta"></textarea></div>
             <button class="remove-conduta text-slate-400 hover:text-red-600 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all print:hidden" data-conduta-index="${ci}">
@@ -3077,6 +3080,19 @@
             }, 'Remover conduta', 'bg-red-600', 'Remover');
           });
           listElement.appendChild(it);
+        });
+
+        // Arrastar (spec 3.10): a ordem vai ao banco pela posição. Redesenha depois: os handlers
+        // de cada conduta guardam o índice e editariam a conduta errada.
+        enableListDrag(listElement, '.conduta', (els) => {
+          const byId = {};
+          (bed.condutas || []).forEach(c => { byId[c.id] = c; });
+          const reordered = els.map(el => byId[el.dataset.condutaId]).filter(Boolean);
+          if (reordered.length === bed.condutas.length) {
+            bed.condutas = reordered;
+            saveData(state);
+            renderScreenB();
+          }
         });
 
         const section = listElement.closest('.collapsible-section');
