@@ -640,6 +640,22 @@
     return 'Labs ' + formatDateBR(last.date) + ': ' + parts.join(' | ');
   }
 
+  // Seta de tendência de cada coleta da tabela de labs: '' | '▲' | '▼'. Entrada em ordem
+  // CRONOLÓGICA (a tabela desenha da mais recente para a mais antiga, mas compara sempre
+  // com a coleta anterior). Compara com a última coleta que tinha número: um "—" no meio
+  // não quebra a comparação.
+  function tendenciasLab(nums) {
+    let prev = null;
+    return (nums || []).map(function (n) {
+      let t = '';
+      if (n !== null && n !== undefined) {
+        if (prev !== null && n !== prev) t = n > prev ? '▲' : '▼';
+        prev = n;
+      }
+      return t;
+    });
+  }
+
   // ---- Faixas de referência: destaque de valores alterados no flowsheet ------
   // Preferência local (como pinnedExams): texto "Nome: min-max", uma linha por exame.
 
@@ -1570,6 +1586,7 @@
     buildPendencias: buildPendencias,
     labNumber: labNumber,
     buildLabsLine: buildLabsLine,
+    tendenciasLab: tendenciasLab,
     buildDailySummary: buildDailySummary,
     DEFAULT_LAB_RANGES_TEXT: DEFAULT_LAB_RANGES_TEXT,
     parseLabRanges: parseLabRanges,

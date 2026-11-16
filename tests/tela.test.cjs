@@ -138,3 +138,18 @@ test('index.html: checks desenhados a partir de DAILY_CHECKS, como botões de 40
   assert.ok(/<button type="button" class="queda-dot [^"]*\bw-10 h-10\b[^"]*"[^>]*aria-pressed=/.test(html));
   assert.ok(!/class="(dot|queda-dot) [^"]*bg-sky-500/.test(html), '✓ branco sobre sky-500 tem contraste 2,8:1');
 });
+
+test('tendenciasLab: compara cada coleta com a anterior que tinha número', () => {
+  assert.deepStrictEqual(PainelCore.tendenciasLab([10, 12, 12, 9]), ['', '▲', '', '▼']);
+  assert.deepStrictEqual(PainelCore.tendenciasLab([10, null, 8]), ['', '', '▼'], 'um "—" no meio não quebra a comparação');
+  assert.deepStrictEqual(PainelCore.tendenciasLab([null, 5]), ['', '']);
+  assert.deepStrictEqual(PainelCore.tendenciasLab([7]), ['']);
+  assert.deepStrictEqual(PainelCore.tendenciasLab([null, null]), ['', '']);
+  assert.deepStrictEqual(PainelCore.tendenciasLab([]), []);
+});
+
+test('index.html: a tabela de labs calcula em ordem cronológica e desenha da mais recente para a mais antiga', () => {
+  assert.ok(html.includes('PainelCore.tendenciasLab(nums)'));
+  assert.ok(html.includes('const columnDates = filteredDates.slice().reverse();'));
+  assert.ok(!html.includes('let prevNum = null;'), 'a tendência saiu do laço das colunas');
+});

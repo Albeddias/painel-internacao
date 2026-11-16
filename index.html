@@ -2999,13 +2999,18 @@ function renderLabFlowsheet(container, bed, filters) {
         return;
     }
 
+    // filteredDates fica em ordem cronológica (tendência e minigráfico dependem dela); as
+    // colunas são desenhadas da coleta mais recente para a mais antiga, para a de hoje
+    // aparecer sem rolar no celular. Coluna ci = índice cronológico filteredDates.length - 1 - ci.
+    const columnDates = filteredDates.slice().reverse();
+
     // 3. Constrói a Tabela
     let tableHtml = '<table class="min-w-full divide-y divide-slate-200 text-sm">';
 
     // Cabeçalho (Datas)
     tableHtml += '<thead class="bg-slate-50">';
     tableHtml += '<tr><th class="sticky left-0 bg-slate-50 px-3 py-2 text-left font-medium text-slate-600">Exame</th>';
-    filteredDates.forEach(date => {
+    columnDates.forEach(date => {
         // CORREÇÃO: Adiciona os ícones de editar/deletar na data
         tableHtml += `
             <th class="px-3 py-2 text-center font-medium text-slate-600 whitespace-nowrap">
@@ -3054,19 +3059,15 @@ function renderLabFlowsheet(container, bed, filters) {
             </td>
         `;
 
-        let prevNum = null;
-        filteredDates.forEach((date, di) => {
+        // Tendência: compara o valor numérico com a coleta anterior (seta ↑/↓ colorida).
+        const trends = PainelCore.tendenciasLab(nums);
+        columnDates.forEach((date, ci) => {
+            const di = filteredDates.length - 1 - ci;
             const raw = rawValues[di];
             const value = (raw == null || raw === '') ? '—' : raw;
-            // Tendência: compara o valor numérico com a coleta anterior (seta ↑/↓ colorida).
-            const num = nums[di];
-            let trend = '';
-            if (num !== null && prevNum !== null && num !== prevNum) {
-                trend = num > prevNum
-                  ? ' <span class="text-red-500" title="subiu">▲</span>'
-                  : ' <span class="text-sky-500" title="caiu">▼</span>';
-            }
-            if (num !== null) prevNum = num;
+            const trend = trends[di] === '▲'
+              ? ' <span class="text-red-500" title="subiu">▲</span>'
+              : trends[di] === '▼' ? ' <span class="text-sky-500" title="caiu">▼</span>' : '';
             // Fora da faixa de referência: alto em vermelho, baixo em azul.
             const cls = PainelCore.classifyLab(examName, value, labRanges);
             const valueClass = cls === 'high' ? 'text-red-600 font-semibold' : cls === 'low' ? 'text-sky-600 font-semibold' : 'text-slate-600';
