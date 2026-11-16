@@ -2,7 +2,7 @@
  * abre a tela pedida. `state`, openPatientDetails, openTrackerModal e showScreen são
  * globais do script do app. Telas:
  *   lista | arquivados | tarefas | paciente:N | paciente:N:aberto | modal:controle | aviso | menu
- *   paciente:N:menu (menu ⋯ do paciente aberto)
+ *   paciente:N:menu (menu ⋯ do paciente aberto) | paciente:N:secao=<atalho> (toca o atalho)
  *   lista:check (marca o primeiro check) | lista:edicao (edita um problema: "alterações a enviar")
  *   lista:vazia (sem leitos) | lista:filtro (busca sem resultado)
  * Sufixo ":medir" em qualquer tela: etiqueta amarela com a altura do cabeçalho fixo da
@@ -26,6 +26,17 @@
     }
     openPatientDetails(n);
     if (partes[2] === 'menu') openPatientMenu();
+    if (/^secao=/.test(partes[2] || '')) {
+      var atalho = partes[2].slice(6);
+      goToSection(atalho);
+      // A rolagem suave não anda no Edge headless: completa a rolagem de forma instantânea.
+      setTimeout(function () {
+        var alvo = { problemas: 'problemas', historico: 'hpp', controles: 'controles', exames: 'exames',
+          condutas: 'condutas', evolucao: 'evolucao', docs: 'textos' }[atalho];
+        document.querySelector('[data-secao="' + alvo + '"]').scrollIntoView({ block: 'start' });
+        atualizarAtalhoAtivo(); // o IntersectionObserver também quase não roda no headless
+      }, 100);
+    }
   } else if (tela === 'modal' && partes[1] === 'controle') {
     openPatientDetails(0);
     openTrackerModal(0);

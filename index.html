@@ -193,6 +193,17 @@
     /* Chip com um campo nativo transparente por cima (spec 3.1): o chip mostra o texto do app,
        o toque cai no campo e abre o seletor do sistema. Fonte de 16 px: sem zoom no iOS. */
     .chip-nativo { position: relative; min-height: 36px; }
+    /* Barra de atalhos do paciente (spec 3.3) */
+    #sectionNav { background: var(--c-surface); border-bottom: 1px solid var(--c-border); }
+    .section-nav-scroll {
+      padding-right: 24px; scroll-padding-inline: 12px 24px; scrollbar-width: none;
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+      mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    }
+    .section-nav-scroll::-webkit-scrollbar { display: none; }
+    .section-nav-chip { min-height: 36px; flex-shrink: 0; font-size: 0.875rem; padding: 0 0.75rem; }
+    body.digitando #sectionNav { display: none; }
+    .collapsible-section { scroll-margin-top: var(--paciente-topo, 132px); }
     .chip-nativo > input, .chip-nativo > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; min-height: 0; padding: 0; cursor: pointer; }
     .patient-meta .chip { min-height: 36px; font-size: 0.875rem; line-height: 1.25rem; }
     .patient-meta input.inline-age { background: transparent; border: 0; padding: 0; text-align: right; }
@@ -364,8 +375,23 @@
       </div>
     </header>
 
+    <!-- BARRA DE ATALHOS (spec 3.3): fixa logo abaixo do cabeçalho; some com um campo em foco -->
+    <nav id="sectionNav" class="fixed left-0 right-0 z-10 print:hidden" aria-label="Seções do paciente">
+      <div class="container mx-auto max-w-7xl">
+      <div class="section-nav-scroll flex gap-2 overflow-x-auto px-3 py-2">
+        <button type="button" class="chip section-nav-chip" data-atalho="problemas">Problemas</button>
+        <button type="button" class="chip section-nav-chip" data-atalho="historico">Histórico</button>
+        <button type="button" class="chip section-nav-chip" data-atalho="controles">Controles</button>
+        <button type="button" class="chip section-nav-chip" data-atalho="exames">Exames</button>
+        <button type="button" class="chip section-nav-chip" data-atalho="condutas">Condutas</button>
+        <button type="button" class="chip section-nav-chip" data-atalho="evolucao">Evolução</button>
+        <button type="button" class="chip section-nav-chip" data-atalho="docs">Docs</button>
+      </div>
+      </div>
+    </nav>
+
     <!-- CONTEÚDO DO PACIENTE (TELA B) -->
-    <main id="patientDetailContent" class="container mx-auto max-w-7xl p-3" style="padding-top: 80px; padding-bottom: 100px;">
+    <main id="patientDetailContent" class="container mx-auto max-w-7xl p-3" style="padding-top: var(--paciente-topo, 132px); padding-bottom: 100px;">
       <!-- O Card de Detalhes é renderizado aqui pelo JS -->
     </main>
 
@@ -1082,6 +1108,7 @@
 
       if (screenName === 'details') {
         screenDetails.classList.add('active');
+        posicionarBarraPaciente();
         window.scrollTo(0, 0);
       } else if (screenName === 'tasks') { // NOVO
         screenTasks.classList.add('active');
@@ -1239,6 +1266,72 @@
     });
     // O selo do cabeçalho leva até a faixa de alergia, no topo do conteúdo.
     document.getElementById('patientAllergyFlag').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+    // --- Barra de atalhos (spec 3.3) ---
+    const sectionNav = document.getElementById('sectionNav');
+    const ATALHO_ALVO = { problemas: 'problemas', historico: 'hpp', controles: 'controles', exames: 'exames',
+      condutas: 'condutas', evolucao: 'evolucao', docs: 'textos' };
+    // Barra logo abaixo do cabeçalho; --paciente-topo = cabeçalho + barra + 8 px (padding do
+    // conteúdo e scroll-margin-top das seções). Com a barra escondida (digitando), não mexe.
+    function posicionarBarraPaciente() {
+      const header = screenDetails.querySelector('header');
+      sectionNav.style.top = header.offsetHeight + 'px';
+      if (!sectionNav.offsetHeight) return;
+      document.documentElement.style.setProperty('--paciente-topo', (header.offsetHeight + sectionNav.offsetHeight + 8) + 'px');
+    }
+    function goToSection(atalho) {
+      const section = patientDetailContent.querySelector('[data-secao="' + ATALHO_ALVO[atalho] + '"]');
+      if (!section) return;
+      const content = section.querySelector('.collapsible-content');
+      if (content && content.classList.contains('hidden')) section.querySelector('.collapsible-toggle-btn').click();
+      // Espera os campos que ajustam a altura num setTimeout antes de rolar.
+      setTimeout(() => section.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
+    }
+    sectionNav.querySelectorAll('.section-nav-chip').forEach((chip) => {
+      chip.addEventListener('click', () => goToSection(chip.dataset.atalho));
+    });
+    function marcarAtalho(atalho) {
+      sectionNav.querySelectorAll('.section-nav-chip').forEach((chip) => {
+        const ativo = chip.dataset.atalho === atalho;
+        chip.classList.toggle('chip-primary', ativo);
+        if (ativo) {
+          chip.setAttribute('aria-current', 'true');
+          chip.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+        } else {
+          chip.removeAttribute('aria-current');
+        }
+      });
+    }
+    // Destaque do chip da seção que está logo abaixo da barra. O IntersectionObserver só avisa
+    // que alguma seção cruzou a metade de cima da tela; a seção ativa é a última cujo topo já
+    // passou da barra (ou a primeira, no topo da página). Sem IntersectionObserver, sem destaque.
+    let sectionObserver = null;
+    function pacienteTopo() {
+      return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--paciente-topo'), 10) || 132;
+    }
+    function atualizarAtalhoAtivo() {
+      const topo = pacienteTopo();
+      const secoes = [...patientDetailContent.querySelectorAll('.collapsible-section[data-atalho]')].filter((s) => s.offsetParent);
+      if (!secoes.length) return;
+      let ativa = secoes[0];
+      secoes.forEach((s) => { if (s.getBoundingClientRect().top <= topo + 2) ativa = s; });
+      marcarAtalho(ativa.dataset.atalho);
+    }
+    function observeSections() {
+      if (sectionObserver) { sectionObserver.disconnect(); sectionObserver = null; }
+      if (typeof IntersectionObserver === 'undefined') return;
+      const topo = pacienteTopo();
+      // root: document — o rootMargin vale também dentro de um iframe (captura de tela).
+      sectionObserver = new IntersectionObserver(atualizarAtalhoAtivo,
+        { root: document, rootMargin: '-' + topo + 'px 0px -50% 0px', threshold: [0, 1] });
+      patientDetailContent.querySelectorAll('.collapsible-section[data-atalho]').forEach((s) => sectionObserver.observe(s));
+    }
+    // Com o teclado aberto, a barra some (sobraria pouco espaço para o campo).
+    const CAMPO_DIGITAVEL = 'textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"]';
+    document.addEventListener('focusin', (e) => {
+      document.body.classList.toggle('digitando', !!(e.target.matches && e.target.matches(CAMPO_DIGITAVEL) && e.target.closest('#screen-details')));
+    });
+    document.addEventListener('focusout', () => document.body.classList.remove('digitando'));
 
     function showConfirm(message, onConfirm, title = "Ação Irreversível", btnClass = 'bg-red-600', btnText = 'Confirmar') {
       confirmModalTitle.textContent = title;
@@ -2195,6 +2288,7 @@
       refreshIdChips(art, b);
 
       patientDetailContent.appendChild(node);
+      observeSections();
 
       if (!b.isNotesMinimized) autoResizeTextarea(notesInput);
     }
@@ -3774,6 +3868,11 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     });
 
     window.addEventListener('resize', adjustListPadding);
+    window.addEventListener('resize', () => {
+      if (!screenDetails.classList.contains('active')) return;
+      posicionarBarraPaciente();
+      observeSections();
+    });
     if (listHeader && typeof ResizeObserver !== 'undefined') {
         new ResizeObserver(adjustListPadding).observe(listHeader);
     }

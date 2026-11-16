@@ -442,3 +442,15 @@ test('index.html: seções do paciente na ordem definida pelo usuário, cada uma
     ['anotacoes', 'condutas'], ['evolucao', 'evolucao'], ['textos', 'docs'], ['documentos', 'docs'],
   ]);
 });
+
+test('index.html: barra de atalhos com os sete chips do spec', () => {
+  const ini = html.indexOf('id="sectionNav"');
+  const nav = html.slice(ini, html.indexOf('</nav>', ini));
+  assert.deepStrictEqual([...nav.matchAll(/data-atalho="([a-z]+)">([^<]+)</g)].map((m) => [m[1], m[2]]), [
+    ['problemas', 'Problemas'], ['historico', 'Histórico'], ['controles', 'Controles'], ['exames', 'Exames'],
+    ['condutas', 'Condutas'], ['evolucao', 'Evolução'], ['docs', 'Docs'],
+  ]);
+  assert.ok(html.includes('function goToSection(') && html.includes('function observeSections('));
+  assert.ok(/scroll-margin-top:\s*var\(--paciente-topo/.test(html));
+  assert.ok(/body\.digitando #sectionNav\s*\{\s*display:\s*none/.test(html));
+});
