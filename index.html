@@ -417,8 +417,9 @@
     <footer class="bg-white border-t border-slate-200 p-3 fixed bottom-0 left-0 right-0 z-20">
       <div class="container mx-auto max-w-7xl flex justify-between items-center gap-2">
         <!-- Navegação -->
-        <button type="button" id="prevPatientBtn" class="nav-btn w-14 h-14 flex-shrink-0 flex items-center justify-center bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all" title="Paciente anterior" aria-label="Paciente anterior">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
+        <button type="button" id="prevPatientBtn" class="nav-btn w-14 h-14 flex-shrink-0 flex flex-col items-center justify-center gap-0.5 px-1 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-40 transition-all" title="Paciente anterior" aria-label="Paciente anterior">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
+          <span class="nav-label text-[11px] leading-none truncate max-w-full"></span>
         </button>
 
         <!-- Ações Rápidas: ícone em cima, rótulo curto embaixo (cabe numa linha em 360 px) -->
@@ -436,8 +437,9 @@
         </button>
 
         <!-- Navegação -->
-        <button type="button" id="nextPatientBtn" class="nav-btn w-14 h-14 flex-shrink-0 flex items-center justify-center bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-all" title="Próximo paciente" aria-label="Próximo paciente">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1.02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>
+        <button type="button" id="nextPatientBtn" class="nav-btn w-14 h-14 flex-shrink-0 flex flex-col items-center justify-center gap-0.5 px-1 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-40 transition-all" title="Próximo paciente" aria-label="Próximo paciente">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 flex-shrink-0" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1.02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>
+          <span class="nav-label text-[11px] leading-none truncate max-w-full"></span>
         </button>
       </div>
     </footer>
@@ -2308,6 +2310,7 @@
       patientDetailContent.appendChild(node);
       patientDetailContent.querySelectorAll('textarea[data-auto-resize]').forEach(resizeNow);
       observeSections();
+      updateFooterNav();
 
       if (!b.isNotesMinimized) autoResizeTextarea(notesInput);
     }
@@ -3939,19 +3942,29 @@ document.getElementById('image-exam-summary').addEventListener('input', (e) => a
     // Navegação Tela B
     document.getElementById('backToListBtn').addEventListener('click', closePatientDetails);
     
+    // ‹ › seguem a ordem da lista e dão a volta; fora da lista (Arquivados, internação anterior,
+    // leito escondido pelo filtro) ficam desabilitados. A regra é do core.
+    function vizinhosAtuais() {
+      if (currentPatientIndex === null) return { anterior: null, proximo: null };
+      return PainelCore.vizinhosNaLista(renderedBedIndexes, currentPatientIndex);
+    }
+    function updateFooterNav() {
+      const v = vizinhosAtuais();
+      [['prevPatientBtn', v.anterior, 'Paciente anterior'], ['nextPatientBtn', v.proximo, 'Próximo paciente']].forEach(([id, alvo, nome]) => {
+        const btn = document.getElementById(id);
+        const leito = alvo === null ? '' : ((state.beds[alvo] && state.beds[alvo].bedNumber) || '—');
+        btn.disabled = alvo === null;
+        btn.querySelector('.nav-label').textContent = leito;
+        btn.setAttribute('aria-label', leito ? nome + ': leito ' + leito : nome);
+      });
+    }
     document.getElementById('prevPatientBtn').addEventListener('click', () => {
-        if (currentPatientIndex === null) return;
-        const currentListIndex = renderedBedIndexes.indexOf(currentPatientIndex);
-        if (currentListIndex === -1) return; 
-        const prevListIndex = (currentListIndex - 1 + renderedBedIndexes.length) % renderedBedIndexes.length;
-        openPatientDetails(renderedBedIndexes[prevListIndex]);
+        const v = vizinhosAtuais();
+        if (v.anterior !== null) openPatientDetails(v.anterior);
     });
     document.getElementById('nextPatientBtn').addEventListener('click', () => {
-        if (currentPatientIndex === null) return;
-        const currentListIndex = renderedBedIndexes.indexOf(currentPatientIndex);
-        if (currentListIndex === -1) return; 
-        const nextListIndex = (currentListIndex + 1) % renderedBedIndexes.length;
-        openPatientDetails(renderedBedIndexes[nextListIndex]);
+        const v = vizinhosAtuais();
+        if (v.proximo !== null) openPatientDetails(v.proximo);
     });
     
     // Ações do Rodapé (Tela B)

@@ -1028,6 +1028,15 @@
     return formatDateBR(f.inicio) + ' a ' + formatDateBR(f.fim);
   }
 
+  // Leitos vizinhos na ordem da lista (‹ › da tela do paciente, spec 3.8): dá a volta; fora da
+  // lista, ou sozinho nela, não há vizinho.
+  function vizinhosNaLista(indices, atual) {
+    const lista = indices || [];
+    const i = lista.indexOf(atual);
+    if (i === -1 || lista.length < 2) return { anterior: null, proximo: null };
+    return { anterior: lista[(i - 1 + lista.length) % lista.length], proximo: lista[(i + 1) % lista.length] };
+  }
+
   // Fim previsto do ATB: a data de fim digitada, se ainda não passou; senão D1 + duração − 1.
   // '' para ATB já suspenso ou sem duração.
   function fimPrevistoAtb(t, hojeISO) {
@@ -1973,6 +1982,7 @@
     umaLinha: umaLinha,
     janelaLabs: janelaLabs,
     rotuloFiltroLabs: rotuloFiltroLabs,
+    vizinhosNaLista: vizinhosNaLista,
     GENDOC_LABEL: GENDOC_LABEL,
     showsQuedaCheck: showsQuedaCheck,
     DAILY_CHECKS: DAILY_CHECKS,

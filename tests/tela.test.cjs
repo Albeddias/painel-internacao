@@ -557,3 +557,21 @@ test('index.html: filtros de labs recolhidos e modo de editar fixados', () => {
   assert.ok(!/<svg class="pin-exam-btn/.test(html), 'o alfinete de 14 px deixou de ser o alvo do toque');
   assert.ok(/<button type="button" class="pin-exam-btn [^"]*min-w-\[44px\]/.test(html));
 });
+
+test('vizinhosNaLista: dá a volta; fora da lista não há vizinho', () => {
+  const v = PainelCore.vizinhosNaLista;
+  assert.deepStrictEqual(v([4, 0, 2], 0), { anterior: 4, proximo: 2 });
+  assert.deepStrictEqual(v([4, 0, 2], 4), { anterior: 2, proximo: 0 });
+  assert.deepStrictEqual(v([4, 0, 2], 2), { anterior: 0, proximo: 4 });
+  assert.deepStrictEqual(v([1, 5], 1), { anterior: 5, proximo: 5 });
+  assert.deepStrictEqual(v([3], 3), { anterior: null, proximo: null });
+  assert.deepStrictEqual(v([4, 0, 2], 7), { anterior: null, proximo: null }, 'paciente aberto de Arquivados');
+  assert.deepStrictEqual(v([], 0), { anterior: null, proximo: null });
+});
+
+test('index.html: ‹ › mostram o leito vizinho e desabilitam fora da lista', () => {
+  assert.ok(html.includes('PainelCore.vizinhosNaLista(renderedBedIndexes, currentPatientIndex)'));
+  assert.ok(html.includes('function updateFooterNav('));
+  assert.strictEqual((html.match(/class="nav-label /g) || []).length, 2);
+  assert.ok(!/% renderedBedIndexes\.length/.test(html), 'a conta do vizinho saiu dos dois listeners');
+});
