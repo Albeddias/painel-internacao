@@ -699,3 +699,26 @@ test('index.html: tela do paciente com largura de leitura no computador', () => 
   assert.ok(!tela.includes('max-w-7xl'));
   assert.strictEqual((tela.match(/\bmax-w-3xl\b/g) || []).length, 4, 'cabeçalho, barra de atalhos, conteúdo e rodapé');
 });
+
+// ---- Revisão final da Fase 4 ----------------------------------------------------
+
+test('index.html: print:hidden vence as classes de componente (.btn, .sheet) na impressão', () => {
+  // .btn e .sheet definem display no <style>, que vem depois do styles.css e venceria o print:hidden.
+  assert.ok(/@media print\s*\{\s*\.print\\:hidden\s*\{\s*display:\s*none\s*!important;?\s*\}\s*\}/.test(html));
+});
+
+test('index.html: cabeçalhos do paciente e das tarefas não saem na impressão', () => {
+  ['id="screen-details"', 'id="screen-tasks"'].forEach((id) => {
+    const tela = html.slice(html.indexOf(id));
+    const header = tela.slice(tela.indexOf('<header'), tela.indexOf('>', tela.indexOf('<header')));
+    assert.ok(header.includes('print:hidden'), id);
+  });
+});
+
+test('index.html: a confirmação aparece por cima do modal que a abriu (erro de validação)', () => {
+  const pos = (id) => html.indexOf('<div id="' + id + '"');
+  // Mesmo z-index: quem vem depois no DOM pinta por cima. O bloqueio do sync continua acima de todos.
+  ['addBedModal', 'readmitModal', 'reminderModal', 'trackerModal', 'imageExamModal']
+    .forEach((m) => assert.ok(pos('confirmModal') > pos(m), m));
+  assert.ok(pos('confirmModal') < pos('syncOverlay'));
+});

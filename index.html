@@ -289,6 +289,8 @@
       text-overflow: ellipsis;
       max-width: 100px;
     }
+    /* .btn e .sheet definem display e vêm depois do styles.css: sem isto, venceriam o print:hidden. */
+    @media print { .print\:hidden { display: none !important; } }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
@@ -386,7 +388,7 @@
   <!-- =================================================================== -->
   <div id="screen-details" class="screen hidden">
     <!-- CABEÇALHO FIXO (TELA B) -->
-    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
+    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20 print:hidden">
       <div class="container mx-auto max-w-3xl flex justify-between items-center gap-2">
         <button id="backToListBtn" class="flex-shrink-0 flex items-center gap-1 text-sky-700 font-medium rounded-lg py-1 pr-3 min-h-[44px]">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
@@ -462,7 +464,7 @@
   <!-- =================================================================== -->
   <div id="screen-tasks" class="screen hidden">
     <!-- CABEÇALHO FIXO (TELA C) -->
-    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
+    <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20 print:hidden">
       <div class="container mx-auto max-w-7xl flex justify-between items-center">
         <button id="backToListFromTasksBtn" class="flex items-center gap-1 text-sky-700 font-medium rounded-lg py-1 pr-3">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
@@ -556,18 +558,6 @@
       <div class="flex gap-3 mt-5">
         <button id="cancelReadmitBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
         <button id="saveReadmitBtn" class="btn btn-primary w-full">Reinternar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- === MODAL DE CONFIRMAÇÃO === -->
-  <div id="confirmModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
-    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-      <h3 id="confirmModalTitle" class="text-lg font-bold text-slate-900">Ação Irreversível</h3>
-      <p id="confirmModalMessage" class="text-sm text-slate-600 mt-1">Você tem certeza que deseja continuar?</p>
-      <div class="flex gap-3 mt-5">
-        <button id="confirmCancelBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
-        <button id="confirmActionBtn" class="w-full bg-red-600 text-white font-medium rounded-lg py-3 hover:bg-red-700 transition-all">Confirmar</button>
       </div>
     </div>
   </div>
@@ -1021,6 +1011,19 @@
     </article>
   </template>
 
+
+  <!-- === MODAL DE CONFIRMAÇÃO === -->
+  <!-- Depois dos outros modais (mesmo z-50): o erro de validação aparece por cima do modal que o abriu. -->
+  <div id="confirmModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+      <h3 id="confirmModalTitle" class="text-lg font-bold text-slate-900">Ação Irreversível</h3>
+      <p id="confirmModalMessage" class="text-sm text-slate-600 mt-1">Você tem certeza que deseja continuar?</p>
+      <div class="flex gap-3 mt-5">
+        <button id="confirmCancelBtn" class="w-full bg-slate-100 text-slate-700 font-medium rounded-lg py-3 hover:bg-slate-200 transition-all">Cancelar</button>
+        <button id="confirmActionBtn" class="w-full bg-red-600 text-white font-medium rounded-lg py-3 hover:bg-red-700 transition-all">Confirmar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- === BLOQUEIO DE TELA DURANTE A SINCRONIZAÇÃO === -->
   <!-- Depois dos modais (mesmo z-50): fica por cima deles; o portão de login (z-60) fica acima. -->
