@@ -337,15 +337,21 @@
   <div id="screen-details" class="screen hidden">
     <!-- CABEÇALHO FIXO (TELA B) -->
     <header class="bg-white shadow-sm p-3 fixed top-0 left-0 right-0 z-20">
-      <div class="container mx-auto max-w-7xl flex justify-between items-center">
-        <button id="backToListBtn" class="flex items-center gap-1 text-sky-600 font-medium rounded-lg py-1 pr-3">
+      <div class="container mx-auto max-w-7xl flex justify-between items-center gap-2">
+        <button id="backToListBtn" class="flex-shrink-0 flex items-center gap-1 text-sky-600 font-medium rounded-lg py-1 pr-3 min-h-[44px]">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.832 10l3.938 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.25a.75.75 0 0 1 0-1.08l4.5-4.25a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd" /></svg>
           Voltar
         </button>
-        <div id="patient-header-info" class="text-right">
-          <div id="patient-header-bed" class="patient-header-bed font-bold text-slate-800 text-lg"></div>
-          <div id="patient-header-name" class="patient-header-name text-slate-600 text-sm"></div>
+        <div id="patient-header-info" class="flex-1 min-w-0 text-center">
+          <div class="flex items-center justify-center gap-2">
+            <div id="patient-header-bed" class="patient-header-bed font-bold text-slate-800 text-lg truncate"></div>
+            <button type="button" id="patientAllergyFlag" class="chip chip-danger hidden flex-shrink-0">⚠ ALERGIA</button>
+          </div>
+          <div id="patient-header-name" class="patient-header-name text-slate-600 text-sm truncate"></div>
         </div>
+        <button type="button" id="patientMenuBtn" class="btn btn-ghost btn-icon flex-shrink-0" aria-label="Ações do paciente">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" aria-hidden="true"><path d="M3 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM8.5 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM15.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" /></svg>
+        </button>
       </div>
     </header>
 
@@ -435,6 +441,20 @@
       <button type="button" id="resetLocalBtn" class="sheet-item sheet-item-danger">Resetar e receber do servidor</button>
       <button type="button" class="sheet-item sheet-cancel" data-sheet-close>Cancelar</button>
       <p id="appVersionLine" class="sheet-foot"></p>
+    </div>
+  </div>
+
+  <!-- Folha de ações: menu ⋯ do paciente. Itens visíveis conforme PainelCore.acoesDoRegistro. -->
+  <div id="patientMenuSheet" class="sheet hidden print:hidden" role="dialog" aria-modal="true" aria-label="Ações do paciente">
+    <div class="sheet-backdrop" data-sheet-close></div>
+    <div class="sheet-panel">
+      <button type="button" id="pmDischarge" class="sheet-item" data-acao="alta">Dar alta</button>
+      <button type="button" id="pmArchive" class="sheet-item" data-acao="arquivar">Arquivar</button>
+      <button type="button" id="pmRestore" class="sheet-item" data-acao="restaurar">Restaurar</button>
+      <button type="button" id="pmReadmit" class="sheet-item" data-acao="reinternar">Reinternar</button>
+      <hr class="sheet-sep">
+      <button type="button" id="pmDelete" class="sheet-item sheet-item-danger" data-acao="deletar">Deletar</button>
+      <button type="button" class="sheet-item sheet-cancel" data-sheet-close>Cancelar</button>
     </div>
   </div>
 
@@ -722,9 +742,6 @@
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 0013.484 0 .75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zM8.05 16.09A.75.75 0 018.8 15h2.4a.75.75 0 01.75.75 1.5 1.5 0 01-3 0z" clip-rule="evenodd" /></svg>
               </button>
             <button class="copy-summary-btn text-sm bg-sky-100 text-sky-800 font-medium rounded-lg py-2 px-3 hover:bg-sky-200 transition-all" title="Copiar resumo do dia para a evolução">Copiar resumo</button>
-            <button class="discharge-card text-sm bg-amber-100 text-amber-800 font-medium rounded-lg py-2 px-3 hover:bg-amber-200 transition-all">Dar Alta</button>
-            <button class="archive-bed-btn text-sm bg-slate-100 text-slate-800 font-medium rounded-lg py-2 px-3 hover:bg-slate-200 transition-all">Arquivar</button>
-            <button class="delete-patient-btn text-sm bg-red-100 text-red-800 font-medium rounded-lg py-2 px-3 hover:bg-red-200 transition-all">Deletar</button>
           </div>
           <div class="flex-1 min-w-0">
             <input class="inline-bed font-bold text-2xl text-slate-900 p-1 -ml-1 rounded-md w-32 border border-transparent focus:border-slate-300 focus:bg-slate-50" placeholder="Leito">
@@ -1147,7 +1164,8 @@
       if (foot) foot.textContent = `Caderno de Visitas · versão ${APP_VERSION} · ${window.innerWidth} px`;
       sheet.classList.remove('hidden');
       history.pushState({ screen: currentScreenName(), overlay: id }, '');
-      sheet.querySelector('.sheet-item').focus();
+      const primeiro = [...sheet.querySelectorAll('.sheet-item')].find((el) => !el.classList.contains('hidden'));
+      if (primeiro) primeiro.focus();
     }
     function closeSheet() {
       if (!openSheetId) return;
@@ -1162,6 +1180,65 @@
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openSheetId) closeSheet(); });
     document.getElementById('listMenuBtn').addEventListener('click', (e) => openSheet('listMenuSheet', e.currentTarget));
+
+    // Menu ⋯ do paciente (spec 3.1): só as ações que valem para o registro aberto. Elementos
+    // fixos: os listeners são ligados aqui, uma vez, e leem o leito aberto na hora do toque.
+    function openPatientMenu(trigger) {
+      const b = state.beds[currentPatientIndex];
+      if (!b) return;
+      const acoes = PainelCore.acoesDoRegistro(b);
+      document.querySelectorAll('#patientMenuSheet [data-acao]').forEach((item) => {
+        item.classList.toggle('hidden', !acoes.includes(item.dataset.acao));
+      });
+      document.querySelector('#patientMenuSheet .sheet-sep').classList.toggle('hidden', acoes.length === 1);
+      openSheet('patientMenuSheet', trigger || document.getElementById('patientMenuBtn'));
+    }
+    document.getElementById('patientMenuBtn').addEventListener('click', (e) => openPatientMenu(e.currentTarget));
+    function onPatientMenu(id, acao) {
+      document.getElementById(id).addEventListener('click', () => {
+        const b = state.beds[currentPatientIndex];
+        if (b) acao(b);
+      });
+    }
+    onPatientMenu('pmDischarge', (b) => {
+      showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? O registro completo será guardado em Arquivados e o leito ficará livre.`, () => {
+        const snapshot = JSON.parse(JSON.stringify(b));
+        snapshot.isArchived = true;
+        snapshot.archiveReason = 'alta';
+        snapshot.dischargedAt = todayISO();
+        state.beds.push(snapshot);
+        Object.assign(b, PainelCore.migrateBed({ bedNumber: b.bedNumber }));
+        saveData(state);
+        closePatientDetails();
+      }, "Dar Alta", 'bg-amber-600', 'Dar Alta');
+    });
+    onPatientMenu('pmArchive', (b) => {
+      showConfirm(`Arquivar o leito ${b.bedNumber}? Ele sairá da lista principal, mas poderá ser restaurado.`, () => {
+        b.isArchived = true;
+        b.archiveReason = 'arquivado';
+        saveData(state);
+        closePatientDetails();
+      }, "Arquivar Leito", 'bg-slate-600', 'Arquivar');
+    });
+    onPatientMenu('pmRestore', (b) => {
+      b.isArchived = false;
+      b.archiveReason = null;
+      b.dischargedAt = '';
+      saveData(state);
+      renderScreenB();
+    });
+    onPatientMenu('pmReadmit', (b) => openReadmitModal(b));
+    onPatientMenu('pmDelete', (b) => {
+      showConfirm(`Deletar PERMANENTEMENTE o leito ${b.bedNumber}? Todos os dados serão perdidos (deste aparelho e do banco na próxima sincronização).`, () => {
+        PainelCore.markPatientDeleted(state, b.patientId);
+        const i = state.beds.indexOf(b);
+        if (i !== -1) state.beds.splice(i, 1);
+        saveData(state);
+        closePatientDetails();
+      }, 'Deletar paciente', 'bg-red-600', 'Deletar');
+    });
+    // O selo do cabeçalho leva até a faixa de alergia, no topo do conteúdo.
+    document.getElementById('patientAllergyFlag').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
     function showConfirm(message, onConfirm, title = "Ação Irreversível", btnClass = 'bg-red-600', btnText = 'Confirmar') {
       confirmModalTitle.textContent = title;
@@ -2016,38 +2093,6 @@
         setTimeout(() => { copySummaryBtn.textContent = 'Copiar resumo'; }, 2000);
       });
 
-      art.querySelector('.discharge-card').addEventListener('click', () => {
-        showConfirm(`Dar alta no paciente do leito ${b.bedNumber}? O registro completo será guardado em Arquivados e o leito ficará livre.`, () => {
-          const snapshot = JSON.parse(JSON.stringify(b));
-          snapshot.isArchived = true;
-          snapshot.archiveReason = 'alta';
-          snapshot.dischargedAt = todayISO();
-          state.beds.push(snapshot);
-          Object.assign(b, PainelCore.migrateBed({ bedNumber: b.bedNumber }));
-          saveData(state);
-          closePatientDetails();
-        }, "Dar Alta", 'bg-amber-600', 'Dar Alta');
-      });
-      
-      art.querySelector('.archive-bed-btn').addEventListener('click', () => {
-        showConfirm(`Arquivar o leito ${b.bedNumber}? Ele sairá da lista principal, mas poderá ser restaurado.`, () => {
-          b.isArchived = true;
-          b.archiveReason = 'arquivado';
-          saveData(state);
-          closePatientDetails();
-        }, "Arquivar Leito", 'bg-slate-600', 'Arquivar');
-      });
-
-      art.querySelector('.delete-patient-btn').addEventListener('click', () => {
-        showConfirm(`Deletar PERMANENTEMENTE o leito ${b.bedNumber}? Todos os dados serão perdidos (deste aparelho e do banco na próxima sincronização).`, () => {
-          PainelCore.markPatientDeleted(state, b.patientId);
-          const i = state.beds.indexOf(b);
-          if (i !== -1) state.beds.splice(i, 1);
-          saveData(state);
-          closePatientDetails();
-        }, 'Deletar paciente', 'bg-red-600', 'Deletar');
-      });
-      
       const reminderBtn = art.querySelector('.reminder-btn');
       if (b.reminderDate && b.reminderDate <= today) {
         reminderBtn.classList.add('active');
@@ -2531,6 +2576,10 @@
       banner.textContent = has ? `⚠ Alergias: ${text}` : '';
       banner.classList.toggle('hidden', !has);
       article.querySelector('.alergias-flag').classList.toggle('hidden', !has);
+      const headerFlag = document.getElementById('patientAllergyFlag');
+      headerFlag.classList.toggle('hidden', !has);
+      if (has) headerFlag.setAttribute('aria-label', `Alergia registrada: ${text}`);
+      else headerFlag.removeAttribute('aria-label');
       const input = article.querySelector('.input-alergias-inline');
       input.classList.toggle('border-red-400', has);
       input.classList.toggle('bg-red-50', has);

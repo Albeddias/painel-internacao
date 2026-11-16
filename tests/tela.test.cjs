@@ -89,6 +89,9 @@ test('showsQuedaCheck: só leito ativo, ocupado e do próprio médico', () => {
 // ---- index.html usa as regras do core (sem cópias locais) ------------------------
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+// Template da tela do paciente (Fase 3).
+const tplIni = html.indexOf('id="patientDetailTpl"');
+const tpl = html.slice(tplIni, html.indexOf('</template>', tplIni));
 
 test('index.html: fixados passam pelo core (nada de includes/indexOf direto em pinnedExams)', () => {
   assert.ok(!/pinnedExams\.(includes|indexOf)\(/.test(html));
@@ -386,4 +389,28 @@ test('index.html: o cartão usa as regras do core e não usa opacidade para esta
   assert.ok(html.includes('id="emptyBedTpl"') && html.includes('Vazio — toque para admitir'));
   assert.ok(html.includes('Nenhum leito neste aparelho. Toque em ＋ para adicionar ou em Sincronizar para receber do banco.'));
   assert.ok(html.includes('class="add-bed-row'));
+});
+
+// ---- Fase 3: tela do paciente ------------------------------------------------
+
+test('acoesDoRegistro: o menu ⋯ depende do registro', () => {
+  const b = (p) => Object.assign({ patientName: 'Paciente Exemplo Um', isArchived: false }, p);
+  assert.deepStrictEqual(PainelCore.acoesDoRegistro(b()), ['alta', 'arquivar', 'deletar']);
+  assert.deepStrictEqual(PainelCore.acoesDoRegistro(b({ externalDoctor: { active: true, name: 'Dra. Exemplo' } })), ['alta', 'arquivar', 'deletar']);
+  assert.deepStrictEqual(PainelCore.acoesDoRegistro(b({ patientName: '  ' })), ['deletar']);
+  assert.deepStrictEqual(PainelCore.acoesDoRegistro(b({ isArchived: true })), ['restaurar', 'reinternar', 'deletar']);
+  assert.deepStrictEqual(PainelCore.acoesDoRegistro(b({ isArchived: true, patientName: '' })), ['restaurar', 'deletar']);
+});
+
+test('index.html: ações do paciente no menu ⋯ do cabeçalho, ligadas uma vez só', () => {
+  ['discharge-card', 'archive-bed-btn', 'delete-patient-btn'].forEach((c) => assert.ok(!tpl.includes(c), c + ' saiu do template'));
+  const ordem = ['id="patientMenuSheet"', 'id="pmDischarge"', 'id="pmArchive"', 'id="pmRestore"', 'id="pmReadmit"', 'id="pmDelete"'];
+  const pos = ordem.map((s) => html.indexOf(s));
+  assert.ok(pos.every((p) => p !== -1), 'falta: ' + ordem[pos.indexOf(-1)]);
+  assert.deepStrictEqual(pos, pos.slice().sort((a, b) => a - b));
+  assert.ok(/id="patientMenuBtn"[^>]*aria-label="Ações do paciente"/.test(html));
+  assert.ok(html.includes('id="patientAllergyFlag"') && html.includes('PainelCore.acoesDoRegistro('));
+  const rb = html.slice(html.indexOf('function renderScreenB()'), html.indexOf('function setupCollapsibleSection('));
+  assert.ok(!/getElementById\('(pm\w+|patientMenuBtn|patientAllergyFlag)'\)\.addEventListener/.test(rb), 'elemento fixo não é religado a cada redesenho');
+  ['Dar alta no paciente do leito', 'Arquivar o leito', 'Deletar PERMANENTEMENTE o leito'].forEach((t) => assert.ok(html.includes(t), 'texto de confirmação: ' + t));
 });

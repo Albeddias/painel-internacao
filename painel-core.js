@@ -682,6 +682,15 @@
     };
   }
 
+  // Itens do menu ⋯ da tela do paciente (spec 3.1). Arquivado: restaurar, reinternar (só com
+  // paciente) e deletar. Ativo sem paciente: só deletar. Ativo com paciente: alta, arquivar, deletar.
+  function acoesDoRegistro(bed) {
+    const b = bed || {};
+    const temNome = !!String(b.patientName || '').trim();
+    if (b.isArchived) return temNome ? ['restaurar', 'reinternar', 'deletar'] : ['restaurar', 'deletar'];
+    return temNome ? ['alta', 'arquivar', 'deletar'] : ['deletar'];
+  }
+
   function fraseArquivados(pessoas, naNuvem) {
     const partes = [];
     if (pessoas) partes.push(plural(pessoas, 'paciente', 'pacientes'));
@@ -1722,6 +1731,7 @@
     statusAltaPrevista: statusAltaPrevista,
     estadoDoLeito: estadoDoLeito,
     selosDoCartao: selosDoCartao,
+    acoesDoRegistro: acoesDoRegistro,
     buildPendencias: buildPendencias,
     agruparPendencias: agruparPendencias,
     LIMIARES: LIMIARES,
